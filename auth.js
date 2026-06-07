@@ -60,6 +60,7 @@ auth.onAuthStateChanged(async (user) => {
         
         // Populate Profile View
         document.getElementById('profileDisplayName').textContent = user.displayName || 'User';
+        if(document.getElementById('mobileTopUsername')) document.getElementById('mobileTopUsername').textContent = user.displayName || 'User';
         document.getElementById('profileEmail').textContent = user.email;
         document.getElementById('profileAvatar').textContent = (user.displayName || 'U').charAt(0).toUpperCase();
         document.getElementById('profileNameInput').value = user.displayName || '';
@@ -193,6 +194,7 @@ document.getElementById('updateProfileForm').addEventListener('submit', (e) => {
     if(user) {
         user.updateProfile({ displayName: name }).then(() => {
             document.getElementById('profileDisplayName').textContent = name;
+            if(document.getElementById('mobileTopUsername')) document.getElementById('mobileTopUsername').textContent = name;
             document.getElementById('profileAvatar').textContent = name.charAt(0).toUpperCase();
             alert("Profile name updated!");
         }).catch(err => alert(err.message));

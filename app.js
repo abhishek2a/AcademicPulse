@@ -1363,11 +1363,17 @@ window.initApp = function() {
             }
         }, 30000); // Update every 30 seconds
         
-        // Register Service Worker for PWA
+        // Unregister Service Worker to prevent extreme mobile caching during development
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('Service Worker registered', reg))
-                .catch(err => console.error('Service Worker registration failed', err));
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+            });
+            // Purge caches
+            caches.keys().then(function(names) {
+                for (let name of names) caches.delete(name);
+            });
         }
 
         setTimeout(() => {

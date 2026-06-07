@@ -9,7 +9,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=3">
     
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -32,19 +32,21 @@
         </div>
     </div>
 
-    <!-- Sidebar / Bottom Navigation -->
-    <nav class="sidebar" id="mobileNav">
-        <h2>Academic<br>Pulse</h2>
-        <div class="nav-item active" data-target="view-overview"><span class="nav-icon">📊</span><span class="nav-text">Overview</span></div>
-        <div class="nav-item" data-target="view-subjects"><span class="nav-icon">📚</span><span class="nav-text">Courses</span></div>
+    <aside class="sidebar">
+        <h2>AcademicPulse</h2>
+        <div class="nav-item active" data-target="view-overview"><span class="nav-icon">📊</span><span class="nav-text">Dashboard</span></div>
+        <div class="nav-item" data-target="view-timer"><span class="nav-icon">⏱️</span><span class="nav-text">Focus</span></div>
+        <div class="nav-item" data-target="view-subjects"><span class="nav-icon">📚</span><span class="nav-text">Subjects</span></div>
         <div class="nav-item" data-target="view-attendance"><span class="nav-icon">📅</span><span class="nav-text">Attendance</span></div>
-        <div class="nav-item" data-target="view-analytics"><span class="nav-icon">📈</span><span class="nav-text">Analytics</span></div>
-        <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Practice</span></div>
-        <div class="nav-item" data-target="view-profile"><span class="nav-icon">⚙️</span><span class="nav-text">Profile</span></div>
-    </nav>
+        <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Mocks</span></div>
+        <div class="nav-item" data-target="view-profile"><span class="nav-icon">👤</span><span class="nav-text">Profile</span></div>
+    </aside>
 
-    <!-- Main Content Area -->
     <main class="main-content">
+        <div class="mobile-topbar">
+            <h2>AcademicPulse</h2>
+            <div>Hi, <span id="mobileTopUsername">User</span></div>
+        </div>
         
         <!-- View: Overview -->
         <section id="view-overview" class="view-section active">
@@ -445,18 +447,18 @@
                 </div>
                 
                 <div style="background: var(--glass-border); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
-                    <div style="display: flex; gap: 10px;">
-                        <select id="practiceCourseInput" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <select id="practiceCourseInput" style="flex:1; min-width: 100px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
                             <option value="CSEB">CSEB</option>
                             <option value="ACCA">ACCA</option>
                         </select>
-                        <select id="practiceSubjectInput" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                        <select id="practiceSubjectInput" style="flex:1; min-width: 100px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
                         </select>
                     </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="number" id="practiceAddAttempted" placeholder="Attempted" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
-                        <input type="number" id="practiceAddCorrect" placeholder="Correct" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
-                        <button class="btn btn-outline" id="practiceAddBtn">Log</button>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <input type="number" id="practiceAddAttempted" placeholder="Attempted" style="flex:1; min-width: 80px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                        <input type="number" id="practiceAddCorrect" placeholder="Correct" style="flex:1; min-width: 80px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                        <button class="btn btn-outline" id="practiceAddBtn" style="flex:1; min-width: 80px;">Log</button>
                     </div>
                 </div>
             </div>

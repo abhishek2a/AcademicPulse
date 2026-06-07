@@ -8,10 +8,9 @@
   "description": "Smart study tracker with analytics and pomodoro timer.",
   "icons": [
     {
-      "src": "icon.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
     }
   ]
 }

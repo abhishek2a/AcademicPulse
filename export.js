@@ -1,3 +1,27 @@
+// Lazy loading PDF libraries
+async function loadPdfLibraries() {
+    if (window.jspdf && window.jspdf.jsPDF && window.pdfjsLib) return;
+    
+    document.getElementById('loadingOverlay')?.classList.add('active');
+    
+    const loadScript = (src) => new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+
+    try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js');
+    } catch (e) {
+        console.error("Error loading PDF scripts", e);
+    }
+    document.getElementById('loadingOverlay')?.classList.remove('active');
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     // Give time for UI to initialize
     setTimeout(() => {
@@ -5,9 +29,9 @@ window.addEventListener('DOMContentLoaded', () => {
         const btnMonthly = document.getElementById('btnExportMonthly');
         const btnAttendance = document.getElementById('btnExportAttendance');
 
-        if (btnStudy) btnStudy.addEventListener('click', generateStudyReport);
-        if (btnMonthly) btnMonthly.addEventListener('click', generateMonthlyReport);
-        if (btnAttendance) btnAttendance.addEventListener('click', generateAttendanceReport);
+        if (btnStudy) btnStudy.addEventListener('click', async () => { await loadPdfLibraries(); generateStudyReport(); });
+        if (btnMonthly) btnMonthly.addEventListener('click', async () => { await loadPdfLibraries(); generateMonthlyReport(); });
+        if (btnAttendance) btnAttendance.addEventListener('click', async () => { await loadPdfLibraries(); generateAttendanceReport(); });
     }, 500);
 });
 

@@ -87,10 +87,16 @@ async function syncDataFromCloud(uid) {
         
         if (docSnap.exists) {
             const data = docSnap.data();
-            if (data.subjects) localStorage.setItem('cseb_study_subjects', JSON.stringify(data.subjects));
-            if (data.sessions) localStorage.setItem('cseb_session_history', JSON.stringify(data.sessions));
-            if (data.attendance) localStorage.setItem('cseb_study_attendance', JSON.stringify(data.attendance));
-            if (data.goals) localStorage.setItem('cseb_study_goals', JSON.stringify(data.goals));
+            if (data.subjects) localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(data.subjects));
+            if (data.sessions) localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(data.sessions));
+            if (data.attendance) localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data.attendance));
+            if (data.goals) localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(data.goals));
+            if (data.accaTopics) localStorage.setItem(STORAGE_KEYS.ACCA_TOPICS, JSON.stringify(data.accaTopics));
+            if (data.mocks) localStorage.setItem(STORAGE_KEYS.MOCKS, JSON.stringify(data.mocks));
+            if (data.practice) localStorage.setItem(STORAGE_KEYS.PRACTICE, JSON.stringify(data.practice));
+            if (data.csebSyllabus) localStorage.setItem(STORAGE_KEYS.CSEB_SYLLABUS, JSON.stringify(data.csebSyllabus));
+            if (data.notifications) localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(data.notifications));
+            if (data.systemState) localStorage.setItem(STORAGE_KEYS.SYSTEM_STATE, JSON.stringify(data.systemState));
         } else {
             // First login, push local data to cloud
             await syncDataToCloud(uid);
@@ -104,20 +110,30 @@ async function syncDataToCloud(uid) {
     if(!uid) return;
     try {
         await db.collection("userData").doc(uid).set({
-            subjects: JSON.parse(localStorage.getItem('cseb_study_subjects') || '[]'),
-            sessions: JSON.parse(localStorage.getItem('cseb_session_history') || '[]'),
-            attendance: JSON.parse(localStorage.getItem('cseb_study_attendance') || '{}'),
-            goals: JSON.parse(localStorage.getItem('cseb_study_goals') || '{"daily":8,"weekly":40,"monthly":160}')
-        });
+            subjects: JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBJECTS) || '[]'),
+            sessions: JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]'),
+            attendance: JSON.parse(localStorage.getItem(STORAGE_KEYS.ATTENDANCE) || '{}'),
+            goals: JSON.parse(localStorage.getItem(STORAGE_KEYS.GOALS) || '{"daily":8,"weekly":40,"monthly":160}'),
+            accaTopics: JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCA_TOPICS) || '[]'),
+            mocks: JSON.parse(localStorage.getItem(STORAGE_KEYS.MOCKS) || '[]'),
+            practice: JSON.parse(localStorage.getItem(STORAGE_KEYS.PRACTICE) || '{"attempted":0,"correct":0}'),
+            csebSyllabus: JSON.parse(localStorage.getItem(STORAGE_KEYS.CSEB_SYLLABUS) || '{}'),
+            notifications: JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || '[]'),
+            systemState: JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_STATE) || '{"currentVersion":"v1.0.0"}')
+        }, { merge: true });
     } catch (error) {
         console.error("Error saving to cloud:", error);
     }
 }
 
+let syncTimer = null;
 // Global function to trigger sync on saveData
 window.triggerCloudSync = () => {
     if (auth.currentUser) {
-        syncDataToCloud(auth.currentUser.uid);
+        if (syncTimer) clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => {
+            syncDataToCloud(auth.currentUser.uid);
+        }, 10000);
     }
 }
 

@@ -13,23 +13,25 @@ const STORAGE_KEYS = {
     ACCA_TOPICS: 'cseb_acca_topics',
     MOCKS: 'cseb_mock_tests',
     PRACTICE: 'cseb_question_practice',
-    CSEB_SYLLABUS: 'cseb_syllabus_tracker'
+    CSEB_SYLLABUS: 'cseb_syllabus_tracker',
+    NOTIFICATIONS: 'cseb_notifications',
+    SYSTEM_STATE: 'cseb_system_state'
 };
 
 const DEFAULT_GOALS = { daily: 8, weekly: 40, monthly: 160 };
 const CUTOFF_DATE = new Date('2026-02-15T00:00:00');
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+const generateId = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
 
 const DEFAULT_SUBJECTS = [
     // CSEB Subjects
     { id: generateId(), name: 'Banking (CSEB)', course: 'CSEB', color: '#2997FF', priority: 'High', targetHours: 5, totalHours: 0 },
-    { id: generateId(), name: 'Co-operation (CSEB)', course: 'CSEB', color: '#30D158', priority: 'High', targetHours: 5, totalHours: 0 },
-    { id: generateId(), name: 'KCS Act and Rules (CSEB)', course: 'CSEB', color: '#BF5AF2', priority: 'High', targetHours: 5, totalHours: 0 },
-    { id: generateId(), name: 'English (CSEB)', course: 'CSEB', color: '#FFD60A', priority: 'Medium', targetHours: 3, totalHours: 0 },
-    { id: generateId(), name: 'GK (CSEB)', course: 'CSEB', color: '#FF453A', priority: 'Low', targetHours: 2, totalHours: 0 },
+    { id: generateId(), name: 'Cooperation (CSEB)', course: 'CSEB', color: '#30D158', priority: 'High', targetHours: 5, totalHours: 0 },
+    { id: generateId(), name: 'Act & Rules (CSEB)', course: 'CSEB', color: '#BF5AF2', priority: 'High', targetHours: 5, totalHours: 0 },
+    { id: generateId(), name: 'General English (CSEB)', course: 'CSEB', color: '#FFD60A', priority: 'Medium', targetHours: 3, totalHours: 0 },
+    { id: generateId(), name: 'General Knowledge (CSEB)', course: 'CSEB', color: '#FF453A', priority: 'Low', targetHours: 2, totalHours: 0 },
     { id: generateId(), name: 'Reasoning (CSEB)', course: 'CSEB', color: '#FF9F0A', priority: 'Medium', targetHours: 3, totalHours: 0 },
-    { id: generateId(), name: 'Accountancy (CSEB)', course: 'CSEB', color: '#32ADE6', priority: 'High', targetHours: 5, totalHours: 0 },
+    { id: generateId(), name: 'Accounting (CSEB)', course: 'CSEB', color: '#32ADE6', priority: 'High', targetHours: 5, totalHours: 0 },
     
     // ACCA Subjects
     { id: generateId(), name: 'Financial Reporting (FR)', course: 'ACCA', color: '#0A84FF', priority: 'High', targetHours: 7, totalHours: 0 }
@@ -50,7 +52,11 @@ const AppState = {
     accaTopics: [],
     mockTests: [],
     questionPractice: { attempted: 0, correct: 0 },
-    csebSyllabus: {}
+    csebSyllabus: {},
+    notifications: [],
+    currentVersion: 'v1.0.0',
+    availableUpdate: null,
+    analyticsCache: null
 };
 
 // ==========================================
@@ -115,6 +121,17 @@ function loadData() {
     if (AppState.subjects.length === 0) {
         AppState.subjects = [...DEFAULT_SUBJECTS];
         saveData('subjects');
+    } else {
+        // Migration: Fix old default names to match syllabus keys
+        let changed = false;
+        AppState.subjects.forEach(s => {
+            if (s.name === 'Co-operation (CSEB)') { s.name = 'Cooperation (CSEB)'; changed = true; }
+            if (s.name === 'KCS Act and Rules (CSEB)') { s.name = 'Act & Rules (CSEB)'; changed = true; }
+            if (s.name === 'English (CSEB)') { s.name = 'General English (CSEB)'; changed = true; }
+            if (s.name === 'GK (CSEB)') { s.name = 'General Knowledge (CSEB)'; changed = true; }
+            if (s.name === 'Accountancy (CSEB)') { s.name = 'Accounting (CSEB)'; changed = true; }
+        });
+        if (changed) saveData('subjects');
     }
 
     AppState.attendance = Storage.get(STORAGE_KEYS.ATTENDANCE, {});
@@ -142,6 +159,11 @@ function loadData() {
     AppState.mockTests = Storage.get(STORAGE_KEYS.MOCKS, []);
     AppState.questionPractice = Storage.get(STORAGE_KEYS.PRACTICE, { attempted: 0, correct: 0 });
     AppState.csebSyllabus = Storage.get(STORAGE_KEYS.CSEB_SYLLABUS, {});
+    AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
+    
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.0', availableUpdate: null });
+    AppState.currentVersion = sysState.currentVersion;
+    AppState.availableUpdate = sysState.availableUpdate;
     
     if (Object.keys(AppState.csebSyllabus).length === 0) {
         AppState.csebSyllabus = {
@@ -247,14 +269,22 @@ function loadData() {
 }
 
 function saveData(key) {
-    if (key === 'subjects') Storage.set(STORAGE_KEYS.SUBJECTS, AppState.subjects);
-    if (key === 'attendance') Storage.set(STORAGE_KEYS.ATTENDANCE, AppState.attendance);
-    if (key === 'sessions') Storage.set(STORAGE_KEYS.SESSIONS, AppState.sessions);
-    if (key === 'goals') Storage.set(STORAGE_KEYS.GOALS, AppState.goals);
-    if (key === 'accaTopics') Storage.set(STORAGE_KEYS.ACCA_TOPICS, AppState.accaTopics);
-    if (key === 'mocks') Storage.set(STORAGE_KEYS.MOCKS, AppState.mockTests);
-    if (key === 'practice') Storage.set(STORAGE_KEYS.PRACTICE, AppState.questionPractice);
-    if (key === 'csebSyllabus') Storage.set(STORAGE_KEYS.CSEB_SYLLABUS, AppState.csebSyllabus);
+    if (key === 'subjects' || key === 'all') Storage.set(STORAGE_KEYS.SUBJECTS, AppState.subjects);
+    if (key === 'attendance' || key === 'all') Storage.set(STORAGE_KEYS.ATTENDANCE, AppState.attendance);
+    if (key === 'sessions' || key === 'all') {
+        Storage.set(STORAGE_KEYS.SESSIONS, AppState.sessions);
+        rebuildAnalyticsCache();
+    }
+    if (key === 'goals' || key === 'all') Storage.set(STORAGE_KEYS.GOALS, AppState.goals);
+    if (key === 'accaTopics' || key === 'all') Storage.set(STORAGE_KEYS.ACCA_TOPICS, AppState.accaTopics);
+    if (key === 'mocks' || key === 'all') Storage.set(STORAGE_KEYS.MOCKS, AppState.mockTests);
+    if (key === 'practice' || key === 'all') Storage.set(STORAGE_KEYS.PRACTICE, AppState.questionPractice);
+    if (key === 'csebSyllabus' || key === 'all') Storage.set(STORAGE_KEYS.CSEB_SYLLABUS, AppState.csebSyllabus);
+    if (key === 'notifications' || key === 'all') Storage.set(STORAGE_KEYS.NOTIFICATIONS, AppState.notifications);
+    if (key === 'system' || key === 'all') Storage.set(STORAGE_KEYS.SYSTEM_STATE, {
+        currentVersion: AppState.currentVersion,
+        availableUpdate: AppState.availableUpdate
+    });
 
     if (typeof window.triggerCloudSync === 'function') {
         window.triggerCloudSync();
@@ -264,24 +294,44 @@ function saveData(key) {
 // ==========================================
 // NAVIGATION
 // ==========================================
+// Lazy loading Chart.js
+async function loadChartJS() {
+    if (window.Chart) return;
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
 function initNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
     const sections = document.querySelectorAll('.view-section');
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
-            navItems.forEach(n => n.classList.remove('active'));
+            const targetId = item.getAttribute('data-target');
+            
+            navItems.forEach(nav => nav.classList.remove('active'));
             item.classList.add('active');
 
-            const targetId = item.getAttribute('data-target');
-            sections.forEach(s => {
-                s.classList.remove('active');
-                if (s.id === targetId) s.classList.add('active');
-            });
+            sections.forEach(sec => sec.classList.remove('active'));
+            document.getElementById(targetId).classList.add('active');
 
             // Re-render views on switch
             if (targetId === 'view-overview') renderOverview();
-            if (targetId === 'view-analytics') renderAnalytics();
+            if (targetId === 'view-analytics') {
+                document.getElementById('loadingOverlay').classList.add('active');
+                loadChartJS().then(() => {
+                    renderAnalytics();
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                }).catch(err => {
+                    console.error("Failed to load Chart.js", err);
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                });
+            }
             if (targetId === 'view-attendance') renderAttendance();
         });
     });
@@ -319,10 +369,18 @@ function initSubjects() {
         if (!name) return alert("Subject name required!");
 
         if (id) {
-            const subj = AppState.subjects.find(s => s.id === id);
-            if (subj) { subj.name = name; subj.course = course; subj.color = color; subj.priority = priority; subj.targetHours = target; }
+            const s = AppState.subjects.find(s => s.id === id);
+            if (s) {
+                s.name = name;
+                s.course = course;
+                s.color = color;
+                s.priority = priority;
+                s.targetHours = target;
+            }
+            addNotification('Subject Updated', `Subject "${name}" has been updated.`, 'success');
         } else {
             AppState.subjects.push({ id: generateId(), name, course, color, priority, targetHours: target, totalHours: 0 });
+            addNotification('Subject Added', `New subject "${name}" added to ${course}.`, 'success');
         }
 
         saveData('subjects');
@@ -342,13 +400,7 @@ window.selectCourseView = function(course) {
     
     // Topic Tracker Visibility
     const accaContainer = document.getElementById('accaTopicTrackerContainer');
-    const csebContainer = document.getElementById('csebSyllabusTrackerContainer');
-    if(accaContainer) accaContainer.style.display = course === 'ACCA' ? 'block' : 'none';
-    if(csebContainer) csebContainer.style.display = course === 'CSEB' ? 'block' : 'none';
-    
     renderSubjects();
-    if (course === 'ACCA') renderAccaTopicTracker();
-    if (course === 'CSEB') renderCsebSyllabusTracker();
 };
 
 window.backToCourses = function() {
@@ -364,7 +416,6 @@ function renderSubjects() {
     
     grid.innerHTML = '';
     
-    // Recalculate total hours per subject
     const subjectTotals = {};
     AppState.sessions.forEach(s => {
         if (s.subjectId && s.endTime) {
@@ -381,68 +432,170 @@ function renderSubjects() {
         const card = document.createElement('div');
         card.className = 'subject-card';
         card.style.setProperty('--sub-color', subj.color);
+        card.style.cursor = 'pointer';
+        card.onclick = () => window.openSyllabusModal(subj.id);
         
-        card.innerHTML = `
+        let html = `
             <div class="subject-meta">
                 <span class="priority-tag priority-${subj.priority}">${subj.priority} Priority</span>
             </div>
-            <div class="subject-title">${subj.name}</div>
+            <div class="subject-title"></div>
             <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
-                Target: ${subj.targetHours}h / week<br>
-                Studied: ${subj.totalHours.toFixed(1)}h Total
-            </div>
-            <div class="subject-actions">
-                <button class="btn btn-outline" onclick="editSubject('${subj.id}')" style="padding: 6px 12px; font-size:0.8rem;">Edit</button>
-                <button class="btn btn-outline" onclick="deleteSubject('${subj.id}')" style="padding: 6px 12px; font-size:0.8rem; color:var(--neon-red); border-color:var(--neon-red);">Delete</button>
+                ${subj.targetHours > 0 ? `<div style="margin-bottom:4px;">Target: ${subj.targetHours}h / week</div>` : ''}
+                <div>Total Studied: ${subj.totalHours.toFixed(1)}h</div>
             </div>
         `;
         
+        let syllabusTopics = null;
+        let syllabusType = null;
+        const currentViewCourse = subj.course || 'CSEB';
+        const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
+        
+        if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
+            const key = Object.keys(AppState.csebSyllabus).find(k => {
+                const cleanK = k.toLowerCase();
+                return cleanName === cleanK || cleanName.includes(cleanK) || cleanK.includes(cleanName);
+            });
+            if (key) {
+                syllabusTopics = AppState.csebSyllabus[key];
+                syllabusType = 'csebSyllabus';
+            }
+        } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
+            syllabusTopics = AppState.accaTopics;
+            syllabusType = 'accaTopics';
+        }
+        
+        if (syllabusTopics && syllabusTopics.length > 0) {
+            let completed = 0;
+            syllabusTopics.forEach(t => { if(t.completed) completed++; });
+            const pct = Math.round((completed / syllabusTopics.length) * 100);
+            
+            html += `
+                <div style="margin-bottom: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Syllabus</span>
+                        <span style="font-size: 0.85rem; color: var(--neon-blue); font-weight: 600;">${pct}%</span>
+                    </div>
+                    <div class="progress-bar-bg" style="height: 6px; margin-bottom: 5px;">
+                        <div class="progress-bar-fill fill-blue" style="width: ${pct}%"></div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-align: right;">Click to view topics</div>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div class="subject-actions" style="margin-top: auto; padding-top: 15px;">
+                <button class="btn btn-outline" onclick="event.stopPropagation(); editSubject('${subj.id}')" style="padding: 6px 12px; font-size:0.8rem;">Edit</button>
+                <button class="btn btn-outline" onclick="event.stopPropagation(); deleteSubject('${subj.id}')" style="padding: 6px 12px; font-size:0.8rem; color:var(--neon-red); border-color:var(--neon-red);">Delete</button>
+            </div>
+        `;
+        
+        card.innerHTML = html;
+        card.querySelector('.subject-title').textContent = subj.name;
         grid.appendChild(card);
     });
 }
 
-function renderAccaTopicTracker() {
-    const list = document.getElementById('accaTopicsList');
-    if (!list) return;
+window.openSyllabusModal = (subjId) => {
+    const subj = AppState.subjects.find(s => s.id === subjId);
+    if (!subj) return;
     
+    let syllabusTopics = null;
+    let syllabusType = null;
+    const currentViewCourse = subj.course || 'CSEB';
+    const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
+    
+    if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
+        const key = Object.keys(AppState.csebSyllabus).find(k => {
+            const cleanK = k.toLowerCase();
+            return cleanName === cleanK || cleanName.includes(cleanK) || cleanK.includes(cleanName);
+        });
+        if (key) {
+            syllabusTopics = AppState.csebSyllabus[key];
+            syllabusType = 'csebSyllabus';
+        }
+    } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
+        syllabusTopics = AppState.accaTopics;
+        syllabusType = 'accaTopics';
+    }
+    
+    if (!syllabusTopics || syllabusTopics.length === 0) {
+        alert("No predefined syllabus topics found for '" + subj.name + "'. Make sure the subject name matches the official syllabus name (e.g., 'Banking').");
+        return;
+    }
+    
+    document.getElementById('syllabusModalTitle').textContent = subj.name + ' Syllabus';
+    
+    const list = document.getElementById('syllabusModalList');
     list.innerHTML = '';
-    let completedCount = 0;
     
-    AppState.accaTopics.forEach((topic, idx) => {
-        if (topic.completed) completedCount++;
+    let completed = 0;
+    syllabusTopics.forEach(t => { if(t.completed) completed++; });
+    const pct = Math.round((completed / syllabusTopics.length) * 100);
+    
+    document.getElementById('syllabusModalPctText').textContent = pct + '%';
+    document.getElementById('syllabusModalProgress').style.width = pct + '%';
+    
+    syllabusTopics.forEach((topic, idx) => {
+        const safeId = subj.id.replace(/[^a-zA-Z0-9]/g, '_');
+        const cbId = `modal_cb_${safeId}_${idx}`;
         
-        const row = document.createElement('label');
-        row.style.cssText = `display: flex; align-items: center; gap: 15px; padding: 12px 15px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 12px; cursor: pointer; transition: 0.2s;`;
-        
-        row.onmouseover = () => row.style.background = 'var(--glass-border)';
-        row.onmouseout = () => row.style.background = 'var(--glass-bg)';
+        const label = document.createElement('label');
+        label.style.display = 'flex';
+        label.style.alignItems = 'flex-start';
+        label.style.gap = '10px';
+        label.style.cursor = 'pointer';
+        label.style.padding = '10px 0';
+        label.style.borderBottom = '1px solid var(--glass-border)';
         
         const cb = document.createElement('input');
         cb.type = 'checkbox';
+        cb.id = cbId;
         cb.checked = topic.completed;
-        cb.style.cssText = `width: 20px; height: 20px; cursor: pointer; accent-color: var(--neon-blue);`;
+        cb.className = 'custom-checkbox';
+        cb.style.marginTop = '2px';
         
-        const text = document.createElement('span');
-        text.textContent = topic.name;
-        text.style.cssText = `font-size: 1rem; flex: 1; transition: 0.2s;`;
-        text.style.textDecoration = topic.completed ? 'line-through' : 'none';
-        text.style.color = topic.completed ? 'var(--text-muted)' : 'var(--text-main)';
+        const span = document.createElement('span');
+        span.style.fontSize = '0.95rem';
+        span.textContent = topic.name;
+        if (topic.completed) {
+            span.style.textDecoration = 'line-through';
+            span.style.color = 'var(--text-muted)';
+        } else {
+            span.style.color = 'var(--text-main)';
+        }
         
-        cb.onchange = (e) => {
-            AppState.accaTopics[idx].completed = e.target.checked;
-            saveData('accaTopics');
-            renderAccaTopicTracker();
-        };
+        cb.addEventListener('change', (e) => {
+            topic.completed = e.target.checked;
+            saveData(syllabusType);
+            
+            let c = 0;
+            syllabusTopics.forEach(t => { if(t.completed) c++; });
+            const p = Math.round((c / syllabusTopics.length) * 100);
+            
+            document.getElementById('syllabusModalPctText').textContent = p + '%';
+            document.getElementById('syllabusModalProgress').style.width = p + '%';
+            
+            if (topic.completed) {
+                span.style.textDecoration = 'line-through';
+                span.style.color = 'var(--text-muted)';
+            } else {
+                span.style.textDecoration = 'none';
+                span.style.color = 'var(--text-main)';
+            }
+            
+            renderSubjects();
+            renderAnalytics();
+        });
         
-        row.appendChild(cb);
-        row.appendChild(text);
-        list.appendChild(row);
+        label.appendChild(cb);
+        label.appendChild(span);
+        list.appendChild(label);
     });
     
-    const pct = Math.round((completedCount / AppState.accaTopics.length) * 100) || 0;
-    document.getElementById('accaTopicProgress').textContent = `${pct}% (${completedCount}/${AppState.accaTopics.length})`;
-    document.getElementById('accaTopicProgressBar').style.width = `${pct}%`;
-}
+    document.getElementById('syllabusModal').classList.add('active');
+};
 
 window.editSubject = (id) => {
     const subj = AppState.subjects.find(s => s.id === id);
@@ -492,9 +645,9 @@ function calculateStreaks() {
         if (!lastDate) {
             tempStreak = 1;
         } else {
-            const diff = (curDate - lastDate) / (1000*60*60*24);
+            const diff = Math.round((curDate - lastDate) / (1000*60*60*24));
             if (diff === 1) tempStreak++;
-            else tempStreak = 1;
+            else if (diff > 1) tempStreak = 1;
         }
         if (tempStreak > bestStreak) bestStreak = tempStreak;
         lastDate = curDate;
@@ -528,7 +681,8 @@ function renderOverview() {
     if (hrs < 12) greeting = 'Good Morning';
     else if (hrs < 17) greeting = 'Good Afternoon';
     
-    const name = AppState.user ? AppState.user.name.split(' ')[0] : 'User';
+    const fbUser = window.firebaseAuth && window.firebaseAuth.currentUser;
+    const name = fbUser && fbUser.displayName ? fbUser.displayName.split(' ')[0] : 'User';
     document.getElementById('greetingTitle').textContent = `${greeting}, ${name}`;
     
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -812,16 +966,11 @@ let monthlyAttendanceBarChartInst = null;
 function renderAnalytics() {
     generateSmartInsights();
     
-    const now = new Date();
-    const todayKey = TimeUtils.getDateKey(now);
-    const thisWeekKey = TimeUtils.getWeekKey(now);
-    const thisMonthKey = TimeUtils.getMonthKey(now);
+    if (!AppState.analyticsCache) rebuildAnalyticsCache();
+    const cache = AppState.analyticsCache;
     
     // Core aggregates
-    let totalSecs = 0, todaySecs = 0, weekSecs = 0, monthSecs = 0;
-    const subjTotals = {};
-    const dailyData = {};
-    const monthlyData = {};
+    const { totalSecs, todaySecs, weekSecs, monthSecs, subjTotals, dailyData, monthlyData } = cache;
     
     // Pre-populate last 14 days for line chart
     const last14Days = [];
@@ -829,7 +978,7 @@ function renderAnalytics() {
         const d = new Date(); d.setDate(d.getDate()-i);
         const k = TimeUtils.getDateKey(d);
         last14Days.push(k);
-        dailyData[k] = 0;
+        if (dailyData[k] === undefined) dailyData[k] = 0;
     }
     
     // Pre-populate last 6 months for bar chart
@@ -838,26 +987,8 @@ function renderAnalytics() {
         const d = new Date(); d.setMonth(d.getMonth()-i);
         const k = TimeUtils.getMonthKey(d);
         last6Months.push(k);
-        monthlyData[k] = 0;
+        if (monthlyData[k] === undefined) monthlyData[k] = 0;
     }
-
-    // Process Sessions
-    AppState.sessions.forEach(s => {
-        const d = new Date(s.startTime);
-        const dKey = TimeUtils.getDateKey(d);
-        const wKey = TimeUtils.getWeekKey(d);
-        const mKey = TimeUtils.getMonthKey(d);
-        const dur = s.duration || ((new Date(s.endTime) - d)/1000);
-        
-        totalSecs += dur;
-        if (dKey === todayKey) todaySecs += dur;
-        if (wKey === thisWeekKey) weekSecs += dur;
-        if (mKey === thisMonthKey) monthSecs += dur;
-        
-        if (s.subjectId) subjTotals[s.subjectId] = (subjTotals[s.subjectId] || 0) + dur;
-        if (dailyData[dKey] !== undefined) dailyData[dKey] += dur;
-        if (monthlyData[mKey] !== undefined) monthlyData[mKey] += dur;
-    });
 
     // Overview Cards
     const streaks = calculateStreaks();
@@ -895,11 +1026,15 @@ function renderAnalytics() {
     const tbody = document.getElementById('subjectRankingTableBody');
     if(tbody) {
         tbody.innerHTML = '';
-        subjArr.forEach(item => {
+        subjArr.forEach((item, index) => {
+            let rank = index + 1;
+            if (rank === 1) rank = '🏆';
+            if (rank === 2) rank = '🥈';
+            if (rank === 3) rank = '🥉';
             const tr = document.createElement('tr');
             tr.style.borderBottom = '1px solid var(--glass-border)';
             const pct = totalSecs > 0 ? Math.round((item.dur/totalSecs)*100) : 0;
-            tr.innerHTML = `<td style="padding: 12px 10px;">${getSubjName(item.id)}</td><td style="padding: 12px 10px;">${(item.dur/3600).toFixed(1)}h</td><td style="padding: 12px 10px;">${pct}%</td>`;
+            tr.innerHTML = `<td style="padding: 12px 10px;">${rank} ${getSubjName(item.id)}</td><td style="padding: 12px 10px;">${(item.dur/3600).toFixed(1)}h</td><td style="padding: 12px 10px;">${pct}%</td>`;
             tbody.appendChild(tr);
         });
     }
@@ -920,11 +1055,18 @@ function renderAnalytics() {
         
         e('anaGoalMetTxt').textContent = `${streaks.totalActive} Active Days`;
         e('anaGoalMetPct').textContent = AppState.sessions.length > 0 ? 'Consistent' : 'Need Data';
+        
+        // 30-Day Study Forecast
+        const currentMonthDaysPassed = now.getDate();
+        const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const avgSecsPerDay = monthSecs / currentMonthDaysPassed;
+        const projectedSecs = avgSecsPerDay * totalDaysInMonth;
+        if(e('ana30DayForecast')) e('ana30DayForecast').textContent = `${(projectedSecs/3600).toFixed(1)}h Projected`;
     }
     
     // Attendance Analytics
     let pres = 0, abs = 0, lev = 0;
-    Object.values(AppState.attendance).forEach(val => { if(val==='Present') pres++; if(val==='Absent') abs++; if(val==='Leave') lev++; });
+    Object.values(AppState.attendance).forEach(val => { if(val==='present') pres++; if(val==='absent') abs++; if(val==='leave') lev++; });
     const totalAtt = pres + abs + lev;
     if(e('attPresentPct')) {
         e('attPresentPct').textContent = totalAtt ? Math.round((pres/totalAtt)*100)+'%' : '0%';
@@ -1003,12 +1145,14 @@ function renderAnalytics() {
 
     // Analytics: ACCA Coverage
     const accaContainer = e('anaAccaTopicList');
+    let accaTopicsCompleted = 0;
     if(accaContainer) {
         if(AppState.accaTopics.length === 0) {
             accaContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">No syllabus data yet.</div>';
         } else {
             accaContainer.innerHTML = '';
             AppState.accaTopics.forEach(t => {
+                if(t.completed) accaTopicsCompleted++;
                 const pct = t.completed ? 100 : 0;
                 let color = t.completed ? 'var(--neon-green)' : 'var(--glass-border)';
                 accaContainer.innerHTML += `
@@ -1020,6 +1164,20 @@ function renderAnalytics() {
             });
         }
     }
+
+    // Exam Readiness Engine
+    const accaTopicPct = AppState.accaTopics.length > 0 ? (accaTopicsCompleted / AppState.accaTopics.length) * 100 : 0;
+    let csebTopicsCompleted = 0, csebTotalTopics = 0;
+    Object.keys(AppState.csebSyllabus).forEach(subj => {
+        AppState.csebSyllabus[subj].forEach(t => {
+            csebTotalTopics++;
+            if(t.completed) csebTopicsCompleted++;
+        });
+    });
+    const csebTopicPct = csebTotalTopics > 0 ? (csebTopicsCompleted / csebTotalTopics) * 100 : 0;
+    
+    if(e('readinessAcca')) e('readinessAcca').textContent = Math.round(accaTopicPct) + '%';
+    if(e('readinessCseb')) e('readinessCseb').textContent = Math.round(csebTopicPct) + '%';
 
     renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr);
     renderConsistencyHeatmap();
@@ -1053,6 +1211,29 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
         });
     }
 
+    const attBarCtx = document.getElementById('monthlyAttendanceBarChart');
+    if (attBarCtx) {
+        if (monthlyAttendanceBarChartInst) monthlyAttendanceBarChartInst.destroy();
+        
+        const monthlyAttData = {};
+        last6Months.forEach(m => monthlyAttData[m] = 0);
+        Object.keys(AppState.attendance).forEach(dateKey => {
+            if (AppState.attendance[dateKey] === 'present') {
+                const mKey = dateKey.substring(0, 7);
+                if (monthlyAttData[mKey] !== undefined) monthlyAttData[mKey]++;
+            }
+        });
+
+        monthlyAttendanceBarChartInst = new Chart(attBarCtx, {
+            type: 'bar',
+            data: {
+                labels: last6Months,
+                datasets: [{ label: 'Days Present', data: last6Months.map(m => monthlyAttData[m]), backgroundColor: '#30D158', borderRadius: 6 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 31, grid: { color: 'var(--glass-border)' } }, x: { grid: { display: false } } } }
+        });
+    }
+
     const pieCtx = document.getElementById('subjectPieChart');
     if (pieCtx) {
         if (subjectPieChartInst) subjectPieChartInst.destroy();
@@ -1082,11 +1263,7 @@ function renderConsistencyHeatmap() {
     const startDate = new Date();
     startDate.setDate(now.getDate() - 120);
     
-    const studyMap = {};
-    AppState.sessions.forEach(s => {
-        const d = TimeUtils.getDateKey(new Date(s.startTime));
-        studyMap[d] = (studyMap[d] || 0) + (s.duration || ((new Date(s.endTime)-new Date(s.startTime))/1000));
-    });
+    const studyMap = AppState.analyticsCache.dailyData || {};
     
     let bestDur = 0, bestDay = null;
     let currDate = new Date(startDate);
@@ -1235,6 +1412,7 @@ function initRetrospectiveLogging() {
     document.getElementById('saveLogBtn').addEventListener('click', () => {
         const dateKey = document.getElementById('logDateInput').value;
         const subjectId = document.getElementById('logSubjectInput').value;
+        const topic = document.getElementById('logTopicDropdown').value;
         const notes = document.getElementById('logNotesInput').value;
         const hours = parseInt(document.getElementById('logHoursInput').value) || 0;
         const minutes = parseInt(document.getElementById('logMinutesInput').value) || 0;
@@ -1250,6 +1428,7 @@ function initRetrospectiveLogging() {
         AppState.sessions.push({
             id: generateId(),
             subjectId: subjectId,
+            topic: topic,
             notes: notes,
             startTime: sessionStart.toISOString(),
             endTime: sessionEnd.toISOString(),
@@ -1262,6 +1441,10 @@ function initRetrospectiveLogging() {
         saveData('sessions');
         saveData('attendance');
         
+        const subjObj = AppState.subjects.find(s => s.id === subjectId);
+        const subjName = subjObj ? subjObj.name : 'Unknown';
+        addNotification('Session Logged', `Logged ${(durationSecs / 3600).toFixed(1)} hours for ${subjName}.`, 'success');
+        
         document.getElementById('logSessionModal').classList.remove('active');
         renderOverview();
         renderAttendance();
@@ -1270,6 +1453,10 @@ function initRetrospectiveLogging() {
 
     document.getElementById('logCourseInput').addEventListener('change', (e) => {
         populateLogSubjects(e.target.value);
+    });
+
+    document.getElementById('logSubjectInput').addEventListener('change', (e) => {
+        populateLogTopics(e.target.value);
     });
 }
 
@@ -1283,6 +1470,44 @@ function populateLogSubjects(course) {
         opt.textContent = s.name;
         select.appendChild(opt);
     });
+    if(filtered.length > 0) {
+        populateLogTopics(filtered[0].id);
+    } else {
+        document.getElementById('logTopicDropdown').innerHTML = '<option value="">-- No Topics --</option>';
+    }
+}
+
+function populateLogTopics(subjId) {
+    const topicDropdown = document.getElementById('logTopicDropdown');
+    topicDropdown.innerHTML = '<option value="">-- Select a Topic (Optional) --</option>';
+    
+    const subj = AppState.subjects.find(s => s.id === subjId);
+    if (!subj) return;
+    
+    let syllabusTopics = null;
+    const currentViewCourse = subj.course || 'CSEB';
+    const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
+    
+    if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
+        const key = Object.keys(AppState.csebSyllabus).find(k => {
+            const cleanK = k.toLowerCase();
+            return cleanName === cleanK || cleanName.includes(cleanK) || cleanK.includes(cleanName);
+        });
+        if (key) syllabusTopics = AppState.csebSyllabus[key];
+    } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
+        syllabusTopics = AppState.accaTopics;
+    }
+    
+    if (syllabusTopics && syllabusTopics.length > 0) {
+        syllabusTopics.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.name;
+            opt.textContent = t.name + (t.completed ? ' (Completed)' : '');
+            topicDropdown.appendChild(opt);
+        });
+    } else {
+        topicDropdown.innerHTML = '<option value="">-- No predefined syllabus --</option>';
+    }
 }
 
 function openLogSessionModal(dateKey) {
@@ -1319,8 +1544,9 @@ function initEditGoals() {
         AppState.goals.monthly = parseInt(document.getElementById('goalMonthlyInput').value) || 160;
         
         saveData('goals');
+        addNotification('Goals Updated', 'Your study goals have been updated.', 'info');
         renderOverview();
-        document.getElementById('editGoalsModal').classList.remove('active');
+        document.getElementById('editGoalsModal').classList.add('active');
     });
 }
 
@@ -1345,9 +1571,46 @@ function initTheme() {
 // ==========================================
 // INITIALIZATION
 // ==========================================
+function rebuildAnalyticsCache() {
+    const cache = {
+        totalSecs: 0,
+        todaySecs: 0,
+        weekSecs: 0,
+        monthSecs: 0,
+        subjTotals: {},
+        dailyData: {},
+        monthlyData: {}
+    };
+    
+    const now = new Date();
+    const todayKey = TimeUtils.getDateKey(now);
+    const thisWeekKey = TimeUtils.getWeekKey(now);
+    const thisMonthKey = TimeUtils.getMonthKey(now);
+    
+    AppState.sessions.forEach(s => {
+        const startDate = new Date(s.startTime);
+        const dKey = TimeUtils.getDateKey(startDate);
+        const wKey = TimeUtils.getWeekKey(startDate);
+        const mKey = TimeUtils.getMonthKey(startDate);
+        const dur = s.duration || ((new Date(s.endTime) - startDate) / 1000);
+        
+        cache.totalSecs += dur;
+        if (dKey === todayKey) cache.todaySecs += dur;
+        if (wKey === thisWeekKey) cache.weekSecs += dur;
+        if (mKey === thisMonthKey) cache.monthSecs += dur;
+        
+        if (s.subjectId) cache.subjTotals[s.subjectId] = (cache.subjTotals[s.subjectId] || 0) + dur;
+        cache.dailyData[dKey] = (cache.dailyData[dKey] || 0) + dur;
+        cache.monthlyData[mKey] = (cache.monthlyData[mKey] || 0) + dur;
+    });
+    
+    AppState.analyticsCache = cache;
+}
+
 window.initApp = function() {
     try {
         loadData();
+        rebuildAnalyticsCache();
         initTheme();
         initNavigation();
         initSubjects();
@@ -1389,7 +1652,7 @@ window.initApp = function() {
 // ==========================================
 // MOCKS & PRACTICE
 // ==========================================
-function initMocksAndPractice() {
+function renderPracticeTotals() {
     const attemptedTxt = document.getElementById('practiceAttemptedTxt');
     const correctTxt = document.getElementById('practiceCorrectTxt');
     
@@ -1404,6 +1667,10 @@ function initMocksAndPractice() {
     
     if (attemptedTxt) attemptedTxt.textContent = totalAtt;
     if (correctTxt) correctTxt.innerHTML = `${totalCor} <span style="font-size:1rem; color: var(--text-muted);">(${totalAtt > 0 ? Math.round((totalCor/totalAtt)*100) : 0}%)</span>`;
+}
+
+function initMocksAndPractice() {
+    renderPracticeTotals();
 
     // Populate Subjects Dropdown
     const courseSelect = document.getElementById('practiceCourseInput');
@@ -1457,8 +1724,8 @@ function initMocksAndPractice() {
         
         document.getElementById('practiceAddAttempted').value = '';
         document.getElementById('practiceAddCorrect').value = '';
-        initMocksAndPractice(); // Re-render this section
-        renderAnalytics(); // Re-render analytics dashboard
+        renderPracticeTotals();
+        renderAnalytics();
     });
 
     document.getElementById('saveMockBtn')?.addEventListener('click', () => {
@@ -1505,74 +1772,528 @@ function renderMocksHistory() {
         if(pct < 50) color = 'var(--neon-red)';
         else if(pct < 75) color = 'var(--neon-gold)';
         
-        tbody.innerHTML += `
-            <tr style="border-bottom: 1px solid var(--glass-border);">
-                <td style="padding:15px 10px;">${new Date(m.date).toLocaleDateString()}</td>
-                <td style="padding:15px 10px;">${m.course}</td>
-                <td style="padding:15px 10px;">${m.name}</td>
-                <td style="padding:15px 10px; font-weight:700; color:${color}">${m.score} / ${m.maxScore} (${pct}%)</td>
-            </tr>
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--glass-border)';
+        tr.innerHTML = `
+            <td style="padding:15px 10px;">${new Date(m.date).toLocaleDateString()}</td>
+            <td class="mock-name" style="padding:15px 10px;"></td>
+            <td style="padding:15px 10px;">${m.score} / ${m.maxScore} (${pct}%)</td>
+            <td style="padding:15px 10px;">
+                <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteMock('${m.id}')">Delete</button>
+            </td>
         `;
+        tr.querySelector('.mock-name').textContent = m.name;
+        tbody.appendChild(tr);
+    });
+}
+
+
+// ==========================================
+// REPORT ANALYZER
+// ==========================================
+
+const pdfDropZone = document.getElementById('pdfDropZone');
+const pdfFileInput = document.getElementById('pdfFileInput');
+const analyzerLoading = document.getElementById('analyzerLoading');
+const analyzerResults = document.getElementById('analyzerResults');
+
+if(pdfDropZone) {
+    pdfDropZone.addEventListener('click', () => pdfFileInput.click());
+    pdfDropZone.addEventListener('dragover', (e) => { e.preventDefault(); pdfDropZone.style.background = 'var(--glass-hover)'; });
+    pdfDropZone.addEventListener('dragleave', () => { pdfDropZone.style.background = 'transparent'; });
+    pdfDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        pdfDropZone.style.background = 'transparent';
+        if(e.dataTransfer.files && e.dataTransfer.files[0]) {
+            processPDF(e.dataTransfer.files[0]);
+        }
+    });
+    
+    pdfFileInput.addEventListener('change', (e) => {
+        if(e.target.files && e.target.files[0]) {
+            processPDF(e.target.files[0]);
+        }
+    });
+}
+
+async function processPDF(file) {
+    if(file.type !== 'application/pdf') {
+        alert("Please upload a valid PDF file.");
+        return;
+    }
+    
+    pdfDropZone.style.display = 'none';
+    analyzerLoading.style.display = 'block';
+    analyzerResults.style.display = 'none';
+    
+    try {
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        
+        let fullText = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(" ");
+            fullText += pageText + " ";
+        }
+        
+        analyzeReportText(fullText);
+    } catch (error) {
+        console.error("PDF Parsing Error:", error);
+        alert("There was an error reading the PDF. Please make sure it's a valid report generated by AcademicPulse.");
+        pdfDropZone.style.display = 'block';
+        analyzerLoading.style.display = 'none';
+    }
+}
+
+function analyzeReportText(text) {
+    let totalHours = 0;
+    let attendance = 0;
+    
+    const hoursMatch1 = text.match(/Total Lifetime Study Hours:\s*([\d\.]+)h/i);
+    const hoursMatch2 = text.match(/Total Hours this Month:\s*([\d\.]+)h/i);
+    if(hoursMatch1) totalHours = parseFloat(hoursMatch1[1]);
+    else if(hoursMatch2) totalHours = parseFloat(hoursMatch2[1]);
+    
+    const attMatch = text.match(/Attendance Percentage:\s*(\d+)%/i);
+    if(attMatch) attendance = parseInt(attMatch[1]);
+    
+    document.getElementById('analyzerHours').textContent = totalHours > 0 ? `${totalHours}h` : 'N/A';
+    document.getElementById('analyzerAttendance').textContent = attendance > 0 ? `${attendance}%` : 'N/A';
+    
+    const suggestions = [];
+    
+    if(totalHours === 0 && attendance === 0) {
+        suggestions.push("<li>We couldn't detect enough data in this report. Make sure you are uploading a valid Study or Monthly report exported from the app.</li>");
+    } else {
+        if(totalHours < 10) {
+            suggestions.push("<li><strong>Increase Study Volume:</strong> Your total hours are quite low. Try using the Pomodoro Focus timer to commit to at least 2 solid hours a day.</li>");
+        } else if(totalHours > 50) {
+            suggestions.push("<li><strong>Great Dedication:</strong> You have logged a massive amount of study hours! Make sure you are also taking breaks to avoid burnout.</li>");
+        } else {
+            suggestions.push("<li><strong>Consistent Effort:</strong> You are maintaining a steady pace. Look into your individual Subject targets to see if any specific area needs more focus.</li>");
+        }
+        
+        if(attendance > 0) {
+            if(attendance < 75) {
+                suggestions.push("<li><strong>Improve Attendance:</strong> Your attendance is below 75%. Falling behind in classes can make studying much harder. Try to minimize leaves.</li>");
+            } else if(attendance >= 90) {
+                suggestions.push("<li><strong>Excellent Attendance:</strong> You have a fantastic attendance record! This builds a strong foundation for your exams.</li>");
+            } else {
+                suggestions.push("<li><strong>Stable Attendance:</strong> Your attendance is solid. Keep showing up to class!</li>");
+            }
+        }
+        
+        suggestions.push("<li><strong>Action Item:</strong> Review the subjects with the lowest progress in your Dashboard and dedicate your next study session entirely to them.</li>");
+    }
+    
+    document.getElementById('analyzerSuggestions').innerHTML = suggestions.join('');
+    
+    analyzerLoading.style.display = 'none';
+    analyzerResults.style.display = 'block';
+    
+    if(!document.getElementById('resetAnalyzerBtn')) {
+        const resetBtn = document.createElement('button');
+        resetBtn.id = 'resetAnalyzerBtn';
+        resetBtn.className = 'btn btn-outline';
+        resetBtn.style.marginTop = '20px';
+        resetBtn.style.width = '100%';
+        resetBtn.textContent = 'Analyze Another Report';
+        resetBtn.onclick = () => {
+            analyzerResults.style.display = 'none';
+            pdfDropZone.style.display = 'block';
+        };
+        analyzerResults.appendChild(resetBtn);
+    }
+}
+
+// ==========================================
+// NOTIFICATIONS SYSTEM
+// ==========================================
+function addNotification(title, message, type = 'info') {
+    const notif = {
+        id: generateId(),
+        title,
+        message,
+        type,
+        timestamp: new Date().toISOString(),
+        read: false
+    };
+    AppState.notifications.unshift(notif);
+    if (AppState.notifications.length > 50) AppState.notifications.pop();
+    saveData('notifications');
+    renderNotifications();
+}
+
+function renderNotifications() {
+    const container = document.getElementById('notificationsContainer');
+    if (!container) return;
+    
+    // Clear All binding
+    const clearBtn = document.getElementById('clearNotifsBtn');
+    if (clearBtn) {
+        clearBtn.onclick = () => {
+            AppState.notifications = [];
+            saveData('notifications');
+            renderNotifications();
+        };
+    }
+    
+    container.innerHTML = '';
+    
+    if (AppState.notifications.length === 0) {
+        container.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 40px;">No notifications yet. Activity will appear here.</div>';
+        return;
+    }
+    
+    AppState.notifications.forEach(n => {
+        let color = 'var(--neon-blue)';
+        let icon = '🔔';
+        if (n.type === 'success') { color = 'var(--neon-green)'; icon = '✅'; }
+        if (n.type === 'warning') { color = 'var(--neon-red)'; icon = '⚠️'; }
+        if (n.type === 'goal') { color = 'var(--neon-gold)'; icon = '🎯'; }
+        
+        const div = document.createElement('div');
+        div.style.background = 'var(--glass-bg)';
+        div.style.border = '1px solid var(--glass-border)';
+        div.style.borderLeft = `4px solid ${color}`;
+        div.style.padding = '18px 20px';
+        div.style.borderRadius = '12px';
+        div.className = 'notif-card hover-lift'; 
+        
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: var(--text-main); font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">
+                    ${icon} <span class="noti-title"></span>
+                </strong>
+                <small style="color: var(--text-muted); font-size: 0.8rem;">${new Date(n.timestamp).toLocaleString()}</small>
+            </div>
+            <p class="noti-desc" style="margin: 8px 0 0 0; color: var(--text-muted); font-size: 0.95rem; line-height: 1.4;"></p>
+        `;
+        div.querySelector('.noti-title').textContent = n.title;
+        div.querySelector('.noti-desc').textContent = n.message;
+        container.appendChild(div);
     });
 }
 
 // ==========================================
-// CSEB SYLLABUS TRACKER
+// SEARCH SYSTEM
 // ==========================================
-function renderCsebSyllabusTracker() {
-    const list = document.getElementById('csebSyllabusList');
-    if (!list) return;
+let currentSearchFilter = 'all';
+
+function setupSearch() {
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput) return;
     
-    list.innerHTML = '';
-    let totalTopics = 0;
-    let completedTopics = 0;
-    
-    Object.keys(AppState.csebSyllabus).forEach(subjectName => {
-        const topics = AppState.csebSyllabus[subjectName];
-        
-        let subjHtml = `
-            <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 15px; border-radius: 12px;">
-                <h4 style="margin: 0 0 10px 0; color: var(--neon-blue); font-size: 1rem;">${subjectName}</h4>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-        `;
-        
-        topics.forEach((topic, idx) => {
-            totalTopics++;
-            if (topic.completed) completedTopics++;
-            
-            const checkboxId = `cseb_${subjectName.replace(/\s+/g, '')}_${idx}`;
-            subjHtml += `
-                <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 5px 0;">
-                    <input type="checkbox" id="${checkboxId}" ${topic.completed ? 'checked' : ''} style="margin-top: 3px;">
-                    <span style="${topic.completed ? 'text-decoration: line-through; color: var(--text-muted);' : 'color: #eee;'} font-size: 0.9rem;">
-                        ${topic.name}
-                    </span>
-                </label>
-            `;
-        });
-        
-        subjHtml += `</div></div>`;
-        list.innerHTML += subjHtml;
+    let debounceTimer;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            renderSearchResults(e.target.value);
+        }, 300);
     });
     
-    const pct = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
-    document.getElementById('csebSyllabusProgress').textContent = `${pct}%`;
-    document.getElementById('csebSyllabusProgressBar').style.width = `${pct}%`;
+    const filterBtns = document.querySelectorAll('.search-filter-btn');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            filterBtns.forEach(b => { b.classList.remove('active-filter'); b.classList.add('btn-outline'); });
+            e.target.classList.remove('btn-outline');
+            e.target.classList.add('active-filter');
+            currentSearchFilter = e.target.getAttribute('data-filter');
+            renderSearchResults(searchInput.value);
+        });
+    });
     
-    // Attach event listeners
-    Object.keys(AppState.csebSyllabus).forEach(subjectName => {
-        const topics = AppState.csebSyllabus[subjectName];
-        topics.forEach((topic, idx) => {
-            const el = document.getElementById(`cseb_${subjectName.replace(/\s+/g, '')}_${idx}`);
-            if (el) {
-                el.addEventListener('change', (e) => {
-                    topic.completed = e.target.checked;
-                    saveData('csebSyllabus');
-                    renderCsebSyllabusTracker();
-                    renderAnalytics(); // Re-render analytics on change
+    // Initial render
+    renderSearchResults('');
+}
+
+function createResultCard(type, title, subtitle, meta, details, color) {
+    const card = document.createElement('div');
+    card.style.background = 'var(--glass-bg)';
+    card.style.border = '1px solid var(--glass-border)';
+    card.style.borderTop = `4px solid ${color}`;
+    card.style.padding = '20px';
+    card.style.borderRadius = '12px';
+    card.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+    card.style.cursor = 'pointer';
+    
+    let typeBadge = '';
+    if (type === 'session') typeBadge = '<span style="font-size: 0.75rem; background: rgba(10, 132, 255, 0.1); color: var(--neon-blue); padding: 3px 8px; border-radius: 12px;">Session</span>';
+    if (type === 'mock') typeBadge = '<span style="font-size: 0.75rem; background: rgba(255, 69, 58, 0.1); color: var(--neon-red); padding: 3px 8px; border-radius: 12px;">Mock Test</span>';
+    if (type === 'subject') typeBadge = '<span style="font-size: 0.75rem; background: rgba(48, 209, 88, 0.1); color: var(--neon-green); padding: 3px 8px; border-radius: 12px;">Subject</span>';
+
+    card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">${meta}</div>
+            ${typeBadge}
+        </div>
+        <div class="search-title" style="color: var(--text-main); font-weight: 600; font-size: 1.1rem; margin-bottom: 6px;"></div>
+        <div style="color: ${color}; font-weight: 500; font-size: 0.9rem;">${subtitle}</div>
+        <div class="search-desc" style="color: var(--text-muted); font-size: 0.9rem; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);"></div>
+    `;
+
+    card.querySelector('.search-title').textContent = title;
+
+    const descEl = card.querySelector('.search-desc');
+    if (details) {
+        const isLong = details.length > 100;
+        const shortText = isLong ? details.substring(0, 100) + '...' : details;
+        
+        const em = document.createElement('em');
+        em.className = 'search-notes-text';
+        em.textContent = shortText;
+        descEl.appendChild(em);
+
+        if (isLong) {
+            const btn = document.createElement('div');
+            btn.className = 'search-expand-btn';
+            btn.style.cssText = 'color: var(--neon-blue); font-size: 0.8rem; margin-top: 5px; font-weight: 500; cursor: pointer;';
+            btn.textContent = 'Show More ▾';
+            descEl.appendChild(btn);
+
+            let expanded = false;
+            card.addEventListener('click', () => {
+                expanded = !expanded;
+                if (expanded) {
+                    em.textContent = details;
+                    btn.textContent = 'Show Less ▴';
+                } else {
+                    em.textContent = shortText;
+                    btn.textContent = 'Show More ▾';
+                }
+            });
+        }
+    } else {
+        descEl.style.display = 'none';
+    }
+
+    return card;
+}
+
+function renderSearchResults(query) {
+    const container = document.getElementById('searchResultsContainer');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    const q = query.trim().toLowerCase();
+    
+    if (q.length === 0 && currentSearchFilter === 'all') {
+        container.innerHTML = '<div style="color: var(--text-muted); grid-column: 1 / -1; padding: 20px; text-align: center; border: 1px dashed var(--glass-border); border-radius: 12px;">Type above to search, or select a category filter to browse...</div>';
+        return;
+    }
+    
+    let allResults = [];
+
+    // 1. Search Sessions
+    if (currentSearchFilter === 'all' || currentSearchFilter === 'sessions') {
+        AppState.sessions.forEach(s => {
+            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const subjName = subj ? subj.name.toLowerCase() : '';
+            const notes = (s.notes || '').toLowerCase();
+            const topic = (s.topic || '').toLowerCase();
+            
+            if (subjName.includes(q) || notes.includes(q) || topic.includes(q)) {
+                allResults.push({
+                    type: 'session',
+                    date: new Date(s.startTime || s.date), // Fallback for old data
+                    data: s,
+                    subj: subj
                 });
             }
         });
+    }
+
+    // 2. Search Mocks
+    if (currentSearchFilter === 'all' || currentSearchFilter === 'mocks') {
+        AppState.mockTests.forEach(m => {
+            const examName = (m.name || '').toLowerCase();
+            if (examName.includes(q)) {
+                allResults.push({
+                    type: 'mock',
+                    date: new Date(m.date),
+                    data: m
+                });
+            }
+        });
+    }
+
+    // 3. Search Subjects
+    if (currentSearchFilter === 'all' || currentSearchFilter === 'subjects') {
+        AppState.subjects.forEach(sub => {
+            if (sub.name.toLowerCase().includes(q)) {
+                allResults.push({
+                    type: 'subject',
+                    date: new Date(), // Subjects don't have a date, just float to top
+                    data: sub
+                });
+            }
+        });
+    }
+    
+    if (allResults.length === 0) {
+        container.innerHTML = '<div style="color: var(--text-muted); grid-column: 1 / -1; padding: 20px; text-align: center;">No results found matching your search.</div>';
+        return;
+    }
+    
+    // Sort newest first
+    allResults.sort((a, b) => b.date - a.date);
+    
+    allResults.forEach(res => {
+        if (res.type === 'session') {
+            const s = res.data;
+            const durationHrs = s.duration ? (s.duration / 3600).toFixed(2) : ((new Date(s.endTime) - new Date(s.startTime)) / 3600000).toFixed(2);
+            const subtitle = `⏱️ ${durationHrs} Hours ${s.topic ? `• ${s.topic}` : ''}`;
+            const card = createResultCard('session', res.subj ? res.subj.name : 'Unknown Subject', subtitle, res.date.toLocaleDateString(), s.notes, res.subj ? res.subj.color : '#0A84FF');
+            container.appendChild(card);
+        } else if (res.type === 'mock') {
+            const m = res.data;
+            const subtitle = `Score: ${m.score} / ${m.maxScore} (${((m.score/m.maxScore)*100).toFixed(1)}%)`;
+            const card = createResultCard('mock', m.name, subtitle, res.date.toLocaleDateString(), `Mock Test Log`, '#FF453A');
+            container.appendChild(card);
+        } else if (res.type === 'subject') {
+            const sub = res.data;
+            const subtitle = `Course: ${sub.course || 'N/A'} • Target: ${sub.targetHours}h/week`;
+            const card = createResultCard('subject', sub.name, subtitle, 'Course Subject', `Priority: ${sub.priority}. Total logged: ${(sub.totalHours || 0).toFixed(1)} hours.`, sub.color || '#30D158');
+            container.appendChild(card);
+        }
     });
 }
+
+// Call initializations
+document.addEventListener('DOMContentLoaded', () => {
+    // Other initializations happen in the main DOMContentLoaded, so we'll just wait a bit or call these when views switch
+    renderNotifications();
+    setupSearch();
+    
+    // Attach to tab switching so they refresh
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const target = item.getAttribute('data-target');
+            if (target === 'view-notifications') renderNotifications();
+            if (target === 'view-search') renderSearchResults(document.getElementById('searchInput').value);
+        });
+    });
+});
+
+// ==========================================
+// SOFTWARE UPDATE SYSTEM
+// ==========================================
+function renderUpdateBadge() {
+    const navItem = document.getElementById('nav-software-update');
+    const badge = document.getElementById('updateSidebarBadge');
+    
+    if (AppState.availableUpdate) {
+        if (navItem) navItem.style.display = 'flex';
+        if (badge) badge.style.display = 'block';
+        
+        const vText = document.getElementById('updateVersionText');
+        const bText = document.getElementById('updateBuildText');
+        const dText = document.getElementById('updateDateText');
+        
+        if (vText) vText.textContent = AppState.availableUpdate.version;
+        if (bText) bText.textContent = AppState.availableUpdate.build;
+        if (dText) dText.textContent = AppState.availableUpdate.date;
+        
+        const list = document.getElementById('updateFeaturesList');
+        if (list) {
+            list.innerHTML = AppState.availableUpdate.features.map(f => `<li style="margin-bottom: 10px;">${f}</li>`).join('');
+        }
+    } else {
+        if (navItem) navItem.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+    }
+    
+    const profileV = document.getElementById('appVersionTextProfile');
+    if (profileV) profileV.textContent = AppState.currentVersion;
+}
+
+function processNewUpdate(updateInfo) {
+    if (!AppState.availableUpdate || AppState.availableUpdate.version !== updateInfo.version) {
+        AppState.availableUpdate = updateInfo;
+        saveData('system');
+        addNotification('System Update Available', `Version ${updateInfo.version} is ready to install.`, 'info');
+        renderUpdateBadge();
+    }
+}
+
+function installUpdate() {
+    if (!AppState.availableUpdate) return;
+    
+    const newVersion = AppState.availableUpdate.version;
+    AppState.currentVersion = newVersion;
+    AppState.availableUpdate = null;
+    saveData('system');
+    
+    addNotification('Update Installed', `Successfully updated to ${newVersion}.`, 'success');
+    renderUpdateBadge();
+    
+    const overviewTab = document.querySelector('.nav-item[data-target="view-overview"]');
+    if (overviewTab) overviewTab.click();
+    
+    // If there's a service worker, tell it to skip waiting so new cache takes over
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const devBtn = document.getElementById('devTriggerUpdateBtn');
+    if (devBtn) {
+        devBtn.addEventListener('click', () => {
+            const newVersion = 'v1.1.' + Math.floor(Math.random() * 100);
+            processNewUpdate({
+                version: newVersion,
+                build: '2026.06.07-alpha',
+                date: new Date().toLocaleDateString(),
+                features: [
+                    '⭐ Global Search Engine indexing Sessions, Mocks, and Subjects',
+                    '🎨 Premium Glassmorphism UI enhancements',
+                    '🔔 Advanced Notification Center with Color Coding',
+                    '🚀 Core performance optimizations'
+                ]
+            });
+            alert('System Update Triggered! Check the sidebar for the new Software Update tab.');
+        });
+    }
+
+    const installBtn = document.getElementById('installUpdateBtn');
+    if (installBtn) {
+        installBtn.addEventListener('click', () => {
+            installUpdate();
+        });
+    }
+    
+    const cancelBtn = document.getElementById('cancelUpdateBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            // Just go back to the dashboard, keep the badge active
+            const overviewTab = document.querySelector('.nav-item[data-target="view-overview"]');
+            if (overviewTab) overviewTab.click();
+        });
+    }
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW failed:', err));
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+                processNewUpdate(event.data.payload);
+            }
+        });
+        
+        // Check for updates shortly after load
+        setTimeout(() => {
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_FOR_UPDATES' });
+            }
+        }, 5000);
+    }
+
+    renderUpdateBadge();
+});
 

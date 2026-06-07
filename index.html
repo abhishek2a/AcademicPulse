@@ -7,16 +7,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>AcademicPulse</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=3">
     
+    <!-- Firebase Scripts -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <!-- Heavy libraries (Chart.js, jsPDF, pdf.js) are lazy-loaded dynamically -->
 </head>
 <body>
     <div id="splash-screen" class="splash-screen">
@@ -35,10 +34,21 @@
     <aside class="sidebar">
         <h2>AcademicPulse</h2>
         <div class="nav-item active" data-target="view-overview"><span class="nav-icon">📊</span><span class="nav-text">Dashboard</span></div>
-        <div class="nav-item" data-target="view-timer"><span class="nav-icon">⏱️</span><span class="nav-text">Focus</span></div>
-        <div class="nav-item" data-target="view-subjects"><span class="nav-icon">📚</span><span class="nav-text">Subjects</span></div>
+
+        <div class="nav-item" data-target="view-subjects"><span class="nav-icon">📚</span><span class="nav-text">Course</span></div>
         <div class="nav-item" data-target="view-attendance"><span class="nav-icon">📅</span><span class="nav-text">Attendance</span></div>
         <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Mocks</span></div>
+        <div class="nav-item" data-target="view-analytics"><span class="nav-icon">📈</span><span class="nav-text">Analytics</span></div>
+        <div class="nav-item" data-target="view-analyzer"><span class="nav-icon">🔍</span><span class="nav-text">Report Analyzer</span></div>
+        <div class="nav-item" data-target="view-notifications"><span class="nav-icon">🔔</span><span class="nav-text">Notifications</span></div>
+        <div class="nav-item" data-target="view-search"><span class="nav-icon">🔎</span><span class="nav-text">Search</span></div>
+        <div class="nav-item" id="nav-software-update" style="display: none; align-items: center; justify-content: space-between;" data-target="view-update">
+            <div style="display: flex; align-items: center;">
+                <span class="nav-icon" style="color: var(--neon-blue);">✨</span>
+                <span class="nav-text">Software Update</span>
+            </div>
+            <span class="update-badge" id="updateSidebarBadge" style="display: none; background: var(--neon-red); color: #fff; font-size: 0.7rem; font-weight: bold; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; box-shadow: 0 0 10px var(--neon-red); margin-left: 10px;">1</span>
+        </div>
         <div class="nav-item" data-target="view-profile"><span class="nav-icon">👤</span><span class="nav-text">Profile</span></div>
     </aside>
 
@@ -145,30 +155,6 @@
                 
                 <div class="subjects-grid" id="courseSubjectsGrid" style="margin-bottom: 30px;">
                     <!-- Subjects injected here -->
-                </div>
-                
-                <!-- Topic Tracker for ACCA -->
-                <div id="accaTopicTrackerContainer" style="display: none; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 25px; margin-top: 30px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0; color: var(--text-main); font-size: 1.2rem;">ACCA FR Topic Coverage Tracker</h3>
-                        <span id="accaTopicProgress" style="color: var(--neon-blue); font-weight: 600; font-size: 0.95rem;">0%</span>
-                    </div>
-                    <div class="progress-bar-bg" style="margin-bottom: 25px; height: 8px;"><div class="progress-bar-fill fill-blue" id="accaTopicProgressBar" style="width: 0%"></div></div>
-                    <div id="accaTopicsList" style="display: flex; flex-direction: column; gap: 10px;">
-                        <!-- Checkboxes injected here -->
-                    </div>
-                </div>
-
-                <!-- Topic Tracker for CSEB -->
-                <div id="csebSyllabusTrackerContainer" style="display: none; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 25px; margin-top: 30px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0; color: var(--text-main); font-size: 1.2rem;">CSEB Syllabus Coverage</h3>
-                        <span id="csebSyllabusProgress" style="color: var(--neon-green); font-weight: 600; font-size: 0.95rem;">0%</span>
-                    </div>
-                    <div class="progress-bar-bg" style="margin-bottom: 25px; height: 8px;"><div class="progress-bar-fill fill-green" id="csebSyllabusProgressBar" style="width: 0%"></div></div>
-                    
-                    <!-- Subject sections injected here via JS -->
-                    <div id="csebSyllabusList" style="display: flex; flex-direction: column; gap: 15px;"></div>
                 </div>
             </div>
         </section>
@@ -344,6 +330,13 @@
                             <span style="font-size: 1.3rem; font-weight: 700; color: var(--neon-gold);" id="anaGoalMetPct">0%</span>
                         </div>
                     </div>
+                    
+                    <div style="background: var(--glass-hover); padding: 15px; border-radius: 12px; margin-top: 15px;">
+                        <div class="stat-label">30-Day Study Forecast</div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px;">
+                            <span style="font-size: 1.3rem; font-weight: 700; color: var(--neon-blue);" id="ana30DayForecast">0h Projected</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Attendance -->
@@ -367,6 +360,21 @@
                     <h3 style="margin-bottom: 10px; font-size: 1rem; color: var(--text-muted);">Monthly Attendance Trend</h3>
                     <div style="height: 150px;">
                         <canvas id="monthlyAttendanceBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exam Readiness Engine -->
+            <div class="chart-card" style="margin-bottom: 30px; text-align: left;">
+                <h3 style="margin-bottom: 20px;">Exam Readiness Engine 🎯</h3>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="flex: 1; background: var(--glass-hover); padding: 20px; border-radius: 12px; text-align: center; min-width: 150px;">
+                        <div class="stat-label" style="margin-bottom: 10px;">ACCA FR Readiness</div>
+                        <div style="font-size: 2.5rem; font-weight: bold; color: var(--neon-blue);" id="readinessAcca">0%</div>
+                    </div>
+                    <div style="flex: 1; background: var(--glass-hover); padding: 20px; border-radius: 12px; text-align: center; min-width: 150px;">
+                        <div class="stat-label" style="margin-bottom: 10px;">CSEB Readiness</div>
+                        <div style="font-size: 2.5rem; font-weight: bold; color: var(--neon-green);" id="readinessCseb">0%</div>
                     </div>
                 </div>
             </div>
@@ -511,10 +519,92 @@
             </div>
         </section>
 
+        <!-- View: Report Analyzer -->
+        <section id="view-analyzer" class="view-section">
+            <div class="header">
+                <h1>Report Analyzer</h1>
+            </div>
+            
+            <div class="profile-card" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 30px; border-radius: 20px; max-width: 600px; margin: 0 auto; text-align: center;">
+                <h3 style="margin-top: 0;">Upload your PDF Report</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Upload a daily or monthly report exported from the app. We will analyze your hours and attendance to give you personalized suggestions.</p>
+                
+                <div style="border: 2px dashed var(--neon-blue); border-radius: 12px; padding: 40px 20px; cursor: pointer; transition: all 0.3s;" id="pdfDropZone">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">📄</div>
+                    <div style="font-weight: 600;">Click or Drag PDF here</div>
+                    <input type="file" id="pdfFileInput" accept="application/pdf" style="display: none;">
+                </div>
+                
+                <div id="analyzerLoading" style="display: none; margin-top: 20px;">
+                    <div class="spinner" style="margin: 0 auto;"></div>
+                    <p style="color: var(--text-muted); margin-top: 10px;">Analyzing your report...</p>
+                </div>
+            </div>
+            
+            <div id="analyzerResults" style="display: none; background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 30px; border-radius: 20px; max-width: 600px; margin: 30px auto 0;">
+                <h3 style="margin-top: 0; color: var(--neon-blue);">Analysis Results</h3>
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <div style="flex: 1; background: var(--glass-hover); padding: 15px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Total Hours</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--text-main);" id="analyzerHours">-</div>
+                    </div>
+                    <div style="flex: 1; background: var(--glass-hover); padding: 15px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Present Days</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--text-main);" id="analyzerAttendance">-</div>
+                    </div>
+                </div>
+                
+                <h4 style="margin-bottom: 10px;">Suggestions for Improvement:</h4>
+                <ul id="analyzerSuggestions" style="color: var(--text-muted); line-height: 1.6; padding-left: 20px; text-align: left;">
+                </ul>
+            </div>
+        </section>
+
+        <!-- View: Notifications -->
+        <section id="view-notifications" class="view-section">
+            <div class="header" style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <h1>Notifications</h1>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Your recent activity and alerts.</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-outline" id="clearNotifsBtn" style="padding: 8px 15px; font-size: 0.85rem;">Clear All</button>
+                </div>
+            </div>
+            <div id="notificationsContainer" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+                <!-- Notifications injected here -->
+            </div>
+        </section>
+
+        <!-- View: Search -->
+        <section id="view-search" class="view-section">
+            <div class="header">
+                <h1>Global Search</h1>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Find sessions, mock tests, and subjects.</p>
+            </div>
+            
+            <div class="form-group" style="margin-top: 20px; margin-bottom: 10px;">
+                <input type="text" id="searchInput" placeholder="Search anything..." style="background: rgba(255,255,255,0.05); padding: 16px 20px; font-size: 1.1rem; border-radius: 16px;">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none;" id="searchFilters">
+                <button class="btn search-filter-btn" data-filter="all" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">All</button>
+                <button class="btn btn-outline search-filter-btn" data-filter="sessions" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">Sessions</button>
+                <button class="btn btn-outline search-filter-btn" data-filter="mocks" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">Mocks</button>
+                <button class="btn btn-outline search-filter-btn" data-filter="subjects" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">Subjects</button>
+            </div>
+            
+            <div id="searchResultsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                <!-- Search results injected here -->
+            </div>
+        </section>
+
         <!-- View: Profile -->
         <section id="view-profile" class="view-section">
             <div class="header">
                 <h1>Profile Settings</h1>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Manage your preferences and data.</p>
             </div>
             
             <div class="profile-card" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 30px; border-radius: 20px; max-width: 500px; margin: 0 auto;">
@@ -531,6 +621,13 @@
                         <span style="font-size: 0.85rem; color: var(--text-muted);">Switch between dark and light themes</span>
                     </div>
                     <button id="themeToggleBtn" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.9rem;">Toggle Theme</button>
+                </div>
+
+                <!-- Developer Settings -->
+                <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px;">
+                    <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 0.95rem; color: var(--neon-blue);">Developer Tools</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">Simulate system events for testing.</p>
+                    <button id="devTriggerUpdateBtn" class="btn btn-outline" style="width: 100%; padding: 8px 16px; font-size: 0.9rem;">Trigger System Update</button>
                 </div>
 
                 <!-- Subscriptions -->
@@ -565,12 +662,51 @@
                 </form>
 
                 <div style="text-align: center; margin-top: 40px;">
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version v1.0.0 (Up to date)</p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version <span id="appVersionTextProfile">v1.0.0</span></p>
                     <button id="btnLogout" class="btn" style="background: var(--neon-red); color: var(--text-main); margin-top: 10px; border: none; width: 100%;">Logout</button>
                 </div>
             </div>
         </section>
 
+        <!-- View: Software Update -->
+        <section id="view-update" class="view-section">
+            <div class="header" style="text-align: center; margin-bottom: 40px;">
+                <div style="display: inline-block; padding: 15px; background: rgba(10, 132, 255, 0.1); border-radius: 50%; margin-bottom: 15px;">
+                    <span style="font-size: 3rem; text-shadow: 0 0 15px var(--neon-blue);">🚀</span>
+                </div>
+                <h1 style="font-size: 2.5rem; margin-bottom: 10px;">Software Update</h1>
+                <p style="color: var(--text-muted); font-size: 1.1rem;">A powerful new version of AcademicPulse is ready.</p>
+            </div>
+            
+            <div style="background: var(--glass-bg); border: 1px solid var(--neon-blue); border-radius: 24px; padding: 40px; position: relative; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.4); max-width: 700px; margin: 0 auto;">
+                <div style="position: absolute; top: -100px; right: -100px; width: 300px; height: 300px; background: var(--neon-blue); filter: blur(100px); opacity: 0.15; border-radius: 50%;"></div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
+                    <div>
+                        <h2 style="font-size: 2rem; margin: 0 0 5px 0; color: var(--text-main);">Version <span id="updateVersionText" style="color: var(--neon-blue);">--</span></h2>
+                        <div style="color: var(--text-muted); font-size: 0.95rem;">Build <span id="updateBuildText">--</span></div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="background: rgba(48, 209, 88, 0.2); color: var(--neon-green); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Verified Release</span>
+                        <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 8px;">Arrived: <span id="updateDateText">--</span></div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 40px;">
+                    <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1.2rem; display: flex; align-items: center; gap: 10px;">
+                        <span>✨</span> What's New
+                    </h3>
+                    <ul id="updateFeaturesList" style="list-style-type: none; padding-left: 0; color: var(--text-main); line-height: 1.8; font-size: 1rem; display: grid; gap: 15px;">
+                        <!-- Features injected here -->
+                    </ul>
+                </div>
+                
+                <div style="display: flex; gap: 20px; justify-content: center; align-items: center; margin-top: 30px;">
+                    <button class="btn btn-outline" id="cancelUpdateBtn" style="padding: 16px 30px; font-size: 1.1rem; border-radius: 30px; border-color: rgba(255,255,255,0.2); color: var(--text-muted); min-width: 150px;">Not Now</button>
+                    <button class="btn" id="installUpdateBtn" style="padding: 16px 45px; font-size: 1.1rem; border-radius: 30px; background: var(--neon-blue); color: #000; font-weight: 600; box-shadow: 0 10px 20px rgba(10, 132, 255, 0.3); min-width: 250px;">Install & Relaunch</button>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Authentication Overlay -->
@@ -713,21 +849,29 @@
                 <label>Date</label>
                 <input type="date" id="logDateInput" required>
             </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Course</label>
+                    <select id="logCourseInput" required>
+                        <option value="CSEB">CSEB</option>
+                        <option value="ACCA">ACCA</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 2;">
+                    <label>Subject</label>
+                    <select id="logSubjectInput" required>
+                        <!-- Injected options -->
+                    </select>
+                </div>
+            </div>
             <div class="form-group">
-                <label>Course</label>
-                <select id="logCourseInput" required>
-                    <option value="CSEB">CSEB</option>
-                    <option value="ACCA">ACCA</option>
+                <label>Syllabus Topic (Optional)</label>
+                <select id="logTopicDropdown">
+                    <option value="">-- Select a Topic --</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>Subject</label>
-                <select id="logSubjectInput" required>
-                    <!-- Injected options -->
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Chapter / Notes</label>
+                <label>Additional Notes</label>
                 <input type="text" id="logNotesInput" placeholder="e.g. Chapter 4 Review" required>
             </div>
             <div style="display: flex; gap: 15px;">
@@ -747,8 +891,28 @@
         </div>
     </div>
 
-    <script src="auth.js?v=4"></script>
+    <!-- Syllabus Modal -->
+    <div class="modal-overlay" id="syllabusModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="syllabusModalTitle">Syllabus</h3>
+                <button class="close-btn" onclick="document.getElementById('syllabusModal').classList.remove('active')">×</button>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase;">Progress</span>
+                <span id="syllabusModalPctText" style="font-size: 0.85rem; color: var(--neon-blue); font-weight: 600;">0%</span>
+            </div>
+            <div class="progress-bar-bg" style="height: 8px; margin-bottom: 20px;">
+                <div class="progress-bar-fill fill-blue" id="syllabusModalProgress" style="width: 0%"></div>
+            </div>
+            <div id="syllabusModalList" style="display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; padding-right: 10px;">
+                <!-- Topics injected here -->
+            </div>
+        </div>
+    </div>
+
     <script src="app.js?v=4"></script>
+    <script src="auth.js?v=4"></script>
     <script src="export.js?v=4"></script>
 </body>
 </html>

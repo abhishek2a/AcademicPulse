@@ -1,0 +1,9 @@
+{
+  "version": "1.1.0",
+  "build": "2026.06.08",
+  "features": [
+    "Subject Ranking",
+    "Study Forecast",
+    "Advanced Analytics"
+  ]
+}

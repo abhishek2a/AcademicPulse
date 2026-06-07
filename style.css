@@ -374,9 +374,9 @@ h1 { font-size: 2.4rem; margin: 0; font-weight: 700; letter-spacing: -1px; }
     
     .mobile-topbar {
         display: flex; justify-content: space-between; align-items: center; 
-        padding: 12px 15px; margin: -20px -15px 20px -15px;
-        background: rgba(0,0,0,0.4); border-bottom: 1px solid var(--glass-border);
-        position: sticky; top: 0; z-index: 50; backdrop-filter: blur(15px);
+        padding: calc(15px + env(safe-area-inset-top, 20px)) 20px 15px 20px; margin: -20px -15px 20px -15px;
+        background: rgba(0,0,0,0.6); border-bottom: 1px solid var(--glass-border);
+        position: sticky; top: 0; z-index: 150; backdrop-filter: blur(25px);
     }
     .mobile-topbar h2 { margin: 0; font-size: 1.2rem; font-weight: 800; background: linear-gradient(135deg, #FFF, #86868B); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .mobile-topbar div { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }

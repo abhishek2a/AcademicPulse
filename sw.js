@@ -1,9 +1,9 @@
-const CACHE_NAME = 'studytrack-v2';
+const CACHE_NAME = 'studytrack-v3';
 const ASSETS_TO_CACHE = [
   './index.html',
-  './style.css',
+  './style.css?v=3',
   './app.js',
-  './icon.svg',
+  './icon.png',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/chart.js'

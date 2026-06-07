@@ -1689,11 +1689,13 @@ function initMocksAndPractice() {
     };
     
     if(courseSelect) {
-        courseSelect.addEventListener('change', (e) => populatePracticeSubjects(e.target.value));
+        courseSelect.onchange = (e) => populatePracticeSubjects(e.target.value);
         populatePracticeSubjects(courseSelect.value);
     }
 
-    document.getElementById('practiceAddBtn')?.addEventListener('click', () => {
+    const addBtn = document.getElementById('practiceAddBtn');
+    if (addBtn) {
+        addBtn.onclick = () => {
         const addAtt = parseInt(document.getElementById('practiceAddAttempted').value) || 0;
         const addCor = parseInt(document.getElementById('practiceAddCorrect').value) || 0;
         if(addAtt === 0 && addCor === 0) return;
@@ -1726,9 +1728,12 @@ function initMocksAndPractice() {
         document.getElementById('practiceAddCorrect').value = '';
         renderPracticeTotals();
         renderAnalytics();
-    });
+    };
+    }
 
-    document.getElementById('saveMockBtn')?.addEventListener('click', () => {
+    const saveMockBtn = document.getElementById('saveMockBtn');
+    if (saveMockBtn) {
+        saveMockBtn.onclick = () => {
         const course = document.getElementById('mockCourseInput').value;
         const name = document.getElementById('mockNameInput').value;
         const score = parseFloat(document.getElementById('mockScoreInput').value) || 0;
@@ -1750,7 +1755,8 @@ function initMocksAndPractice() {
         document.getElementById('mockScoreInput').value = '';
         renderMocksHistory();
         renderAnalytics();
-    });
+    };
+    }
 
     renderMocksHistory();
 }

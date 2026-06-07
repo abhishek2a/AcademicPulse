@@ -1,0 +1,213 @@
+const firebaseConfig = {
+    apiKey: "AIzaSyDePs88cfFibQGQ6J44hcBYjUzz_dUtNtY",
+    authDomain: "academicpulse-3e1e2.firebaseapp.com",
+    projectId: "academicpulse-3e1e2",
+    storageBucket: "academicpulse-3e1e2.firebasestorage.app",
+    messagingSenderId: "319669838898",
+    appId: "1:319669838898:web:2725e03ef576736003482b",
+    measurementId: "G-WXSKH63X5Q"
+};
+
+// Initialize Firebase using compat API
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Make db and auth globally accessible for app.js to sync data
+window.firebaseAuth = auth;
+window.firebaseDb = db;
+
+// DOM Elements
+const authOverlay = document.getElementById('auth-overlay');
+const splashScreen = document.getElementById('splash-screen');
+const loginCard = document.getElementById('authLoginCard');
+const registerCard = document.getElementById('authRegisterCard');
+const resetCard = document.getElementById('authResetCard');
+
+// Toggle UI Forms
+document.getElementById('linkToRegister').addEventListener('click', (e) => {
+    e.preventDefault();
+    loginCard.style.display = 'none';
+    registerCard.style.display = 'block';
+});
+
+document.getElementById('linkToLogin').addEventListener('click', (e) => {
+    e.preventDefault();
+    registerCard.style.display = 'none';
+    loginCard.style.display = 'block';
+});
+
+document.getElementById('linkToReset').addEventListener('click', (e) => {
+    e.preventDefault();
+    loginCard.style.display = 'none';
+    resetCard.style.display = 'block';
+});
+
+document.getElementById('linkToLoginFromReset').addEventListener('click', (e) => {
+    e.preventDefault();
+    resetCard.style.display = 'none';
+    loginCard.style.display = 'block';
+});
+
+// Authentication State Observer
+auth.onAuthStateChanged(async (user) => {
+    if (user) {
+        // Logged In
+        authOverlay.classList.add('hidden');
+        
+        // Sync Data from Firestore
+        await syncDataFromCloud(user.uid);
+        
+        // Populate Profile View
+        document.getElementById('profileDisplayName').textContent = user.displayName || 'User';
+        document.getElementById('profileEmail').textContent = user.email;
+        document.getElementById('profileAvatar').textContent = (user.displayName || 'U').charAt(0).toUpperCase();
+        document.getElementById('profileNameInput').value = user.displayName || '';
+        
+        // Ensure Main App starts
+        if(typeof window.initApp === 'function') window.initApp();
+        
+    } else {
+        // Logged Out
+        authOverlay.classList.remove('hidden');
+    }
+    
+    // Hide Splash Screen after initial load
+    setTimeout(() => {
+        splashScreen.classList.add('hidden');
+    }, 1500); // 1.5s for cool effect
+});
+
+// Sync Functions
+async function syncDataFromCloud(uid) {
+    try {
+        const docRef = db.collection("userData").doc(uid);
+        const docSnap = await docRef.get();
+        
+        if (docSnap.exists) {
+            const data = docSnap.data();
+            if (data.subjects) localStorage.setItem('cseb_study_subjects', JSON.stringify(data.subjects));
+            if (data.sessions) localStorage.setItem('cseb_session_history', JSON.stringify(data.sessions));
+            if (data.attendance) localStorage.setItem('cseb_study_attendance', JSON.stringify(data.attendance));
+            if (data.goals) localStorage.setItem('cseb_study_goals', JSON.stringify(data.goals));
+        } else {
+            // First login, push local data to cloud
+            await syncDataToCloud(uid);
+        }
+    } catch (error) {
+        console.error("Error syncing data:", error);
+    }
+}
+
+async function syncDataToCloud(uid) {
+    if(!uid) return;
+    try {
+        await db.collection("userData").doc(uid).set({
+            subjects: JSON.parse(localStorage.getItem('cseb_study_subjects') || '[]'),
+            sessions: JSON.parse(localStorage.getItem('cseb_session_history') || '[]'),
+            attendance: JSON.parse(localStorage.getItem('cseb_study_attendance') || '{}'),
+            goals: JSON.parse(localStorage.getItem('cseb_study_goals') || '{"daily":8,"weekly":40,"monthly":160}')
+        });
+    } catch (error) {
+        console.error("Error saving to cloud:", error);
+    }
+}
+
+// Global function to trigger sync on saveData
+window.triggerCloudSync = () => {
+    if (auth.currentUser) {
+        syncDataToCloud(auth.currentUser.uid);
+    }
+}
+
+// Login
+document.getElementById('loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value;
+    const pass = document.getElementById('loginPassword').value;
+    const btn = document.getElementById('btnLoginSubmit');
+    btn.textContent = 'Logging in...';
+    
+    auth.signInWithEmailAndPassword(email, pass)
+        .then(() => { btn.textContent = 'Log In'; })
+        .catch(err => {
+            btn.textContent = 'Log In';
+            alert(err.message);
+        });
+});
+
+// Register
+document.getElementById('registerForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('registerName').value;
+    const email = document.getElementById('registerEmail').value;
+    const pass = document.getElementById('registerPassword').value;
+    const btn = document.getElementById('btnRegisterSubmit');
+    btn.textContent = 'Signing up...';
+
+    auth.createUserWithEmailAndPassword(email, pass)
+        .then((userCredential) => {
+            return userCredential.user.updateProfile({ displayName: name });
+        })
+        .then(() => {
+            btn.textContent = 'Sign Up';
+        })
+        .catch(err => {
+            btn.textContent = 'Sign Up';
+            alert(err.message);
+        });
+});
+
+// Reset Password
+document.getElementById('resetPasswordForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = document.getElementById('resetEmail').value;
+    const btn = document.getElementById('btnResetSubmit');
+    btn.textContent = 'Sending...';
+
+    auth.sendPasswordResetEmail(email)
+        .then(() => {
+            btn.textContent = 'Send Reset Link';
+            alert("Password reset email sent!");
+            document.getElementById('linkToLoginFromReset').click();
+        })
+        .catch(err => {
+            btn.textContent = 'Send Reset Link';
+            alert(err.message);
+        });
+});
+
+// Logout
+document.getElementById('btnLogout').addEventListener('click', () => {
+    auth.signOut().then(() => {
+        // Force reload to clear state
+        window.location.reload();
+    });
+});
+
+// Update Profile
+document.getElementById('updateProfileForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('profileNameInput').value;
+    const user = auth.currentUser;
+    if(user) {
+        user.updateProfile({ displayName: name }).then(() => {
+            document.getElementById('profileDisplayName').textContent = name;
+            document.getElementById('profileAvatar').textContent = name.charAt(0).toUpperCase();
+            alert("Profile name updated!");
+        }).catch(err => alert(err.message));
+    }
+});
+
+// Update Password
+document.getElementById('updatePasswordForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const pass = document.getElementById('profilePasswordInput').value;
+    const user = auth.currentUser;
+    if(user) {
+        user.updatePassword(pass).then(() => {
+            alert("Password updated successfully!");
+            document.getElementById('profilePasswordInput').value = '';
+        }).catch(err => alert(err.message));
+    }
+});

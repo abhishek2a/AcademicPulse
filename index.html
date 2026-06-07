@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcademicPulse</title>
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div id="splash-screen" class="splash-screen">
+        <h1 class="pulse-text">AcademicPulse</h1>
+    </div>
+
+    <div class="ambient-bg"></div>
+    
+    <div class="loading-overlay" id="loadingOverlay">
+        <div style="text-align: center;">
+            <div class="spinner"></div>
+            <div style="color: var(--text-muted)">Processing data...</div>
+        </div>
+    </div>
+
+    <!-- Sidebar / Bottom Navigation -->
+    <nav class="sidebar" id="mobileNav">
+        <h2>Academic<br>Pulse</h2>
+        <div class="nav-item active" data-target="view-overview"><span class="nav-icon">📊</span><span class="nav-text">Overview</span></div>
+        <div class="nav-item" data-target="view-subjects"><span class="nav-icon">📚</span><span class="nav-text">Courses</span></div>
+        <div class="nav-item" data-target="view-attendance"><span class="nav-icon">📅</span><span class="nav-text">Attendance</span></div>
+        <div class="nav-item" data-target="view-analytics"><span class="nav-icon">📈</span><span class="nav-text">Analytics</span></div>
+        <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Practice</span></div>
+        <div class="nav-item" data-target="view-profile"><span class="nav-icon">⚙️</span><span class="nav-text">Profile</span></div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        
+        <!-- View: Overview -->
+        <section id="view-overview" class="view-section active">
+            <div class="header">
+                <h1 id="greetingTitle">Dashboard</h1>
+                <div class="date-display" id="currentDateDisplay"></div>
+            </div>
+
+            <!-- Exam Widgets -->
+            <div id="examWidgetsContainer" class="exams-grid">
+                <!-- Injected via JS -->
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Study Streak</div>
+                    <div class="stat-value text-green" id="studyStreakVal">0</div>
+                    <div class="stat-sub" id="bestStudyStreakVal">Best: 0 days</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Time (Month)</div>
+                    <div class="stat-value" id="totalHoursVal">0h 0m</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Today's Time</div>
+                    <div class="stat-value text-blue" id="todayTimeVal">0m</div>
+                </div>
+            </div>
+
+            <div class="goals-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">Goal Tracking</h3>
+                    <button class="btn btn-outline" id="openEditGoalsBtn" style="padding: 4px 10px; font-size: 0.8rem;">Edit Goals</button>
+                </div>
+                <div class="goal-item">
+                    <div class="goal-header"><span>Daily Goal (8h)</span><span id="dailyGoalText">0 / 8h</span></div>
+                    <div class="progress-bar-bg"><div class="progress-bar-fill fill-blue" id="dailyGoalFill" style="width: 0%"></div></div>
+                </div>
+                <div class="goal-item">
+                    <div class="goal-header"><span>Weekly Goal (40h)</span><span id="weeklyGoalText">0 / 40h</span></div>
+                    <div class="progress-bar-bg"><div class="progress-bar-fill fill-purple" id="weeklyGoalFill" style="width: 0%"></div></div>
+                </div>
+                <div class="goal-item">
+                    <div class="goal-header"><span>Monthly Goal (160h)</span><span id="monthlyGoalText">0 / 160h</span></div>
+                    <div class="progress-bar-bg"><div class="progress-bar-fill fill-green" id="monthlyGoalFill" style="width: 0%"></div></div>
+                </div>
+            </div>
+
+            <!-- Original Session Log component placeholder -->
+            <div class="chart-card">
+                <h3>Recent Sessions</h3>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 15px; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.85rem;">
+                            <th style="padding: 10px;">Subject</th>
+                            <th style="padding: 10px;">Time</th>
+                            <th style="padding: 10px;">Duration</th>
+                            <th style="padding: 10px;">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentLogsTableBody">
+                        <tr><td colspan="4" style="text-align: center; padding: 20px;">No recent logs</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- View: Courses -->
+        <section id="view-subjects" class="view-section">
+            <div class="header">
+                <h1>Course Management</h1>
+                <button class="btn" id="openSubjectModalBtn" style="display: none;">+ Add Subject</button>
+            </div>
+            
+            <!-- Level 1: Course Selection -->
+            <div id="courseSelectionView">
+                <h2 style="font-size: 1.2rem; margin-bottom: 20px; color: var(--text-muted);">Select a Course</h2>
+                <div class="stats-grid">
+                    <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="window.selectCourseView('CSEB')">
+                        <div class="stat-value text-blue" style="font-size: 2rem; margin-bottom: 10px;">CSEB</div>
+                        <div class="stat-sub">Co-operative Service Examination Board</div>
+                    </div>
+                    <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="window.selectCourseView('ACCA')">
+                        <div class="stat-value text-purple" style="font-size: 2rem; margin-bottom: 10px;">ACCA</div>
+                        <div class="stat-sub">Association of Chartered Certified Accountants</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Level 2: Subject List -->
+            <div id="subjectsListView" style="display: none;">
+                <div style="display: flex; align-items: center; margin-bottom: 20px; gap: 15px;">
+                    <button class="btn btn-outline" onclick="window.backToCourses()" style="padding: 6px 12px; font-size: 0.9rem;">← Back</button>
+                    <h2 id="currentCourseTitle" style="font-size: 1.4rem; margin: 0; color: var(--text-main);">Course Subjects</h2>
+                </div>
+                
+                <div class="subjects-grid" id="courseSubjectsGrid" style="margin-bottom: 30px;">
+                    <!-- Subjects injected here -->
+                </div>
+                
+                <!-- Topic Tracker for ACCA -->
+                <div id="accaTopicTrackerContainer" style="display: none; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 25px; margin-top: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: var(--text-main); font-size: 1.2rem;">ACCA FR Topic Coverage Tracker</h3>
+                        <span id="accaTopicProgress" style="color: var(--neon-blue); font-weight: 600; font-size: 0.95rem;">0%</span>
+                    </div>
+                    <div class="progress-bar-bg" style="margin-bottom: 25px; height: 8px;"><div class="progress-bar-fill fill-blue" id="accaTopicProgressBar" style="width: 0%"></div></div>
+                    <div id="accaTopicsList" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Checkboxes injected here -->
+                    </div>
+                </div>
+
+                <!-- Topic Tracker for CSEB -->
+                <div id="csebSyllabusTrackerContainer" style="display: none; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 25px; margin-top: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: var(--text-main); font-size: 1.2rem;">CSEB Syllabus Coverage</h3>
+                        <span id="csebSyllabusProgress" style="color: var(--neon-green); font-weight: 600; font-size: 0.95rem;">0%</span>
+                    </div>
+                    <div class="progress-bar-bg" style="margin-bottom: 25px; height: 8px;"><div class="progress-bar-fill fill-green" id="csebSyllabusProgressBar" style="width: 0%"></div></div>
+                    
+                    <!-- Subject sections injected here via JS -->
+                    <div id="csebSyllabusList" style="display: flex; flex-direction: column; gap: 15px;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- View: Attendance -->
+        <section id="view-attendance" class="view-section">
+            <div class="header">
+                <h1>Attendance & Day Report</h1>
+            </div>
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="stat-card" style="padding: 20px;">
+                    <div class="stat-label">Attendance Streak</div>
+                    <div class="stat-value text-purple" id="attendanceStreakVal" style="font-size: 2rem;">0</div>
+                </div>
+                <div class="stat-card" style="padding: 20px;">
+                    <div class="stat-label">Monthly Attendance</div>
+                    <div class="stat-value" id="attendancePercentVal" style="font-size: 2rem;">0%</div>
+                </div>
+            </div>
+            <div class="attendance-split">
+                <div class="chart-card calendar-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 id="attendanceMonthTitle" style="margin: 0; font-size: 1.2rem;">Month</h3>
+                    </div>
+                    <div class="calendar-grid" id="attendanceCalendarGrid"></div>
+                    <div class="calendar-legend">
+                        <div><span class="legend-dot present"></span> Present</div>
+                        <div><span class="legend-dot absent"></span> Absent</div>
+                        <div><span class="legend-dot leave"></span> Leave</div>
+                    </div>
+                </div>
+                <div class="chart-card day-report-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 id="dayReportTitle" style="margin: 0;">Select a Day</h3>
+                        <button class="btn" id="openLogModalFromReportBtn" style="padding: 6px 12px; font-size: 0.85rem; display: none;">+ Add Session</button>
+                    </div>
+                    <div id="dayReportTotal" style="color: var(--neon-blue); font-weight: 600; margin-bottom: 15px;"></div>
+                    <div id="dayReportContent" class="day-report-content">
+                        <div style="text-align: center; color: var(--text-muted); margin-top: 40px;">Click a date on the calendar to see the report.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- View: Analytics -->
+        <section id="view-analytics" class="view-section">
+            <div class="header">
+                <h1>Analytics Dashboard</h1>
+            </div>
+
+            <!-- Top Overview Cards -->
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); margin-bottom: 20px;">
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">Total Hours</div><div class="stat-value" id="anaTotalHours" style="font-size: 2rem;">0h</div></div>
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">Today's Hours</div><div class="stat-value text-blue" id="anaTodayHours" style="font-size: 2rem;">0h</div></div>
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">Current Streak</div><div class="stat-value text-green" id="anaStreak" style="font-size: 2rem;">0</div></div>
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">Attendance %</div><div class="stat-value text-purple" id="anaAttendance" style="font-size: 2rem;">0%</div></div>
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">Focus Score</div><div class="stat-value text-gold" id="anaFocusScore" style="font-size: 2rem;">0/100</div></div>
+            </div>
+
+            <!-- 1. Smart Insights Panel -->
+            <div id="smartInsightsContainer" style="margin-bottom: 30px;">
+                <!-- Smart insights injected here -->
+            </div>
+
+            <!-- 2. Study Trends -->
+            <h2 style="margin-bottom: 15px;">Study Hours Analytics</h2>
+            <div class="charts-grid" style="margin-bottom: 30px;">
+                <div class="chart-card" style="grid-column: span 2;">
+                    <h3>Daily & Weekly Study Trend</h3>
+                    <div style="height: 250px;"><canvas id="dailyStudyLineChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Monthly Study Trend</h3>
+                    <div style="height: 250px;"><canvas id="monthlyStudyBarChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- 3. Study Time Distribution -->
+            <h2 style="margin-bottom: 15px;">Study Time Distribution</h2>
+            <div class="stats-grid" style="margin-bottom: 30px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));">
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">Today</div><div class="stat-value" id="distToday">0h</div></div>
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">This Week</div><div class="stat-value" id="distWeek">0h</div></div>
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">This Month</div><div class="stat-value" id="distMonth">0h</div></div>
+                <div class="stat-card" style="padding: 15px;"><div class="stat-label">All Time</div><div class="stat-value" id="distAll">0h</div></div>
+            </div>
+
+            <!-- 4. Subject Analytics -->
+            <h2 style="margin-bottom: 15px;">Subject Analytics</h2>
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); margin-bottom: 20px;">
+                <div class="stat-card" style="text-align: left; display: flex; flex-direction: column; justify-content: center;">
+                    <div class="stat-label">Most Studied Subject</div>
+                    <div style="font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 5px;" id="mostStudiedSubject">🏆 -</div>
+                    <div class="stat-sub" id="mostStudiedHours" style="margin: 0;">0 Hours</div>
+                </div>
+                <div class="stat-card" style="text-align: left; display: flex; flex-direction: column; justify-content: center;">
+                    <div class="stat-label">Least Studied Subject</div>
+                    <div style="font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 5px;" id="leastStudiedSubject">⚠️ -</div>
+                    <div class="stat-sub" id="leastStudiedHours" style="margin: 0;">0 Hours</div>
+                </div>
+            </div>
+            
+            <div class="charts-grid" style="margin-bottom: 30px;">
+                <div class="chart-card">
+                    <h3>Subject Distribution</h3>
+                    <canvas id="subjectPieChart"></canvas>
+                </div>
+                <div class="chart-card" style="overflow-x: auto;">
+                    <h3>Subject Ranking Table</h3>
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; margin-top: 15px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted);">
+                                <th style="padding: 10px;">Subject</th>
+                                <th style="padding: 10px;">Hours</th>
+                                <th style="padding: 10px;">%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subjectRankingTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 5. Consistency Analytics (Heatmap) -->
+            <h2 style="margin-bottom: 15px;">Consistency Analytics</h2>
+            <div class="chart-card" style="margin-bottom: 20px; text-align: left; overflow-x: auto;">
+                <h3 style="margin-bottom: 15px;">Study Heatmap</h3>
+                <div id="studyHeatmap" class="heatmap-grid" style="display: flex; gap: 4px;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 15px; font-size: 0.8rem; color: var(--text-muted); align-items: center; justify-content: flex-end;">
+                    <span>Less</span>
+                    <div class="heatmap-cell" style="width:12px; height:12px; border-radius:3px; background: var(--glass-border);"></div>
+                    <div class="heatmap-cell" style="width:12px; height:12px; border-radius:3px; background: rgba(48, 209, 88, 0.3);"></div>
+                    <div class="heatmap-cell" style="width:12px; height:12px; border-radius:3px; background: rgba(48, 209, 88, 0.6);"></div>
+                    <div class="heatmap-cell" style="width:12px; height:12px; border-radius:3px; background: rgba(48, 209, 88, 1);"></div>
+                    <span>More</span>
+                </div>
+            </div>
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); margin-bottom: 30px;">
+                <div class="stat-card">
+                    <div class="stat-label">Best Study Day</div>
+                    <div class="stat-value text-blue" id="bestStudyDayStr" style="font-size: 1.8rem;">-</div>
+                    <div class="stat-sub" id="bestStudyDayAvg">Average: 0 Hours</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Most Productive Month</div>
+                    <div class="stat-value text-purple" id="bestStudyMonthStr" style="font-size: 1.8rem;">-</div>
+                    <div class="stat-sub" id="bestStudyMonthHours">0 Hours</div>
+                </div>
+            </div>
+
+            <!-- 6. Goals & Attendance -->
+            <div class="charts-grid" style="margin-bottom: 30px;">
+                <!-- Goals -->
+                <div class="chart-card" style="text-align: left;">
+                    <h3 style="margin-bottom: 20px;">Goal Analytics</h3>
+                    
+                    <div class="goal-item" style="margin-bottom: 15px;">
+                        <div class="goal-header" style="font-size: 0.95rem;"><span>Daily Goal</span><span id="anaDailyGoalTxt">0%</span></div>
+                        <div class="progress-bar-bg" style="height: 10px;"><div class="progress-bar-fill fill-blue" id="anaDailyGoalFill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="goal-item" style="margin-bottom: 15px;">
+                        <div class="goal-header" style="font-size: 0.95rem;"><span>Weekly Goal</span><span id="anaWeeklyGoalTxt">0%</span></div>
+                        <div class="progress-bar-bg" style="height: 10px;"><div class="progress-bar-fill fill-purple" id="anaWeeklyGoalFill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="goal-item" style="margin-bottom: 25px;">
+                        <div class="goal-header" style="font-size: 0.95rem;"><span>Monthly Goal</span><span id="anaMonthlyGoalTxt">0%</span></div>
+                        <div class="progress-bar-bg" style="height: 10px;"><div class="progress-bar-fill fill-green" id="anaMonthlyGoalFill" style="width: 0%"></div></div>
+                    </div>
+                    
+                    <div style="background: var(--glass-hover); padding: 15px; border-radius: 12px;">
+                        <div class="stat-label">Goal Achievement Rate</div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px;">
+                            <span style="font-size: 1.3rem; font-weight: 700; color: var(--text-main);" id="anaGoalMetTxt">0 / 0 Days</span>
+                            <span style="font-size: 1.3rem; font-weight: 700; color: var(--neon-gold);" id="anaGoalMetPct">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attendance -->
+                <div class="chart-card" style="text-align: left;">
+                    <h3 style="margin-bottom: 20px;">Attendance Analytics</h3>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                        <div>
+                            <div class="stat-label">Present</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--neon-green);" id="attPresentPct">0%</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Absent</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--neon-red);" id="attAbsentPct">0%</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Leave</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--neon-gold);" id="attLeavePct">0%</div>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-bottom: 10px; font-size: 1rem; color: var(--text-muted);">Monthly Attendance Trend</h3>
+                    <div style="height: 150px;">
+                        <canvas id="monthlyAttendanceBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. ACCA FR Analytics & 8. CSEB Analytics -->
+            <div class="charts-grid" style="margin-bottom: 30px;">
+                <div class="chart-card" style="text-align: left;">
+                    <h3 style="margin-bottom: 20px;">ACCA FR Analytics</h3>
+                    
+                    <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted);">Topic Coverage</h4>
+                    <div id="anaAccaTopicList" style="margin-bottom: 25px; display: flex; flex-direction: column; gap: 10px;">
+                        <div style="color: var(--text-muted); font-size: 0.85rem;">No syllabus data yet.</div>
+                    </div>
+
+                    <div id="analyticsQuestionPracticeContainer">
+                        <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted);">Question Practice</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--glass-hover); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                            <div>
+                                <div class="stat-label">Attempted</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);" id="anaPracticeAttempted">0</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="stat-label">Correct</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--neon-blue);" id="anaPracticeCorrect">0 <span style="font-size:1rem; color: var(--text-muted);">(0%)</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted);">Mock Test Trend</h4>
+                    <div id="anaMockTrendContainer" style="display: flex; flex-direction: column; gap: 10px;">
+                        <div style="color: var(--text-muted); font-size: 0.85rem;">No mock tests logged yet.</div>
+                    </div>
+                </div>
+
+                <div class="chart-card" style="text-align: left;">
+                    <h3 style="margin-bottom: 20px;">CSEB Analytics</h3>
+                    
+                    <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted);">Syllabus Coverage</h4>
+                    <div id="anaCsebCoverageContainer" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 25px;">
+                        <div style="color: var(--text-muted); font-size: 0.85rem;">No syllabus data yet.</div>
+                    </div>
+
+                    <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted); display: none;">Revision Progress</h4>
+                    <div id="anaCsebRevisionContainer" style="display: none; flex-direction: column; gap: 10px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Section -->
+            <div class="export-section" style="margin-bottom: 25px; margin-top: 40px;">
+                <h3 style="margin-top: 0; margin-bottom: 15px; color: var(--text-main);">Generate Reports</h3>
+                <div class="export-buttons-grid">
+                    <button class="btn btn-export" id="btnExportStudy">📄 Study Report (PDF)</button>
+                    <button class="btn btn-export" id="btnExportMonthly">📅 Monthly Report (PDF)</button>
+                    <button class="btn btn-export" id="btnExportAttendance">🗓️ Attendance Report (PDF)</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- View: Mocks & Practice -->
+        <section id="view-mocks" class="view-section">
+            <div class="header">
+                <h1>Mocks & Practice</h1>
+            </div>
+
+            <!-- Question Practice Widget -->
+            <div class="chart-card" style="margin-bottom: 30px;">
+                <h3 style="margin-bottom: 20px;">Question Practice</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div style="text-align: left;">
+                        <div class="stat-label">Total Attempted</div>
+                        <div class="stat-value" id="practiceAttemptedTxt">0</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="stat-label">Total Correct</div>
+                        <div class="stat-value text-blue" id="practiceCorrectTxt">0</div>
+                    </div>
+                </div>
+                
+                <div style="background: var(--glass-border); padding: 15px; border-radius: 12px; display: flex; gap: 10px; align-items: center;">
+                    <input type="number" id="practiceAddAttempted" placeholder="Attempted" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                    <input type="number" id="practiceAddCorrect" placeholder="Correct" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                    <button class="btn btn-outline" id="practiceAddBtn">Update</button>
+                </div>
+            </div>
+
+            <!-- Add Mock Exam -->
+            <div class="chart-card" style="margin-bottom: 30px; text-align: left;">
+                <h3 style="margin-bottom: 15px;">Log New Mock Test</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Course</label>
+                        <select id="mockCourseInput" class="form-input">
+                            <option value="ACCA">ACCA</option>
+                            <option value="CSEB">CSEB</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Mock Exam Name</label>
+                        <input type="text" id="mockNameInput" class="form-input" placeholder="e.g. Mock Test 1">
+                    </div>
+                    <div class="form-group">
+                        <label>Score</label>
+                        <input type="number" id="mockScoreInput" class="form-input" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Score</label>
+                        <input type="number" id="mockMaxScoreInput" class="form-input" placeholder="100">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <button class="btn" id="saveMockBtn" style="width: 100%;">Save Mock Test</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mock Exam History -->
+            <div class="chart-card">
+                <h3>Mock Test History</h3>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 15px; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.85rem;">
+                            <th style="padding: 10px;">Date</th>
+                            <th style="padding: 10px;">Course</th>
+                            <th style="padding: 10px;">Name</th>
+                            <th style="padding: 10px;">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mocksTableBody">
+                        <!-- Mocks injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- View: Profile -->
+        <section id="view-profile" class="view-section">
+            <div class="header">
+                <h1>Profile Settings</h1>
+            </div>
+            
+            <div class="profile-card" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 30px; border-radius: 20px; max-width: 500px; margin: 0 auto;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="width: 80px; height: 80px; background: var(--neon-blue); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--text-main); margin-bottom: 15px;" id="profileAvatar">U</div>
+                    <h2 style="margin: 0;" id="profileDisplayName">User</h2>
+                    <p style="color: var(--text-muted); margin-top: 5px;" id="profileEmail">user@example.com</p>
+                </div>
+
+                <!-- Theme Settings -->
+                <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin-top: 0; margin-bottom: 5px; font-size: 0.95rem; color: var(--text-main);">App Appearance</h3>
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">Switch between dark and light themes</span>
+                    </div>
+                    <button id="themeToggleBtn" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.9rem;">Toggle Theme</button>
+                </div>
+
+                <!-- Subscriptions -->
+                <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px;">
+                    <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Active Subscriptions</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--glass-border);">
+                        <span style="font-weight: 600; color: var(--text-main);">CSEB</span>
+                        <span style="color: var(--neon-green); font-size: 0.9rem; font-weight: 500;">Valid till 25/05/2027</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: var(--text-main);">ACCA FR</span>
+                        <span style="color: var(--neon-gold); font-size: 0.9rem; font-weight: 500;">Valid till 10 Sep 2026</span>
+                    </div>
+                </div>
+
+                <form id="updateProfileForm" style="margin-bottom: 25px;">
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="profileNameInput" required>
+                    </div>
+                    <button type="submit" class="btn" style="width: 100%;">Update Name</button>
+                </form>
+
+                <hr style="border: none; border-top: 1px solid var(--glass-border); margin: 25px 0;">
+
+                <form id="updatePasswordForm" style="margin-bottom: 25px;">
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" id="profilePasswordInput" required minlength="6">
+                    </div>
+                    <button type="submit" class="btn btn-outline" style="width: 100%;">Change Password</button>
+                </form>
+
+                <div style="text-align: center; margin-top: 40px;">
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version v1.0.0 (Up to date)</p>
+                    <button id="btnLogout" class="btn" style="background: var(--neon-red); color: var(--text-main); margin-top: 10px; border: none; width: 100%;">Logout</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Authentication Overlay -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-card" id="authLoginCard">
+            <div class="auth-logo">AcademicPulse</div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="loginEmail" required placeholder="name@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn-premium" style="width: 100%; margin-top: 15px; font-size: 1.05rem;" id="btnLoginSubmit">Log In</button>
+            </form>
+            <div style="text-align: center; margin-top: 25px; font-size: 0.95rem;">
+                <a href="#" id="linkToRegister" style="color: var(--neon-blue); text-decoration: none; font-weight: 600;">Create an account</a><br><br>
+                <a href="#" id="linkToReset" style="color: var(--text-muted); text-decoration: none;">Forgot password?</a>
+            </div>
+        </div>
+
+        <div class="auth-card" id="authRegisterCard" style="display: none;">
+            <div class="auth-logo">AcademicPulse</div>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="registerName" required placeholder="John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="registerEmail" required placeholder="name@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="registerPassword" required minlength="6" placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn-premium" style="width: 100%; margin-top: 15px; font-size: 1.05rem;" id="btnRegisterSubmit">Create Account</button>
+            </form>
+            <div style="text-align: center; margin-top: 25px; font-size: 0.95rem;">
+                <a href="#" id="linkToLogin" style="color: var(--neon-blue); text-decoration: none; font-weight: 600;">Already have an account? Log In</a>
+            </div>
+        </div>
+
+        <div class="auth-card" id="authResetCard" style="display: none;">
+            <div class="auth-logo">AcademicPulse</div>
+            <form id="resetPasswordForm">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="resetEmail" required placeholder="name@example.com">
+                </div>
+                <button type="submit" class="btn btn-premium" style="width: 100%; margin-top: 15px; font-size: 1.05rem;" id="btnResetSubmit">Send Reset Link</button>
+            </form>
+            <div style="text-align: center; margin-top: 25px; font-size: 0.95rem;">
+                <a href="#" id="linkToLoginFromReset" style="color: var(--neon-blue); text-decoration: none; font-weight: 600;">Back to Log In</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="subjectModal">
+        <div class="modal-card">
+            <h2 style="margin-top: 0;" id="subjectModalTitle">Add Subject</h2>
+            <input type="hidden" id="subjectIdInput">
+            <div class="form-group">
+                <label>Subject Name</label>
+                <input type="text" id="subjectNameInput" required>
+            </div>
+            <div class="form-group">
+                <label>Course</label>
+                <select id="subjectCourseInput">
+                    <option value="CSEB">CSEB</option>
+                    <option value="ACCA">ACCA</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Color Tag</label>
+                <input type="color" id="subjectColorInput" value="#2997FF" style="height: 40px; padding: 2px;">
+            </div>
+            <div class="form-group">
+                <label>Priority</label>
+                <select id="subjectPriorityInput">
+                    <option value="High">High</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Weekly Target (Hours)</label>
+                <input type="number" id="subjectTargetInput" min="1" value="5">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="closeSubjectModalBtn">Cancel</button>
+                <button class="btn" id="saveSubjectBtn">Save Subject</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto Pause Modal -->
+    <div class="modal-overlay" id="inactivityModal">
+        <div class="modal-card" style="text-align: center;">
+            <h2 style="margin-top: 0; color: var(--neon-gold)">Are you still studying?</h2>
+            <p style="color: var(--text-muted); margin-bottom: 30px;">We noticed 5 minutes of inactivity.</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button class="btn btn-outline" id="inactivityPauseBtn">Pause Timer</button>
+                <button class="btn" id="inactivityContinueBtn">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Goals Modal -->
+    <div class="modal-overlay" id="editGoalsModal">
+        <div class="modal-card">
+            <h2 style="margin-top: 0;">Edit Target Goals</h2>
+            <div class="form-group">
+                <label>Daily Goal (Hours)</label>
+                <input type="number" id="goalDailyInput" min="1" step="1">
+            </div>
+            <div class="form-group">
+                <label>Weekly Goal (Hours)</label>
+                <input type="number" id="goalWeeklyInput" min="1" step="1">
+            </div>
+            <div class="form-group">
+                <label>Monthly Goal (Hours)</label>
+                <input type="number" id="goalMonthlyInput" min="1" step="1">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="closeEditGoalsBtn">Cancel</button>
+                <button class="btn" id="saveGoalsBtn">Save Goals</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Retrospective Log Modal -->
+    <div class="modal-overlay" id="logSessionModal">
+        <div class="modal-card">
+            <h2 style="margin-top: 0;">Log Past Session</h2>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="logDateInput" required>
+            </div>
+            <div class="form-group">
+                <label>Course</label>
+                <select id="logCourseInput" required>
+                    <option value="CSEB">CSEB</option>
+                    <option value="ACCA">ACCA</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Subject</label>
+                <select id="logSubjectInput" required>
+                    <!-- Injected options -->
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Chapter / Notes</label>
+                <input type="text" id="logNotesInput" placeholder="e.g. Chapter 4 Review" required>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Hours</label>
+                    <input type="number" id="logHoursInput" min="0" value="1">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Minutes</label>
+                    <input type="number" id="logMinutesInput" min="0" max="59" value="0">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="closeLogModalBtn">Cancel</button>
+                <button class="btn" id="saveLogBtn">Save Session</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>

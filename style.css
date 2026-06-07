@@ -87,6 +87,14 @@ body.light-theme .ambient-bg { opacity: 0.6; }
     font-weight: 600;
 }
 
+/* Touch Opts */
+.nav-item, .btn, .day-cell, .timer-btn, .mode-btn {
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
 /* Main Content */
 .main-content {
     flex: 1;
@@ -350,9 +358,9 @@ h1 { font-size: 2.4rem; margin: 0; font-weight: 700; letter-spacing: -1px; }
     body { flex-direction: column; overflow: hidden; }
     
     .sidebar {
-        position: fixed; bottom: 0; left: 0; width: 100%; height: 75px;
+        position: fixed; bottom: 0; left: 0; width: 100%; height: calc(75px + env(safe-area-inset-bottom));
         flex-direction: row; justify-content: space-around; align-items: center;
-        padding: 5px 2px; border-right: none; border-top: 1px solid var(--glass-border);
+        padding: 5px 2px calc(5px + env(safe-area-inset-bottom)) 2px; border-right: none; border-top: 1px solid var(--glass-border);
         background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(25px); z-index: 100;
         overflow-x: auto; scrollbar-width: none;
     }
@@ -392,6 +400,7 @@ h1 { font-size: 2.4rem; margin: 0; font-weight: 700; letter-spacing: -1px; }
 
 @media (max-width: 400px) {
     .nav-text { display: none; } /* Hide text, show only icons for very small screens */
-    .nav-icon { font-size: 1.5rem; margin-top: 5px; }
+    .nav-icon { font-size: 1.6rem; margin-top: 8px; }
+    .nav-item { padding: 8px; justify-content: center; }
 }
 

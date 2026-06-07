@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AcademicPulse</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
@@ -441,10 +442,20 @@
                     </div>
                 </div>
                 
-                <div style="background: var(--glass-border); padding: 15px; border-radius: 12px; display: flex; gap: 10px; align-items: center;">
-                    <input type="number" id="practiceAddAttempted" placeholder="Attempted" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
-                    <input type="number" id="practiceAddCorrect" placeholder="Correct" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
-                    <button class="btn btn-outline" id="practiceAddBtn">Update</button>
+                <div style="background: var(--glass-border); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 10px;">
+                        <select id="practiceCourseInput" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                            <option value="CSEB">CSEB</option>
+                            <option value="ACCA">ACCA</option>
+                        </select>
+                        <select id="practiceSubjectInput" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="number" id="practiceAddAttempted" placeholder="Attempted" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                        <input type="number" id="practiceAddCorrect" placeholder="Correct" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                        <button class="btn btn-outline" id="practiceAddBtn">Log</button>
+                    </div>
                 </div>
             </div>
 

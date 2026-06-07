@@ -938,8 +938,16 @@ function renderAnalytics() {
     if(e('anaFocusScore')) e('anaFocusScore').textContent = `${focusScore}/100`;
 
     // Analytics: Practice
-    if(e('anaPracticeAttempted')) e('anaPracticeAttempted').textContent = AppState.questionPractice.attempted;
-    if(e('anaPracticeCorrect')) e('anaPracticeCorrect').innerHTML = `${AppState.questionPractice.correct} <span style="font-size:1rem; color: var(--text-muted);">(${AppState.questionPractice.attempted > 0 ? Math.round((AppState.questionPractice.correct/AppState.questionPractice.attempted)*100) : 0}%)</span>`;
+    let pracAtt = 0, pracCor = 0;
+    if (Array.isArray(AppState.questionPractice)) {
+        AppState.questionPractice.forEach(p => { pracAtt += p.attempted; pracCor += p.correct; });
+    } else {
+        pracAtt = AppState.questionPractice.attempted || 0;
+        pracCor = AppState.questionPractice.correct || 0;
+    }
+    
+    if(e('anaPracticeAttempted')) e('anaPracticeAttempted').textContent = pracAtt;
+    if(e('anaPracticeCorrect')) e('anaPracticeCorrect').innerHTML = `${pracCor} <span style="font-size:1rem; color: var(--text-muted);">(${pracAtt > 0 ? Math.round((pracCor/pracAtt)*100) : 0}%)</span>`;
 
     // Analytics: Mocks
     const mockContainer = e('anaMockTrendContainer');
@@ -1378,16 +1386,67 @@ window.initApp = function() {
 function initMocksAndPractice() {
     const attemptedTxt = document.getElementById('practiceAttemptedTxt');
     const correctTxt = document.getElementById('practiceCorrectTxt');
-    if (attemptedTxt) attemptedTxt.textContent = AppState.questionPractice.attempted;
-    if (correctTxt) correctTxt.innerHTML = `${AppState.questionPractice.correct} <span style="font-size:1rem; color: var(--text-muted);">(${AppState.questionPractice.attempted > 0 ? Math.round((AppState.questionPractice.correct/AppState.questionPractice.attempted)*100) : 0}%)</span>`;
+    
+    // Calculate global totals from array or legacy object
+    let totalAtt = 0, totalCor = 0;
+    if (Array.isArray(AppState.questionPractice)) {
+        AppState.questionPractice.forEach(p => { totalAtt += p.attempted; totalCor += p.correct; });
+    } else {
+        totalAtt = AppState.questionPractice.attempted || 0;
+        totalCor = AppState.questionPractice.correct || 0;
+    }
+    
+    if (attemptedTxt) attemptedTxt.textContent = totalAtt;
+    if (correctTxt) correctTxt.innerHTML = `${totalCor} <span style="font-size:1rem; color: var(--text-muted);">(${totalAtt > 0 ? Math.round((totalCor/totalAtt)*100) : 0}%)</span>`;
+
+    // Populate Subjects Dropdown
+    const courseSelect = document.getElementById('practiceCourseInput');
+    const subjSelect = document.getElementById('practiceSubjectInput');
+    
+    const populatePracticeSubjects = (course) => {
+        if(!subjSelect) return;
+        subjSelect.innerHTML = '';
+        const filtered = AppState.subjects.filter(s => s.course === course || (!s.course && course === 'CSEB'));
+        filtered.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name;
+            subjSelect.appendChild(opt);
+        });
+    };
+    
+    if(courseSelect) {
+        courseSelect.addEventListener('change', (e) => populatePracticeSubjects(e.target.value));
+        populatePracticeSubjects(courseSelect.value);
+    }
 
     document.getElementById('practiceAddBtn')?.addEventListener('click', () => {
         const addAtt = parseInt(document.getElementById('practiceAddAttempted').value) || 0;
         const addCor = parseInt(document.getElementById('practiceAddCorrect').value) || 0;
         if(addAtt === 0 && addCor === 0) return;
         
-        AppState.questionPractice.attempted += addAtt;
-        AppState.questionPractice.correct += addCor;
+        const c = document.getElementById('practiceCourseInput')?.value;
+        const sId = document.getElementById('practiceSubjectInput')?.value;
+        
+        if (!Array.isArray(AppState.questionPractice)) {
+            // Migrate legacy object to array
+            const legacyAtt = AppState.questionPractice.attempted || 0;
+            const legacyCor = AppState.questionPractice.correct || 0;
+            AppState.questionPractice = [];
+            if(legacyAtt > 0) {
+                AppState.questionPractice.push({ id: generateId(), date: new Date().toISOString(), course: 'Legacy', subjectId: null, attempted: legacyAtt, correct: legacyCor });
+            }
+        }
+        
+        AppState.questionPractice.push({
+            id: generateId(),
+            date: new Date().toISOString(),
+            course: c,
+            subjectId: sId,
+            attempted: addAtt,
+            correct: addCor
+        });
+        
         saveData('practice');
         
         document.getElementById('practiceAddAttempted').value = '';

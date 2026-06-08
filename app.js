@@ -54,7 +54,7 @@ const AppState = {
     questionPractice: { attempted: 0, correct: 0 },
     csebSyllabus: {},
     notifications: [],
-    currentVersion: 'v1.1.20',
+    currentVersion: 'v1.1.21',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -152,7 +152,7 @@ function loadData() {
 
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.20', availableUpdate: null, dataVersion: 1 });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.21', availableUpdate: null, dataVersion: 1 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
@@ -796,7 +796,7 @@ function renderOverview() {
         tbody.innerHTML = '';
         const recent = [...AppState.sessions].sort((a,b) => new Date(b.startTime) - new Date(a.startTime)).slice(0, 5);
         if (recent.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No recent sessions</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No recent sessions</td></tr>';
         } else {
             recent.forEach(log => {
                 const subj = AppState.subjects.find(s => s.id === log.subjectId);
@@ -814,8 +814,11 @@ function renderOverview() {
                             </div>
                         </td>
                         <td style="padding:15px 10px;">${timeStr}</td>
-                        <td style="padding:15px 10px; font-family:'Inter',monospace;">${durStr}</td>
                         <td style="padding:15px 10px; color:var(--text-muted); font-size:0.85rem;">${log.notes || '-'}</td>
+                        <td style="padding:15px 10px; text-align:right; min-width: 100px;">
+                            <a href="#" style="color:var(--neon-blue); margin-right:10px; font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); editAttendance('${log.id}')">Edit</a>
+                            <a href="#" style="color:var(--neon-red); font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); deleteAttendance('${log.id}')">Delete</a>
+                        </td>
                     </tr>
                 `;
             });
@@ -950,9 +953,22 @@ function renderDayReport(dateKey) {
     const content = document.getElementById('dayReportContent');
     const totalDiv = document.getElementById('dayReportTotal');
     
+    const currentStatus = AppState.attendance[dateKey] || 'none';
+    let statusText = '';
+    if (currentStatus === 'absent') statusText = '<span style="color:var(--neon-red); margin-left:10px; font-size:0.9rem;">(Marked Absent)</span>';
+    if (currentStatus === 'leave') statusText = '<span style="color:var(--neon-yellow); margin-left:10px; font-size:0.9rem;">(Marked Leave)</span>';
+
+    const statusControls = `
+        <div style="margin-bottom:15px; display:flex; gap:10px;">
+            <button class="btn btn-outline" style="padding:4px 8px; font-size:0.8rem; flex:1;" onclick="setAttendanceStatus('${dateKey}', 'absent')">Mark Absent</button>
+            <button class="btn btn-outline" style="padding:4px 8px; font-size:0.8rem; flex:1;" onclick="setAttendanceStatus('${dateKey}', 'leave')">Mark Leave</button>
+            <button class="btn btn-outline" style="padding:4px 8px; font-size:0.8rem; flex:1;" onclick="setAttendanceStatus('${dateKey}', 'none')">Clear Status</button>
+        </div>
+    `;
+    
     if (daySessions.length === 0) {
-        totalDiv.textContent = 'Total Studied: 0h 0m';
-        content.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: 40px;">No sessions logged for this day.</div>';
+        totalDiv.innerHTML = `Total Studied: 0h 0m ${statusText}`;
+        content.innerHTML = statusControls + '<div style="text-align: center; color: var(--text-muted); margin-top: 40px;">No sessions logged for this day.</div>';
         return;
     }
 
@@ -975,6 +991,7 @@ function renderDayReport(dateKey) {
                     <span>${subj.name}</span>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <span style="color: var(--neon-blue);">${timeStr}</span>
+                        <button onclick="editAttendance('${s.id}')" style="background:transparent; border:none; color:var(--neon-blue); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Edit Session">✎</button>
                         <button onclick="deleteSession('${s.id}')" style="background:transparent; border:none; color:var(--neon-red); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Delete Session">×</button>
                     </div>
                 </div>
@@ -985,10 +1002,22 @@ function renderDayReport(dateKey) {
 
     let totalHrs = Math.floor(totalDuration / 3600);
     let totalMins = Math.floor((totalDuration % 3600) / 60);
-    totalDiv.textContent = `Total Studied: ${totalHrs}h ${totalMins}m`;
+    totalDiv.innerHTML = `Total Studied: ${totalHrs}h ${totalMins}m ${statusText}`;
     
-    content.innerHTML = html;
+    content.innerHTML = statusControls + html;
 }
+
+window.setAttendanceStatus = function(dateKey, status) {
+    if (status === 'none') {
+        delete AppState.attendance[dateKey];
+    } else {
+        AppState.attendance[dateKey] = status;
+    }
+    saveData('attendance');
+    renderAttendance();
+    renderDayReport(dateKey);
+    renderAnalytics();
+};
 
 window.deleteSession = function(sessionId) {
     if (!confirm("Are you sure you want to delete this recorded session?")) return;
@@ -2048,8 +2077,9 @@ function renderMocksHistory() {
             <td style="padding:15px 10px;">${new Date(m.date).toLocaleDateString()}</td>
             <td class="mock-name" style="padding:15px 10px;"></td>
             <td style="padding:15px 10px;">${m.score} / ${m.maxScore} (${pct}%)</td>
-            <td style="padding:15px 10px;">
-                <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteMock('${m.id}')">Delete</button>
+            <td style="padding:15px 10px; text-align:right; min-width: 100px;">
+                <a href="#" style="color:var(--neon-blue); margin-right:10px; font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); editMock('${m.id}')">Edit</a>
+                <a href="#" style="color:var(--neon-red); font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); deleteMock('${m.id}')">Delete</a>
             </td>
         `;
         tr.querySelector('.mock-name').textContent = m.name;
@@ -2635,11 +2665,150 @@ function renderPracticeHistory() {
                 <div style="font-weight:bold; color:${color}">${pct}%</div>
                 <div style="font-size:0.8rem; color:var(--text-muted);">${m.correct}/${m.attempted}</div>
             </td>
-            <td style="padding:15px 10px; text-align:right;">
-                <button class="btn btn-outline" style="padding:5px 10px; font-size:0.8rem; border-color:var(--neon-red); color:var(--neon-red);" onclick="deletePractice('${m.id}')">Delete</button>
+            <td style="padding:15px 10px; text-align:right; min-width: 100px;">
+                <a href="#" style="color:var(--neon-blue); margin-right:10px; font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); editPractice('${m.id}')">Edit</a>
+                <a href="#" style="color:var(--neon-red); font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); deletePractice('${m.id}')">Delete</a>
             </td>
         `;
         tbody.appendChild(tr);
     });
 }
 
+// ==========================================
+// EDIT / DELETE SESSIONS
+// ==========================================
+
+window.deleteAttendance = function(id) {
+    if (!confirm("Are you sure you want to delete this session?")) return;
+    const session = AppState.sessions.find(s => s.id === id);
+    if (!session) return;
+    AppState.sessions = AppState.sessions.filter(s => s.id !== id);
+    saveData('sessions');
+    renderOverview();
+    renderAnalytics();
+};
+
+window.editAttendance = function(id) {
+    const session = AppState.sessions.find(s => s.id === id);
+    if (!session) return;
+    
+    document.getElementById('editAttendanceId').value = id;
+    document.getElementById('editAttendanceDate').value = session.startTime.split('T')[0];
+    
+    const subjectSelect = document.getElementById('editAttendanceSubject');
+    subjectSelect.innerHTML = '';
+    AppState.subjects.forEach(subj => {
+        const opt = document.createElement('option');
+        opt.value = subj.id;
+        opt.textContent = subj.name;
+        subjectSelect.appendChild(opt);
+    });
+    document.getElementById('editAttendanceSubject').value = session.subjectId;
+    
+    document.getElementById('editAttendanceNotes').value = session.notes || '';
+    
+    const durSecs = session.duration || 0;
+    const h = Math.floor(durSecs / 3600);
+    const m = Math.floor((durSecs % 3600) / 60);
+    
+    document.getElementById('editAttendanceHours').value = h;
+    document.getElementById('editAttendanceMinutes').value = m;
+    
+    document.getElementById('editAttendanceModal').classList.add('active');
+};
+
+window.saveEditAttendance = function() {
+    const id = document.getElementById('editAttendanceId').value;
+    const date = document.getElementById('editAttendanceDate').value;
+    const subj = document.getElementById('editAttendanceSubject').value;
+    const notes = document.getElementById('editAttendanceNotes').value;
+    const h = parseInt(document.getElementById('editAttendanceHours').value) || 0;
+    const m = parseInt(document.getElementById('editAttendanceMinutes').value) || 0;
+    
+    const session = AppState.sessions.find(s => s.id === id);
+    if (!session) return;
+    if (!date || !subj) return alert("Date and subject are required.");
+    
+    const durSecs = (h * 3600) + (m * 60);
+    if (durSecs <= 0) return alert("Duration must be > 0");
+    
+    session.startTime = new Date(date + 'T12:00:00Z').toISOString();
+    session.endTime = new Date(new Date(session.startTime).getTime() + durSecs*1000).toISOString();
+    session.subjectId = subj;
+    session.notes = notes;
+    session.duration = durSecs;
+    
+    saveData('sessions');
+    document.getElementById('editAttendanceModal').classList.remove('active');
+    renderOverview();
+    renderAnalytics();
+};
+
+window.editPractice = function(id) {
+    const session = AppState.questionPractice.find(s => s.id === id);
+    if (!session) return;
+    
+    document.getElementById('editPracticeId').value = id;
+    document.getElementById('editPracticeDate').value = session.date;
+    document.getElementById('editPracticeAttempted').value = session.attempted;
+    document.getElementById('editPracticeCorrect').value = session.correct;
+    
+    document.getElementById('editPracticeModal').classList.add('active');
+};
+
+window.saveEditPractice = function() {
+    const id = document.getElementById('editPracticeId').value;
+    const date = document.getElementById('editPracticeDate').value;
+    const attempted = parseInt(document.getElementById('editPracticeAttempted').value) || 0;
+    const correct = parseInt(document.getElementById('editPracticeCorrect').value) || 0;
+    
+    if (!date || attempted < 1) return alert("Valid date and attempted questions > 0 are required.");
+    if (correct > attempted) return alert("Correct answers cannot exceed attempted.");
+    
+    const session = AppState.questionPractice.find(s => s.id === id);
+    if (!session) return;
+    
+    session.date = date;
+    session.attempted = attempted;
+    session.correct = correct;
+    
+    saveData('practice');
+    document.getElementById('editPracticeModal').classList.remove('active');
+    renderPracticeTotals();
+    renderPracticeHistory();
+    renderAnalytics();
+};
+
+window.editMock = function(id) {
+    const session = AppState.mockTests.find(s => s.id === id);
+    if (!session) return;
+    
+    document.getElementById('editMockId').value = id;
+    document.getElementById('editMockDate').value = session.date;
+    document.getElementById('editMockScore').value = session.score;
+    document.getElementById('editMockMaxScore').value = session.maxScore;
+    
+    document.getElementById('editMockModal').classList.add('active');
+};
+
+window.saveEditMock = function() {
+    const id = document.getElementById('editMockId').value;
+    const date = document.getElementById('editMockDate').value;
+    const score = parseFloat(document.getElementById('editMockScore').value) || 0;
+    const maxScore = parseFloat(document.getElementById('editMockMaxScore').value) || 0;
+    
+    if (!date || maxScore < 1) return alert("Valid date and max score > 0 are required.");
+    if (score > maxScore) return alert("Score cannot exceed max score.");
+    
+    const session = AppState.mockTests.find(s => s.id === id);
+    if (!session) return;
+    
+    session.date = date;
+    session.score = score;
+    session.maxScore = maxScore;
+    
+    saveData('mocks');
+    document.getElementById('editMockModal').classList.remove('active');
+    renderMocksHistory();
+    renderAnalytics();
+};

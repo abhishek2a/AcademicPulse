@@ -112,14 +112,15 @@
                 <table style="width: 100%; border-collapse: collapse; margin-top: 15px; text-align: left;">
                     <thead>
                         <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.85rem;">
-                            <th style="padding: 10px;">Subject</th>
-                            <th style="padding: 10px;">Time</th>
-                            <th style="padding: 10px;">Duration</th>
-                            <th style="padding: 10px;">Notes</th>
+                            <th style="padding: 10px; font-weight: 500;">Subject</th>
+                            <th style="padding: 10px; font-weight: 500;">Time</th>
+                            <th style="padding: 10px; font-weight: 500;">Duration</th>
+                            <th style="padding: 10px; font-weight: 500;">Notes</th>
+                            <th style="padding: 10px; font-weight: 500; text-align: right;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="recentLogsTableBody">
-                        <tr><td colspan="4" style="text-align: center; padding: 20px;">No recent logs</td></tr>
+                        <tr><td colspan="5" style="text-align: center; padding: 20px;">No recent logs</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -533,9 +534,9 @@
                     <thead>
                         <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.85rem;">
                             <th style="padding: 10px;">Date</th>
-                            <th style="padding: 10px;">Course</th>
                             <th style="padding: 10px;">Name</th>
                             <th style="padding: 10px;">Score</th>
+                            <th style="padding: 10px; text-align: right;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="mocksTableBody">
@@ -688,7 +689,7 @@
                 </form>
 
                 <div style="text-align: center; margin-top: 40px;">
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version <span id="appVersionTextProfile">v1.1.20</span></p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version <span id="appVersionTextProfile">v1.1.21</span></p>
                     <button id="btnLogout" class="btn" style="background: var(--neon-red); color: var(--text-main); margin-top: 10px; border: none; width: 100%;">Logout</button>
                 </div>
             </div>
@@ -936,6 +937,87 @@
             </div>
         </div>
     </div>
+    <!-- Edit Attendance Modal -->
+    <div class="modal-overlay" id="editAttendanceModal">
+        <div class="modal-card">
+            <h2 style="margin-top: 0;">Edit Study Session</h2>
+            <input type="hidden" id="editAttendanceId">
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="editAttendanceDate" required>
+            </div>
+            <div class="form-group">
+                <label>Subject</label>
+                <select id="editAttendanceSubject" required></select>
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <input type="text" id="editAttendanceNotes" required>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Hours</label>
+                    <input type="number" id="editAttendanceHours" min="0">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Minutes</label>
+                    <input type="number" id="editAttendanceMinutes" min="0" max="59">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="document.getElementById('editAttendanceModal').classList.remove('active')">Cancel</button>
+                <button class="btn" onclick="saveEditAttendance()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Practice Modal -->
+    <div class="modal-overlay" id="editPracticeModal">
+        <div class="modal-card">
+            <h2 style="margin-top: 0;">Edit Practice Session</h2>
+            <input type="hidden" id="editPracticeId">
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="editPracticeDate" required>
+            </div>
+            <div class="form-group">
+                <label>Attempted Questions</label>
+                <input type="number" id="editPracticeAttempted" min="1" required>
+            </div>
+            <div class="form-group">
+                <label>Correct Answers</label>
+                <input type="number" id="editPracticeCorrect" min="0" required>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="document.getElementById('editPracticeModal').classList.remove('active')">Cancel</button>
+                <button class="btn" onclick="saveEditPractice()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Mock Modal -->
+    <div class="modal-overlay" id="editMockModal">
+        <div class="modal-card">
+            <h2 style="margin-top: 0;">Edit Mock Exam</h2>
+            <input type="hidden" id="editMockId">
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="editMockDate" required>
+            </div>
+            <div class="form-group">
+                <label>Score</label>
+                <input type="number" id="editMockScore" min="0" step="0.5" required>
+            </div>
+            <div class="form-group">
+                <label>Max Score</label>
+                <input type="number" id="editMockMaxScore" min="1" required>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="document.getElementById('editMockModal').classList.remove('active')">Cancel</button>
+                <button class="btn" onclick="saveEditMock()">Save Changes</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Whats New Modal -->
     <div class="modal-overlay" id="whatsNewModal">
@@ -953,6 +1035,6 @@
 
     <script src="auth.js?v=8"></script>
     <script src="export.js?v=5"></script>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=12"></script>
 </body>
 </html>

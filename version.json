@@ -1,9 +1,10 @@
 {
-  "version": "1.1.22",
+  "version": "1.1.21",
   "build": "2026.06.08",
   "features": [
-    "Welcome to the AcademicPulse v1.1.20 update! This release brings powerful new analytics, enhanced performance, and intuitive tools designed to keep your exam preparation on track.",
+    "Welcome to the AcademicPulse v1.1.21 update! This release brings powerful new analytics, enhanced performance, and intuitive tools designed to keep your exam preparation on track.",
     "<b>✨ Major Features</b>",
+    "Session Management ✏️: Added full Edit and Delete functionality for past Attendance logs, Question Practice sessions, and Mock Exams to easily correct mistakes.",
     "Exam Readiness Engine 🎯: We have introduced a dedicated readiness engine to track your preparation for specific courses like ACCA FR and CSEB. This feature evaluates your progress, highlights your weakest areas (🔴), and provides smart topic recommendations (💡).",
     "Performance Matrix: Added a comprehensive Performance Matrix by Syllabus Area. You can now track your accuracy, mock exam averages, and total questions done for specific topics.",
     "PDF Report Analyzer 🔍: A brand-new drag-and-drop report analyzer has been added. You can now upload your exported daily or monthly PDF reports, and the app will analyze your hours and attendance to generate personalized improvement suggestions.",

@@ -41,7 +41,7 @@ const EXAMS = [
     { category: 'CAT 11/2026 · TARGET', date: '2026-07-11T00:00:00', title: 'Junior Clerk / Cashier', subtext: 'Special Grade · Class-I Banks' },
     { category: 'CAT 10/2026 · UPCOMING', date: '2026-08-08T00:00:00', title: 'Junior Clerk / Cashier', subtext: 'Super Grade Banks' },
     { category: 'CAT 09/2026 · UPCOMING', date: '2026-08-16T00:00:00', title: 'Assistant Secretary', subtext: '' },
-    { category: 'ACCA · UPCOMING', date: '2026-09-10T00:00:00', title: 'Financial Reporting (FR)', subtext: 'ACCA Certification' }
+    { category: 'ACCA · UPCOMING', date: '2026-09-10T00:00:00', title: 'Financial Reporting (FR)', subtext: '' }
 ];
 
 const AppState = {
@@ -49,12 +49,13 @@ const AppState = {
     attendance: {},
     sessions: [],
     goals: DEFAULT_GOALS,
-    accaTopics: [],
+    accaTopics: {},
     mockTests: [],
     questionPractice: { attempted: 0, correct: 0 },
     csebSyllabus: {},
     notifications: [],
-    currentVersion: 'v1.0.0',
+    currentVersion: 'v1.1.20',
+    dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
 };
@@ -138,32 +139,23 @@ function loadData() {
     AppState.sessions = Storage.get(STORAGE_KEYS.SESSIONS, []);
     AppState.goals = Storage.get(STORAGE_KEYS.GOALS, DEFAULT_GOALS);
     
-    AppState.accaTopics = Storage.get(STORAGE_KEYS.ACCA_TOPICS, []);
-    if (AppState.accaTopics.length === 0) {
-        AppState.accaTopics = [
-            { name: "Conceptual Framework", completed: false },
-            { name: "IAS 1 Presentation of Financial Statements", completed: false },
-            { name: "IAS 16 Property, Plant & Equipment", completed: false },
-            { name: "IAS 38 Intangible Assets", completed: false },
-            { name: "IAS 36 Impairment", completed: false },
-            { name: "IAS 37 Provisions", completed: false },
-            { name: "IAS 2 Inventories", completed: false },
-            { name: "IAS 7 Cash Flow Statements", completed: false },
-            { name: "IFRS 15 Revenue", completed: false },
-            { name: "Consolidation", completed: false },
-            { name: "Interpretation Questions", completed: false }
-        ];
-    }
-    
     // New tracking keys
     AppState.mockTests = Storage.get(STORAGE_KEYS.MOCKS, []);
     AppState.questionPractice = Storage.get(STORAGE_KEYS.PRACTICE, { attempted: 0, correct: 0 });
     AppState.csebSyllabus = Storage.get(STORAGE_KEYS.CSEB_SYLLABUS, {});
+    AppState.accaTopics = Storage.get(STORAGE_KEYS.ACCA_TOPICS, {});
+    
+    // Force reset if accaTopics is an old legacy array to trigger the fallback builder
+    if (Array.isArray(AppState.accaTopics)) {
+        AppState.accaTopics = {};
+    }
+
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.0', availableUpdate: null });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.20', availableUpdate: null, dataVersion: 1 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
+    AppState.dataVersion = sysState.dataVersion || 1;
     
     if (Object.keys(AppState.csebSyllabus).length === 0) {
         AppState.csebSyllabus = {
@@ -266,7 +258,67 @@ function loadData() {
         };
         saveData('csebSyllabus');
     }
+
+    if (Object.keys(AppState.accaTopics).length === 0) {
+        AppState.accaTopics = {
+            "IAS Standards": [
+                { name: "IAS 1 Presentation of Financial Statements", completed: false, difficulty: "Medium" },
+                { name: "IAS 16 Property, Plant & Equipment", completed: false, difficulty: "Medium" },
+                { name: "IAS 38 Intangible Assets", completed: false, difficulty: "Medium" },
+                { name: "IAS 36 Impairment", completed: false, difficulty: "Medium" },
+                { name: "IAS 37 Provisions", completed: false, difficulty: "Medium" },
+                { name: "IAS 2 Inventories", completed: false, difficulty: "Medium" },
+                { name: "IAS 7 Cash Flow Statements", completed: false, difficulty: "Medium" }
+            ],
+            "IFRS Standards": [
+                { name: "IFRS 15 Revenue", completed: false, difficulty: "Medium" }
+            ],
+            "Consolidation": [
+                { name: "Consolidation P&L and Balance Sheet", completed: false, difficulty: "Medium" }
+            ],
+            "Interpretation": [
+                { name: "Interpretation Questions", completed: false, difficulty: "Medium" }
+            ],
+            "Ethics": [
+                { name: "Conceptual Framework & Ethics", completed: false, difficulty: "Medium" }
+            ]
+        };
+        saveData('accaTopics');
+    }
 }
+
+window.showWhatsNewPopup = async function() {
+    let features = [];
+    try {
+        const res = await fetch('version.json?t=' + new Date().getTime());
+        const data = await res.json();
+        features = data.features;
+    } catch(e) {
+        console.warn('Could not fetch version details, using fallback.', e);
+        features = [
+            "Welcome to the AcademicPulse update! This release brings powerful new analytics, enhanced performance, and intuitive tools.",
+            "<b>✨ Major Features</b>",
+            "Exam Readiness Engine 🎯: Track your preparation for specific courses like ACCA FR and CSEB.",
+            "Performance Matrix: Comprehensive Performance Matrix by Syllabus Area.",
+            "PDF Report Analyzer 🔍: Upload exported PDF reports for personalized improvement suggestions.",
+            "Global Search 🔎: Find past data easily.",
+            "Inactivity Auto-Pause: Detects 5 minutes of inactivity to keep tracking accurate.",
+            "<b>📈 Analytics Enhancements</b>",
+            "Study Heatmap & Consistency Analytics.",
+            "30-Day Forecast.",
+            "Goal Achievement Rates.",
+            "<b>🛠️ UI & Performance Improvements</b>",
+            "Optimized Loading: Much faster initial app startup time.",
+            "Theme Toggle: Switch between dark and light themes.",
+            "In-App Software Updates: See release notes instantly."
+        ];
+    }
+    const list = document.getElementById('whatsNewModalList');
+    if(list) {
+        list.innerHTML = features.map(f => `<li style="margin-bottom: 10px;">${f}</li>`).join('');
+        document.getElementById('whatsNewModal').classList.add('active');
+    }
+};
 
 function saveData(key) {
     if (key === 'subjects' || key === 'all') Storage.set(STORAGE_KEYS.SUBJECTS, AppState.subjects);
@@ -283,7 +335,8 @@ function saveData(key) {
     if (key === 'notifications' || key === 'all') Storage.set(STORAGE_KEYS.NOTIFICATIONS, AppState.notifications);
     if (key === 'system' || key === 'all') Storage.set(STORAGE_KEYS.SYSTEM_STATE, {
         currentVersion: AppState.currentVersion,
-        availableUpdate: AppState.availableUpdate
+        availableUpdate: AppState.availableUpdate,
+        dataVersion: AppState.dataVersion
     });
 
     if (typeof window.triggerCloudSync === 'function') {
@@ -461,7 +514,8 @@ function renderSubjects() {
                 syllabusType = 'csebSyllabus';
             }
         } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
-            syllabusTopics = AppState.accaTopics;
+            // New logic: Flatten categories to count overall
+            syllabusTopics = [].concat(...Object.values(AppState.accaTopics));
             syllabusType = 'accaTopics';
         }
         
@@ -516,7 +570,7 @@ window.openSyllabusModal = (subjId) => {
             syllabusType = 'csebSyllabus';
         }
     } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
-        syllabusTopics = AppState.accaTopics;
+        syllabusTopics = [].concat(...Object.values(AppState.accaTopics));
         syllabusType = 'accaTopics';
     }
     
@@ -892,7 +946,7 @@ function renderDayReport(dateKey) {
     btn.style.display = 'block';
     btn.onclick = () => openLogSessionModal(dateKey);
 
-    const daySessions = AppState.sessions.filter(s => s.startTime.startsWith(dateKey));
+    const daySessions = AppState.sessions.filter(s => TimeUtils.getDateKey(new Date(s.startTime)) === dateKey);
     const content = document.getElementById('dayReportContent');
     const totalDiv = document.getElementById('dayReportTotal');
     
@@ -944,13 +998,18 @@ window.deleteSession = function(sessionId) {
         AppState.sessions = AppState.sessions.filter(s => s.id !== sessionId);
         saveData('sessions');
         
-        // Find if this was the only session for that date. If so, we could potentially clear attendance, but for now we just delete the session.
+        const dateKey = TimeUtils.getDateKey(new Date(session.startTime));
+        const remainingSessions = AppState.sessions.filter(s => TimeUtils.getDateKey(new Date(s.startTime)) === dateKey);
+        if (remainingSessions.length === 0) {
+            delete AppState.attendance[dateKey];
+            saveData('attendance');
+        }
+        
         renderOverview();
         renderAttendance();
         renderAnalytics();
         
         // Re-render the currently open day report
-        const dateKey = TimeUtils.getDateKey(new Date(session.startTime));
         renderDayReport(dateKey);
     }
 }
@@ -964,6 +1023,7 @@ let subjectPieChartInst = null;
 let monthlyAttendanceBarChartInst = null;
 
 function renderAnalytics() {
+    const now = new Date();
     generateSmartInsights();
     
     if (!AppState.analyticsCache) rebuildAnalyticsCache();
@@ -1079,105 +1139,198 @@ function renderAnalytics() {
     const focusScore = Math.min(100, Math.round((todaySecs/dGoal)*60 + (streaks.current*2)));
     if(e('anaFocusScore')) e('anaFocusScore').textContent = `${focusScore}/100`;
 
-    // Analytics: Practice
-    let pracAtt = 0, pracCor = 0;
-    if (Array.isArray(AppState.questionPractice)) {
-        AppState.questionPractice.forEach(p => { pracAtt += p.attempted; pracCor += p.correct; });
-    } else {
-        pracAtt = AppState.questionPractice.attempted || 0;
-        pracCor = AppState.questionPractice.correct || 0;
-    }
+    // --- NEW ANALYTICS ENGINE: Performance Matrix & Readiness ---
     
-    if(e('anaPracticeAttempted')) e('anaPracticeAttempted').textContent = pracAtt;
-    if(e('anaPracticeCorrect')) e('anaPracticeCorrect').innerHTML = `${pracCor} <span style="font-size:1rem; color: var(--text-muted);">(${pracAtt > 0 ? Math.round((pracCor/pracAtt)*100) : 0}%)</span>`;
-
-    // Analytics: Mocks
-    const mockContainer = e('anaMockTrendContainer');
-    if(mockContainer) {
-        if(AppState.mockTests.length === 0) {
-            mockContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">No mock tests logged yet.</div>';
-        } else {
-            mockContainer.innerHTML = '';
-            const recentMocks = [...AppState.mockTests].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 3);
-            recentMocks.forEach(m => {
-                const pct = Math.round((m.score / m.maxScore) * 100);
-                let color = 'var(--neon-green)';
-                if(pct < 50) color = 'var(--neon-red)';
-                else if(pct < 75) color = 'var(--neon-gold)';
-                mockContainer.innerHTML += `
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 500; font-size: 0.9rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.name}</span>
-                        <div style="flex: 2; margin: 0 15px; background: var(--glass-border); height: 8px; border-radius: 4px;"><div style="width: ${pct}%; background: ${color}; height: 100%; border-radius: 4px;"></div></div>
-                        <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem; width: 40px; text-align: right;">${pct}%</span>
-                    </div>
-                `;
-            });
+    // 1. Gather all areas and compute metrics
+    const performanceData = {}; // key: areaName
+    
+    // Helper to init
+    const initAreaObj = (area, course) => {
+        if(!performanceData[area]) {
+            performanceData[area] = {
+                course: course, area: area,
+                practiceAtt: 0, practiceCor: 0,
+                mockScores: [], mockMaxScores: [],
+                completedTopics: 0, totalTopics: 0
+            };
         }
-    }
+    };
 
-    // Analytics: CSEB Coverage
-    const csebContainer = e('anaCsebCoverageContainer');
-    if(csebContainer) {
-        if(Object.keys(AppState.csebSyllabus).length === 0) {
-            csebContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">No syllabus data yet.</div>';
-        } else {
-            csebContainer.innerHTML = '';
-            Object.keys(AppState.csebSyllabus).forEach(subjName => {
-                const topics = AppState.csebSyllabus[subjName];
-                let comp = 0;
-                topics.forEach(t => { if(t.completed) comp++; });
-                const pct = topics.length > 0 ? Math.round((comp / topics.length) * 100) : 0;
-                let color = 'var(--neon-blue)';
-                if(pct > 80) color = 'var(--neon-green)';
-                else if(pct > 40) color = 'var(--neon-gold)';
-                else if(pct > 0) color = 'var(--neon-purple)';
-                else color = 'var(--text-muted)';
-                
-                csebContainer.innerHTML += `
-                    <div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.85rem;"><span>${subjName}</span><span style="color:${color};">${pct}%</span></div>
-                        <div class="progress-bar-bg" style="height: 6px;"><div class="progress-bar-fill" style="background: ${color}; width: ${pct}%;"></div></div>
-                    </div>
-                `;
-            });
-        }
-    }
-
-    // Analytics: ACCA Coverage
-    const accaContainer = e('anaAccaTopicList');
-    let accaTopicsCompleted = 0;
-    if(accaContainer) {
-        if(AppState.accaTopics.length === 0) {
-            accaContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem;">No syllabus data yet.</div>';
-        } else {
-            accaContainer.innerHTML = '';
-            AppState.accaTopics.forEach(t => {
-                if(t.completed) accaTopicsCompleted++;
-                const pct = t.completed ? 100 : 0;
-                let color = t.completed ? 'var(--neon-green)' : 'var(--glass-border)';
-                accaContainer.innerHTML += `
-                    <div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.85rem;"><span>${t.name}</span><span style="color:${color};">${pct}%</span></div>
-                        <div class="progress-bar-bg" style="height: 6px; background: var(--glass-bg);"><div class="progress-bar-fill" style="background: ${color}; width: ${pct}%;"></div></div>
-                    </div>
-                `;
-            });
-        }
-    }
-
-    // Exam Readiness Engine
-    const accaTopicPct = AppState.accaTopics.length > 0 ? (accaTopicsCompleted / AppState.accaTopics.length) * 100 : 0;
-    let csebTopicsCompleted = 0, csebTotalTopics = 0;
-    Object.keys(AppState.csebSyllabus).forEach(subj => {
-        AppState.csebSyllabus[subj].forEach(t => {
-            csebTotalTopics++;
-            if(t.completed) csebTopicsCompleted++;
+    // Syllabus
+    let accaTopicsCompleted = 0, totalAccaTopics = 0;
+    Object.entries(AppState.accaTopics).forEach(([area, topics]) => {
+        initAreaObj(area, 'ACCA');
+        topics.forEach(t => {
+            performanceData[area].totalTopics++;
+            totalAccaTopics++;
+            if(t.completed) {
+                performanceData[area].completedTopics++;
+                accaTopicsCompleted++;
+            }
         });
     });
-    const csebTopicPct = csebTotalTopics > 0 ? (csebTopicsCompleted / csebTotalTopics) * 100 : 0;
+
+    let csebTopicsCompleted = 0, totalCsebTopics = 0;
+    Object.entries(AppState.csebSyllabus).forEach(([area, topics]) => {
+        initAreaObj(area, 'CSEB');
+        topics.forEach(t => {
+            performanceData[area].totalTopics++;
+            totalCsebTopics++;
+            if(t.completed) {
+                performanceData[area].completedTopics++;
+                csebTopicsCompleted++;
+            }
+        });
+    });
+
+    // Practice
+    if (Array.isArray(AppState.questionPractice)) {
+        AppState.questionPractice.forEach(p => {
+            if(p.syllabusArea && p.syllabusArea !== 'General') {
+                initAreaObj(p.syllabusArea, p.course);
+                performanceData[p.syllabusArea].practiceAtt += p.attempted || 0;
+                performanceData[p.syllabusArea].practiceCor += p.correct || 0;
+            }
+        });
+    }
+
+    // Mocks
+    AppState.mockTests.forEach(m => {
+        if(m.syllabusArea && m.syllabusArea !== 'General') {
+            initAreaObj(m.syllabusArea, m.course);
+            performanceData[m.syllabusArea].mockScores.push(m.score);
+            performanceData[m.syllabusArea].mockMaxScores.push(m.maxScore);
+        }
+    });
+
+    // Compute derived metrics
+    const matrixRows = [];
+    Object.values(performanceData).forEach(d => {
+        d.accPct = d.practiceAtt > 0 ? (d.practiceCor / d.practiceAtt) * 100 : 0;
+        
+        let sumS = 0, sumM = 0;
+        d.mockScores.forEach((s, i) => { sumS += s; sumM += d.mockMaxScores[i]; });
+        d.mockPct = sumM > 0 ? (sumS / sumM) * 100 : 0;
+        
+        // Syllabus completion pct for this area
+        d.sylPct = d.totalTopics > 0 ? (d.completedTopics / d.totalTopics) * 100 : 0;
+
+        // Composite area score
+        d.compositeScore = (d.accPct * 0.4) + (d.mockPct * 0.6);
+        if(d.practiceAtt === 0 && d.mockScores.length === 0) d.compositeScore = 0; // No data
+
+        let statusText = 'Need Data', color = 'var(--text-muted)';
+        if (d.practiceAtt > 0 || d.mockScores.length > 0) {
+            if (d.compositeScore >= 80) { statusText = 'Strong'; color = 'var(--neon-green)'; }
+            else if (d.compositeScore >= 60) { statusText = 'Average'; color = 'var(--neon-gold)'; }
+            else { statusText = 'Needs Work'; color = 'var(--neon-red)'; }
+        }
+        d.statusText = statusText;
+        d.color = color;
+        
+        matrixRows.push(d);
+    });
+
+    // 2. Render Performance Matrix
+    const matrixBody = e('performanceMatrixBody');
+    if (matrixBody) {
+        matrixBody.innerHTML = '';
+        if (matrixRows.length === 0) {
+            matrixBody.innerHTML = '<tr><td colspan="6" style="padding: 15px; text-align: center; color: var(--text-muted);">No syllabus performance data yet.</td></tr>';
+        } else {
+            matrixRows.sort((a,b) => b.compositeScore - a.compositeScore).forEach(r => {
+                matrixBody.innerHTML += `
+                    <tr style="border-bottom: 1px solid var(--glass-border);">
+                        <td style="padding: 10px;">${r.area}</td>
+                        <td style="padding: 10px; color: var(--text-muted); font-size: 0.85rem;">${r.course}</td>
+                        <td style="padding: 10px;">${r.practiceAtt > 0 ? Math.round(r.accPct)+'%' : '-'}</td>
+                        <td style="padding: 10px;">${r.mockScores.length > 0 ? Math.round(r.mockPct)+'%' : '-'}</td>
+                        <td style="padding: 10px;">${r.practiceAtt}</td>
+                        <td style="padding: 10px; color: ${r.color};">${r.statusText}</td>
+                    </tr>
+                `;
+            });
+        }
+    }
+
+    // 3. Render Weakest Areas & Recommendations
+    const weakestContainer = e('weakestAreasContainer');
+    const topicRecs = e('topicRecommendationsList');
+    const weakestAreas = matrixRows.filter(r => r.statusText === 'Needs Work' || r.statusText === 'Average').sort((a,b) => a.compositeScore - b.compositeScore).slice(0,3);
     
-    if(e('readinessAcca')) e('readinessAcca').textContent = Math.round(accaTopicPct) + '%';
-    if(e('readinessCseb')) e('readinessCseb').textContent = Math.round(csebTopicPct) + '%';
+    if (weakestContainer) {
+        if (weakestAreas.length === 0) {
+            weakestContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem;">No weaknesses detected. Great job!</div>';
+        } else {
+            weakestContainer.innerHTML = '';
+            weakestAreas.forEach(w => {
+                weakestContainer.innerHTML += `
+                    <div style="background: var(--glass-hover); padding: 15px; border-radius: 8px; flex: 1; min-width: 150px; border-left: 4px solid ${w.color};">
+                        <div style="font-weight: bold; margin-bottom: 5px;">${w.area}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Avg Score: ${Math.round(w.compositeScore)}%</div>
+                    </div>
+                `;
+            });
+        }
+    }
+
+    if (topicRecs) {
+        topicRecs.innerHTML = '';
+        if (weakestAreas.length === 0) {
+            topicRecs.innerHTML = '<li style="color: var(--text-muted);">Focus on completing remaining syllabus topics.</li>';
+        } else {
+            weakestAreas.forEach(w => {
+                const syllabusObj = w.course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
+                const topics = syllabusObj[w.area] || [];
+                const hardTopics = topics.filter(t => t.difficulty === 'Hard' && !t.completed).slice(0, 2);
+                const focusTopics = hardTopics.length > 0 ? hardTopics : topics.filter(t => !t.completed).slice(0, 2);
+                
+                focusTopics.forEach(ft => {
+                    topicRecs.innerHTML += `<li><strong style="color: var(--text-main);">${w.area}:</strong> ${ft.name}</li>`;
+                });
+            });
+            if(topicRecs.innerHTML === '') topicRecs.innerHTML = '<li style="color: var(--text-muted);">No specific incomplete topics found in weak areas.</li>';
+        }
+    }
+
+    // 4. Calculate Readiness Formula
+    // Consistency Score (15%) - based on active days in last 30 days
+    const last30DaysAtt = Object.keys(AppState.attendance).filter(k => {
+        const d = new Date(k);
+        const diff = (now - d) / (1000 * 3600 * 24);
+        return diff <= 30 && AppState.attendance[k] === 'present';
+    }).length;
+    const consistencyPct = Math.min(100, (last30DaysAtt / 24) * 100); // 24 days present out of 30 is 100%
+    
+    const accaSylPct = totalAccaTopics > 0 ? (accaTopicsCompleted / totalAccaTopics) * 100 : 0;
+    const csebSylPct = totalCsebTopics > 0 ? (csebTopicsCompleted / totalCsebTopics) * 100 : 0;
+    
+    // Aggregates for ACCA Readiness
+    const accaAreas = matrixRows.filter(r => r.course === 'ACCA');
+    const accaPracAtt = accaAreas.reduce((sum, r) => sum + r.practiceAtt, 0);
+    const accaPracCor = accaAreas.reduce((sum, r) => sum + r.practiceCor, 0);
+    const accaPracPct = accaPracAtt > 0 ? (accaPracCor / accaPracAtt) * 100 : 0;
+    let sumAMockS = 0, sumAMockM = 0;
+    accaAreas.forEach(r => r.mockScores.forEach((s, i) => { sumAMockS += s; sumAMockM += r.mockMaxScores[i]; }));
+    const accaMockPct = sumAMockM > 0 ? (sumAMockS / sumAMockM) * 100 : 0;
+    
+    const accaReadiness = (accaSylPct * 0.35) + (accaMockPct * 0.25) + (accaPracPct * 0.25) + (consistencyPct * 0.15);
+
+    // Aggregates for CSEB Readiness
+    const csebAreas = matrixRows.filter(r => r.course === 'CSEB');
+    const csebPracAtt = csebAreas.reduce((sum, r) => sum + r.practiceAtt, 0);
+    const csebPracCor = csebAreas.reduce((sum, r) => sum + r.practiceCor, 0);
+    const csebPracPct = csebPracAtt > 0 ? (csebPracCor / csebPracAtt) * 100 : 0;
+    let sumCMockS = 0, sumCMockM = 0;
+    csebAreas.forEach(r => r.mockScores.forEach((s, i) => { sumCMockS += s; sumCMockM += r.mockMaxScores[i]; }));
+    const csebMockPct = sumCMockM > 0 ? (sumCMockS / sumCMockM) * 100 : 0;
+    
+    const csebReadiness = (csebSylPct * 0.35) + (csebMockPct * 0.25) + (csebPracPct * 0.25) + (consistencyPct * 0.15);
+
+    if(e('readinessAcca')) e('readinessAcca').textContent = Math.round(accaReadiness) + '%';
+    if(e('readinessCseb')) e('readinessCseb').textContent = Math.round(csebReadiness) + '%';
+    if(e('readinessAccaBar')) e('readinessAccaBar').style.width = Math.round(accaReadiness) + '%';
+    if(e('readinessCsebBar')) e('readinessCsebBar').style.width = Math.round(csebReadiness) + '%';
 
     renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr);
     renderConsistencyHeatmap();
@@ -1495,7 +1648,7 @@ function populateLogTopics(subjId) {
         });
         if (key) syllabusTopics = AppState.csebSyllabus[key];
     } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
-        syllabusTopics = AppState.accaTopics;
+        syllabusTopics = [].concat(...Object.values(AppState.accaTopics));
     }
     
     if (syllabusTopics && syllabusTopics.length > 0) {
@@ -1607,9 +1760,55 @@ function rebuildAnalyticsCache() {
     AppState.analyticsCache = cache;
 }
 
+function migrateData() {
+    if (AppState.dataVersion < 2) {
+        // Migrate accaTopics from Array to Categorized Object
+        if (Array.isArray(AppState.accaTopics)) {
+            const oldArray = AppState.accaTopics;
+            const newObj = {
+                "IAS Standards": [],
+                "IFRS Standards": [],
+                "Consolidation": [],
+                "Interpretation": [],
+                "Ethics": []
+            };
+            
+            oldArray.forEach(t => {
+                const nameLower = t.name.toLowerCase();
+                let cat = "IAS Standards"; // fallback
+                if (nameLower.includes("ifrs")) cat = "IFRS Standards";
+                else if (nameLower.includes("consolidation")) cat = "Consolidation";
+                else if (nameLower.includes("interpretation")) cat = "Interpretation";
+                else if (nameLower.includes("ethic")) cat = "Ethics";
+                else cat = "IAS Standards";
+                
+                newObj[cat].push({ name: t.name, completed: t.completed, difficulty: "Medium" });
+            });
+            
+            AppState.accaTopics = newObj;
+            saveData('accaTopics');
+        }
+        
+        // Add difficulty to CSEB syllabus if missing
+        if (typeof AppState.csebSyllabus === 'object') {
+            Object.keys(AppState.csebSyllabus).forEach(cat => {
+                AppState.csebSyllabus[cat].forEach(t => {
+                    if (!t.difficulty) t.difficulty = "Medium";
+                });
+            });
+            saveData('csebSyllabus');
+        }
+
+        AppState.dataVersion = 2;
+        saveData('system');
+        console.log("Data migrated to v2.");
+    }
+}
+
 window.initApp = function() {
     try {
         loadData();
+        migrateData();
         rebuildAnalyticsCache();
         initTheme();
         initNavigation();
@@ -1671,26 +1870,61 @@ function renderPracticeTotals() {
 
 function initMocksAndPractice() {
     renderPracticeTotals();
+    renderPracticeHistory();
 
-    // Populate Subjects Dropdown
     const courseSelect = document.getElementById('practiceCourseInput');
-    const subjSelect = document.getElementById('practiceSubjectInput');
+    const areaSelect = document.getElementById('practiceAreaInput');
+    const topicSelect = document.getElementById('practiceTopicInput');
     
-    const populatePracticeSubjects = (course) => {
-        if(!subjSelect) return;
-        subjSelect.innerHTML = '';
-        const filtered = AppState.subjects.filter(s => s.course === course || (!s.course && course === 'CSEB'));
-        filtered.forEach(s => {
+    const populatePracticeAreas = (course) => {
+        if(!areaSelect) return;
+        areaSelect.innerHTML = '<option value="">Select Area</option>';
+        const syllabusObj = course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
+        const areas = Object.keys(syllabusObj);
+        areas.forEach(area => {
             const opt = document.createElement('option');
-            opt.value = s.id;
-            opt.textContent = s.name;
-            subjSelect.appendChild(opt);
+            opt.value = area;
+            opt.textContent = area;
+            areaSelect.appendChild(opt);
+        });
+        const fallbackOpt = document.createElement('option');
+        fallbackOpt.value = 'General';
+        fallbackOpt.textContent = 'General';
+        areaSelect.appendChild(fallbackOpt);
+        
+        if(topicSelect) {
+            topicSelect.innerHTML = '<option value="">Select Topic</option>';
+        }
+
+        // Auto-select the first valid area to prevent an empty topics dropdown bug
+        if (areas.length > 0) {
+            areaSelect.selectedIndex = 1; // 1 because 0 is "Select Area"
+            populatePracticeTopics(course, areas[0]);
+        }
+    };
+
+    const populatePracticeTopics = (course, area) => {
+        if(!topicSelect) return;
+        topicSelect.innerHTML = '<option value="">Select Topic</option>';
+        if(!area) return;
+        const syllabusObj = course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
+        const topics = syllabusObj[area] || [];
+        if (!Array.isArray(topics)) return;
+        
+        topics.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.name;
+            opt.textContent = t.name;
+            topicSelect.appendChild(opt);
         });
     };
     
     if(courseSelect) {
-        courseSelect.onchange = (e) => populatePracticeSubjects(e.target.value);
-        populatePracticeSubjects(courseSelect.value);
+        courseSelect.onchange = (e) => populatePracticeAreas(e.target.value);
+        if (areaSelect) {
+            areaSelect.onchange = (e) => populatePracticeTopics(courseSelect.value, e.target.value);
+        }
+        populatePracticeAreas(courseSelect.value);
     }
 
     const addBtn = document.getElementById('practiceAddBtn');
@@ -1701,7 +1935,12 @@ function initMocksAndPractice() {
         if(addAtt === 0 && addCor === 0) return;
         
         const c = document.getElementById('practiceCourseInput')?.value;
-        const sId = document.getElementById('practiceSubjectInput')?.value;
+        const areaVal = document.getElementById('practiceAreaInput')?.value;
+        
+        if (!c || !areaVal) return alert('Please select a Course and Syllabus Area.');
+        
+        const topicVal = document.getElementById('practiceTopicInput')?.value || '';
+        const confVal = document.getElementById('practiceConfidenceInput')?.value || 'Medium';
         
         if (!Array.isArray(AppState.questionPractice)) {
             // Migrate legacy object to array
@@ -1709,7 +1948,7 @@ function initMocksAndPractice() {
             const legacyCor = AppState.questionPractice.correct || 0;
             AppState.questionPractice = [];
             if(legacyAtt > 0) {
-                AppState.questionPractice.push({ id: generateId(), date: new Date().toISOString(), course: 'Legacy', subjectId: null, attempted: legacyAtt, correct: legacyCor });
+                AppState.questionPractice.push({ id: generateId(), date: new Date().toISOString(), course: 'Legacy', syllabusArea: 'General', topic: '', confidence: 'Medium', attempted: legacyAtt, correct: legacyCor });
             }
         }
         
@@ -1717,7 +1956,9 @@ function initMocksAndPractice() {
             id: generateId(),
             date: new Date().toISOString(),
             course: c,
-            subjectId: sId,
+            syllabusArea: areaVal,
+            topic: topicVal,
+            confidence: confVal,
             attempted: addAtt,
             correct: addCor
         });
@@ -1727,14 +1968,36 @@ function initMocksAndPractice() {
         document.getElementById('practiceAddAttempted').value = '';
         document.getElementById('practiceAddCorrect').value = '';
         renderPracticeTotals();
+        renderPracticeHistory();
         renderAnalytics();
     };
     }
 
     const saveMockBtn = document.getElementById('saveMockBtn');
+    const mockCourseSelect = document.getElementById('mockCourseInput');
+    const mockAreaSelect = document.getElementById('mockAreaInput');
+
+    const populateMockAreas = (course) => {
+        if(!mockAreaSelect) return;
+        mockAreaSelect.innerHTML = '<option value="">General</option>';
+        const syllabusObj = course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
+        Object.keys(syllabusObj).forEach(area => {
+            const opt = document.createElement('option');
+            opt.value = area;
+            opt.textContent = area;
+            mockAreaSelect.appendChild(opt);
+        });
+    };
+
+    if(mockCourseSelect) {
+        mockCourseSelect.onchange = (e) => populateMockAreas(e.target.value);
+        populateMockAreas(mockCourseSelect.value);
+    }
+
     if (saveMockBtn) {
         saveMockBtn.onclick = () => {
         const course = document.getElementById('mockCourseInput').value;
+        const area = document.getElementById('mockAreaInput').value || 'General';
         const name = document.getElementById('mockNameInput').value;
         const score = parseFloat(document.getElementById('mockScoreInput').value) || 0;
         const max = parseFloat(document.getElementById('mockMaxScoreInput').value) || 100;
@@ -1744,9 +2007,10 @@ function initMocksAndPractice() {
         AppState.mockTests.push({
             id: generateId(),
             date: new Date().toISOString(),
-            course,
-            name,
-            score,
+            course: course,
+            syllabusArea: area,
+            name: name,
+            score: score,
             maxScore: max
         });
         
@@ -1793,7 +2057,15 @@ function renderMocksHistory() {
     });
 }
 
-
+window.addEventListener('storage', (event) => {
+    if (Object.values(STORAGE_KEYS).includes(event.key)) {
+        loadData();
+        renderOverview();
+        if (document.getElementById('view-analytics') && document.getElementById('view-analytics').classList.contains('active')) {
+            renderAnalytics();
+        }
+    }
+});
 // ==========================================
 // REPORT ANALYZER
 // ==========================================
@@ -1860,8 +2132,8 @@ function analyzeReportText(text) {
     let totalHours = 0;
     let attendance = 0;
     
-    const hoursMatch1 = text.match(/Total Lifetime Study Hours:\s*([\d\.]+)h/i);
-    const hoursMatch2 = text.match(/Total Hours this Month:\s*([\d\.]+)h/i);
+    const hoursMatch1 = text.match(/Total\s*Lifetime\s*Study\s*Hours:\s*([\d\.]+)\s*h/i);
+    const hoursMatch2 = text.match(/Total\s*Hours\s*this\s*Month:\s*([\d\.]+)\s*h/i);
     if(hoursMatch1) totalHours = parseFloat(hoursMatch1[1]);
     else if(hoursMatch2) totalHours = parseFloat(hoursMatch2[1]);
     
@@ -2220,11 +2492,17 @@ function renderUpdateBadge() {
 }
 
 function processNewUpdate(updateInfo) {
-    if (!AppState.availableUpdate || AppState.availableUpdate.version !== updateInfo.version) {
+    if (updateInfo.version !== AppState.currentVersion && (!AppState.availableUpdate || AppState.availableUpdate.version !== updateInfo.version)) {
         AppState.availableUpdate = updateInfo;
         saveData('system');
         addNotification('System Update Available', `Version ${updateInfo.version} is ready to install.`, 'info');
         renderUpdateBadge();
+        
+        // Let the user click it instead of forcing it
+        const updateTab = document.getElementById('nav-software-update');
+        if (updateTab) {
+            updateTab.style.display = 'flex';
+        }
     }
 }
 
@@ -2245,6 +2523,9 @@ function installUpdate() {
     // If there's a service worker, tell it to skip waiting so new cache takes over
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     }
 }
 
@@ -2302,4 +2583,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderUpdateBadge();
 });
+
+window.deleteMock = function(mockId) {
+    if (!confirm("Are you sure you want to delete this mock test record?")) return;
+    AppState.mockTests = AppState.mockTests.filter(m => m.id !== mockId);
+    saveData('mocks');
+    renderMocksHistory();
+    renderAnalytics();
+};
+
+window.deletePractice = function(id) {
+    if (!confirm("Are you sure you want to delete this practice session?")) return;
+    AppState.questionPractice = AppState.questionPractice.filter(m => m.id !== id);
+    saveData('practice');
+    renderPracticeTotals();
+    renderPracticeHistory();
+    renderAnalytics();
+};
+
+function renderPracticeHistory() {
+    const tbody = document.getElementById('practiceTableBody');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    
+    if (!Array.isArray(AppState.questionPractice)) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No practice sessions logged</td></tr>';
+        return;
+    }
+    
+    const sorted = [...AppState.questionPractice].sort((a,b) => new Date(b.date) - new Date(a.date));
+    if(sorted.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No practice sessions logged</td></tr>';
+        return;
+    }
+    
+    sorted.forEach(m => {
+        const pct = Math.round((m.correct / m.attempted) * 100) || 0;
+        let color = 'var(--neon-green)';
+        if(pct < 50) color = 'var(--neon-red)';
+        else if(pct < 75) color = 'var(--neon-gold)';
+        
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--glass-border)';
+        tr.innerHTML = `
+            <td style="padding:15px 10px;">${new Date(m.date).toLocaleDateString()}</td>
+            <td class="mock-name" style="padding:15px 10px;">
+                <div style="font-weight:600">${m.syllabusArea || 'General'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">${m.course} ${m.topic ? '• '+m.topic : ''}</div>
+            </td>
+            <td style="padding:15px 10px;">
+                <div style="font-weight:bold; color:${color}">${pct}%</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">${m.correct}/${m.attempted}</div>
+            </td>
+            <td style="padding:15px 10px; text-align:right;">
+                <button class="btn btn-outline" style="padding:5px 10px; font-size:0.8rem; border-color:var(--neon-red); color:var(--neon-red);" onclick="deletePractice('${m.id}')">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
 

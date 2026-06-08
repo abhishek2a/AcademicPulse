@@ -10,6 +10,18 @@ const firebaseConfig = {
 
 // Initialize Firebase using compat API
 const app = firebase.initializeApp(firebaseConfig);
+
+// Initialize Firebase App Check with reCAPTCHA v3
+try {
+    const appCheck = firebase.appCheck();
+    appCheck.activate(
+        '6LdSBBMtAAAAAAyOgUbNa37n9vUyU7WX6fMKYHC7',
+        true // isTokenAutoRefreshEnabled
+    );
+} catch (e) {
+    console.warn("App Check failed to initialize (expected if running locally):", e);
+}
+
 const auth = firebase.auth();
 const db = firebase.firestore();
 
@@ -119,7 +131,7 @@ async function syncDataToCloud(uid) {
             practice: JSON.parse(localStorage.getItem(STORAGE_KEYS.PRACTICE) || '{"attempted":0,"correct":0}'),
             csebSyllabus: JSON.parse(localStorage.getItem(STORAGE_KEYS.CSEB_SYLLABUS) || '{}'),
             notifications: JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || '[]'),
-            systemState: JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_STATE) || '{"currentVersion":"v1.0.0"}')
+            systemState: JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_STATE) || '{"currentVersion":"v1.1.20"}')
         }, { merge: true });
     } catch (error) {
         console.error("Error saving to cloud:", error);
@@ -133,7 +145,7 @@ window.triggerCloudSync = () => {
         if (syncTimer) clearTimeout(syncTimer);
         syncTimer = setTimeout(() => {
             syncDataToCloud(auth.currentUser.uid);
-        }, 10000);
+        }, 3000); // 3 seconds
     }
 }
 
@@ -227,5 +239,12 @@ document.getElementById('updatePasswordForm').addEventListener('submit', (e) => 
             alert("Password updated successfully!");
             document.getElementById('profilePasswordInput').value = '';
         }).catch(err => alert(err.message));
+    }
+});
+
+window.addEventListener('beforeunload', () => {
+    if (syncTimer && window.firebaseAuth?.currentUser) {
+        clearTimeout(syncTimer);
+        syncDataToCloud(window.firebaseAuth.currentUser.uid);
     }
 });

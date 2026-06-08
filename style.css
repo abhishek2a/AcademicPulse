@@ -209,7 +209,7 @@ h1 { font-size: 2.4rem; margin: 0; font-weight: 700; letter-spacing: -1px; }
     box-shadow: 0 0 15px rgba(10, 132, 255, 0.15);
     background: var(--glass-hover);
 }
-select option { background-color: var(--app-bg); color: var(--text-main); }
+
 .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 35px; }
 
 /* Subject Cards */
@@ -277,6 +277,14 @@ select option { background-color: var(--app-bg); color: var(--text-main); }
 .session-setup { background: var(--glass-bg); padding: 25px; border-radius: 24px; border: 1px solid var(--glass-border); width: 100%; max-width: 450px; text-align: left; }
 
 /* Goals & Progress */
+.chart-card { background: var(--glass-bg); padding: 25px; border-radius: 20px; border: 1px solid var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transform: translateZ(0); will-change: transform; }
+.chart-container { position: relative; height: 300px; width: 100%; margin-top: 20px; }
+.heatmap-grid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin-top: 15px; }
+
+@media (min-width: 769px) {
+    select option { background-color: var(--app-bg); color: var(--text-main); }
+}
+
 .goals-section { background: var(--glass-bg); padding: 35px; border-radius: 28px; border: 1px solid var(--glass-border); margin-bottom: 40px; }
 .goal-item { margin-bottom: 25px; }
 .goal-item:last-child { margin-bottom: 0; }
@@ -460,4 +468,13 @@ select option { background-color: var(--app-bg); color: var(--text-main); }
 #syllabusModalList::-webkit-scrollbar-track { background: transparent; }
 #syllabusModalList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
 #syllabusModalList::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+/* Hide scrollbar for What's New modal */
+#whatsNewModalContent {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+#whatsNewModalContent::-webkit-scrollbar {
+    display: none;
+}
 

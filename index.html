@@ -9,10 +9,11 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=9">
     
     <!-- Firebase Scripts -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-appcheck-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <!-- Heavy libraries (Chart.js, jsPDF, pdf.js) are lazy-loaded dynamically -->
@@ -70,17 +71,17 @@
                 <!-- Injected via JS -->
             </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));">
+                <div class="stat-card" style="text-align: center;">
                     <div class="stat-label">Study Streak</div>
                     <div class="stat-value text-green" id="studyStreakVal">0</div>
                     <div class="stat-sub" id="bestStudyStreakVal">Best: 0 days</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" style="text-align: center;">
                     <div class="stat-label">Total Time (Month)</div>
                     <div class="stat-value" id="totalHoursVal">0h 0m</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" style="text-align: center;">
                     <div class="stat-label">Today's Time</div>
                     <div class="stat-value text-blue" id="todayTimeVal">0m</div>
                 </div>
@@ -361,65 +362,60 @@
                     <div style="height: 150px;">
                         <canvas id="monthlyAttendanceBarChart"></canvas>
                     </div>
-                </div>
-            </div>
-
-            <!-- Exam Readiness Engine -->
+                 <!-- Exam Readiness Engine -->
             <div class="chart-card" style="margin-bottom: 30px; text-align: left;">
                 <h3 style="margin-bottom: 20px;">Exam Readiness Engine 🎯</h3>
                 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
                     <div style="flex: 1; background: var(--glass-hover); padding: 20px; border-radius: 12px; text-align: center; min-width: 150px;">
                         <div class="stat-label" style="margin-bottom: 10px;">ACCA FR Readiness</div>
                         <div style="font-size: 2.5rem; font-weight: bold; color: var(--neon-blue);" id="readinessAcca">0%</div>
+                        <div style="width: 100%; height: 8px; background: var(--glass-bg); margin-top: 10px; border-radius: 4px; overflow: hidden;">
+                            <div id="readinessAccaBar" style="height: 100%; background: var(--neon-blue); width: 0%;"></div>
+                        </div>
                     </div>
                     <div style="flex: 1; background: var(--glass-hover); padding: 20px; border-radius: 12px; text-align: center; min-width: 150px;">
                         <div class="stat-label" style="margin-bottom: 10px;">CSEB Readiness</div>
                         <div style="font-size: 2.5rem; font-weight: bold; color: var(--neon-green);" id="readinessCseb">0%</div>
+                        <div style="width: 100%; height: 8px; background: var(--glass-bg); margin-top: 10px; border-radius: 4px; overflow: hidden;">
+                            <div id="readinessCsebBar" style="height: 100%; background: var(--neon-green); width: 0%;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 7. ACCA FR Analytics & 8. CSEB Analytics -->
-            <div class="charts-grid" style="margin-bottom: 30px;">
-                <div class="chart-card" style="text-align: left;">
-                    <h3 style="margin-bottom: 20px;">ACCA FR Analytics</h3>
-                    
-                    <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted);">Topic Coverage</h4>
-                    <div id="anaAccaTopicList" style="margin-bottom: 25px; display: flex; flex-direction: column; gap: 10px;">
-                        <div style="color: var(--text-muted); font-size: 0.85rem;">No syllabus data yet.</div>
-                    </div>
-
-                    <div id="analyticsQuestionPracticeContainer">
-                        <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted);">Question Practice</h4>
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--glass-hover); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
-                            <div>
-                                <div class="stat-label">Attempted</div>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);" id="anaPracticeAttempted">0</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div class="stat-label">Correct</div>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--neon-blue);" id="anaPracticeCorrect">0 <span style="font-size:1rem; color: var(--text-muted);">(0%)</span></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted);">Mock Test Trend</h4>
-                    <div id="anaMockTrendContainer" style="display: flex; flex-direction: column; gap: 10px;">
-                        <div style="color: var(--text-muted); font-size: 0.85rem;">No mock tests logged yet.</div>
-                    </div>
+            <!-- Weakest Areas & Recommendations -->
+            <div class="chart-card" style="margin-bottom: 30px; text-align: left;">
+                <h3 style="margin-bottom: 15px; color: var(--neon-red);">Weakest Areas 🔴</h3>
+                <div id="weakestAreasContainer" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 25px;">
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">Not enough data yet.</div>
                 </div>
+                <h3 style="margin-bottom: 15px; color: var(--neon-gold);">Topic Recommendations 💡</h3>
+                <div style="background: var(--glass-hover); padding: 20px; border-radius: 12px;">
+                    <ul id="topicRecommendationsList" style="margin: 0; padding-left: 20px; color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
+                        <li style="color: var(--text-muted);">Not enough data yet.</li>
+                    </ul>
+                </div>
+            </div>
 
-                <div class="chart-card" style="text-align: left;">
-                    <h3 style="margin-bottom: 20px;">CSEB Analytics</h3>
-                    
-                    <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted);">Syllabus Coverage</h4>
-                    <div id="anaCsebCoverageContainer" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 25px;">
-                        <div style="color: var(--text-muted); font-size: 0.85rem;">No syllabus data yet.</div>
-                    </div>
-
-                    <h4 style="margin: 0 0 15px 0; font-size: 0.95rem; color: var(--text-muted); display: none;">Revision Progress</h4>
-                    <div id="anaCsebRevisionContainer" style="display: none; flex-direction: column; gap: 10px;">
-                    </div>
+            <!-- Performance Matrix -->
+            <div class="chart-card" style="margin-bottom: 30px; text-align: left; overflow-x: auto;">
+                <h3 style="margin-bottom: 20px;">Performance Matrix by Syllabus Area</h3>
+                <table style="width: 100%; min-width: 500px; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.85rem;">
+                            <th style="padding: 10px;">Area</th>
+                            <th style="padding: 10px;">Course</th>
+                            <th style="padding: 10px;">Accuracy</th>
+                            <th style="padding: 10px;">Mock Avg</th>
+                            <th style="padding: 10px;">Qs Done</th>
+                            <th style="padding: 10px;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="performanceMatrixBody">
+                        <tr><td colspan="6" style="padding: 15px; text-align: center; color: var(--text-muted);">No syllabus performance data yet.</td></tr>
+                    </tbody>
+                </table>
+            </div>
                 </div>
             </div>
 
@@ -460,14 +456,38 @@
                             <option value="CSEB">CSEB</option>
                             <option value="ACCA">ACCA</option>
                         </select>
-                        <select id="practiceSubjectInput" style="flex:1; min-width: 100px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                        <select id="practiceAreaInput" style="flex:1; min-width: 100px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                            <option value="">Select Area</option>
+                        </select>
+                        <select id="practiceTopicInput" style="flex:1; min-width: 100px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                            <option value="">Select Topic</option>
                         </select>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                         <input type="number" id="practiceAddAttempted" placeholder="Attempted" style="flex:1; min-width: 80px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
                         <input type="number" id="practiceAddCorrect" placeholder="Correct" style="flex:1; min-width: 80px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                        <select id="practiceConfidenceInput" style="flex:1; min-width: 80px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                            <option value="Low">Low Confidence</option>
+                            <option value="Medium" selected>Medium Confidence</option>
+                            <option value="High">High Confidence</option>
+                        </select>
                         <button class="btn btn-outline" id="practiceAddBtn" style="flex:1; min-width: 80px;">Log</button>
                     </div>
+                </div>
+                <div style="margin-top: 20px; overflow-x: auto;">
+                    <table class="table" style="width: 100%; min-width: 500px;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Topic</th>
+                                <th>Score</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="practiceTableBody">
+                            <tr><td colspan="4" style="text-align:center; padding:20px;">No practice sessions logged</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -480,6 +500,12 @@
                         <select id="mockCourseInput" class="form-input">
                             <option value="ACCA">ACCA</option>
                             <option value="CSEB">CSEB</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Syllabus Area</label>
+                        <select id="mockAreaInput" class="form-input">
+                            <option value="">General</option>
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
@@ -623,9 +649,14 @@
                     <button id="themeToggleBtn" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.9rem;">Toggle Theme</button>
                 </div>
 
-
-
-                <!-- Subscriptions -->
+                <!-- What's New Settings -->
+                <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin-top: 0; margin-bottom: 5px; font-size: 0.95rem; color: var(--text-main);">Release Notes</h3>
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">View the latest features and updates</span>
+                    </div>
+                    <button onclick="showWhatsNewPopup()" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.9rem; color: var(--neon-blue); border-color: var(--neon-blue);">What's New</button>
+                </div>                <!-- Subscriptions -->
                 <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px;">
                     <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Active Subscriptions</h3>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--glass-border);">
@@ -657,7 +688,7 @@
                 </form>
 
                 <div style="text-align: center; margin-top: 40px;">
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version <span id="appVersionTextProfile">v1.0.0</span></p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version <span id="appVersionTextProfile">v1.1.20</span></p>
                     <button id="btnLogout" class="btn" style="background: var(--neon-red); color: var(--text-main); margin-top: 10px; border: none; width: 100%;">Logout</button>
                 </div>
             </div>
@@ -906,8 +937,22 @@
         </div>
     </div>
 
-    <script src="app.js?v=4"></script>
-    <script src="auth.js?v=4"></script>
-    <script src="export.js?v=4"></script>
+    <!-- Whats New Modal -->
+    <div class="modal-overlay" id="whatsNewModal">
+        <div class="modal-card" style="max-width: 600px; width: 90%;">
+            <div class="modal-header">
+                <h3 id="whatsNewModalTitle" style="display: flex; align-items: center; gap: 10px;">✨ Release Notes</h3>
+                <button class="close-btn" onclick="document.getElementById('whatsNewModal').classList.remove('active')">x</button>
+            </div>
+            <div id="whatsNewModalContent" style="margin-top: 15px; font-size: 0.95rem; color: var(--text-main); line-height: 1.6; max-height: 60vh; overflow-y: auto;">
+                <ul id="whatsNewModalList" style="list-style-type: none; padding-left: 0; display: grid; gap: 15px;">
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js?v=8"></script>
+    <script src="export.js?v=5"></script>
+    <script src="app.js?v=9"></script>
 </body>
 </html>

@@ -1,7 +1,11 @@
-const CACHE_NAME = 'academicpulse-v1.1.0';
+const CACHE_NAME = 'academicpulse-v1.1.29';
 
 const STATIC_ASSETS = [
-    'style.css',
+    'index.html',
+    'style.css?v=9',
+    'app.js?v=9',
+    'auth.js?v=8',
+    'export.js?v=5',
     'manifest.json',
     'icon.svg'
 ];
@@ -75,7 +79,7 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'CHECK_FOR_UPDATES') {
-        fetch('./version.json')
+        fetch('./version.json?t=' + Date.now())
             .then(res => res.json())
             .then(updateInfo => {
                 updateInfo.date = new Date().toLocaleDateString();

@@ -1,9 +1,21 @@
 {
-  "version": "1.1.0",
+  "version": "1.1.22",
   "build": "2026.06.08",
   "features": [
-    "Subject Ranking",
-    "Study Forecast",
-    "Advanced Analytics"
+    "Welcome to the AcademicPulse v1.1.20 update! This release brings powerful new analytics, enhanced performance, and intuitive tools designed to keep your exam preparation on track.",
+    "<b>✨ Major Features</b>",
+    "Exam Readiness Engine 🎯: We have introduced a dedicated readiness engine to track your preparation for specific courses like ACCA FR and CSEB. This feature evaluates your progress, highlights your weakest areas (🔴), and provides smart topic recommendations (💡).",
+    "Performance Matrix: Added a comprehensive Performance Matrix by Syllabus Area. You can now track your accuracy, mock exam averages, and total questions done for specific topics.",
+    "PDF Report Analyzer 🔍: A brand-new drag-and-drop report analyzer has been added. You can now upload your exported daily or monthly PDF reports, and the app will analyze your hours and attendance to generate personalized improvement suggestions.",
+    "Global Search 🔎: Finding your past data is now easier than ever with the new Global Search feature. You can quickly filter and search through your study sessions, mock tests, and subjects.",
+    "Inactivity Auto-Pause: To keep your study tracking accurate, we have implemented an inactivity modal. If the app detects 5 minutes of inactivity, it will prompt you to either pause the timer or continue your session.",
+    "<b>📈 Analytics & Goal Tracking Enhancements</b>",
+    "Study Heatmap & Consistency Analytics: Visualize your study habits with the new consistency heatmap grid, which highlights your most productive days and months.",
+    "30-Day Forecast: The analytics dashboard now features a 30-Day Study Forecast to project your upcoming study hours.",
+    "Goal Achievement Rates: Track your daily, weekly, and monthly target goals alongside a new Goal Achievement Rate percentage metric.",
+    "<b>🛠️ UI & Performance Improvements</b>",
+    "Optimized Loading: Heavy processing libraries—specifically Chart.js, jsPDF, and pdf.js—are now dynamically lazy-loaded, ensuring a much faster initial app startup time.",
+    "Theme Toggle: Customize your app appearance effortlessly with the new Theme Toggle button located in the Profile Settings.",
+    "In-App Software Updates: Added a dedicated Software Update view and sidebar notification badge (✨) to seamlessly install new features and relaunch the app."
   ]
 }

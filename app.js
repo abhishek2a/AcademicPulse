@@ -740,7 +740,7 @@ function renderOverview() {
     document.getElementById('greetingTitle').textContent = `${greeting}, ${name}`;
     
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     document.getElementById('currentDateDisplay').textContent = `${dateStr} • ${timeStr}`;
 
     const streaks = calculateStreaks();
@@ -802,8 +802,9 @@ function renderOverview() {
                 const subj = AppState.subjects.find(s => s.id === log.subjectId);
                 const subjName = subj ? subj.name : 'Uncategorized';
                 const color = subj ? subj.color : '#aaa';
-                const timeStr = new Date(log.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                const timeStr = new Date(log.startTime).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
                 const durStr = TimeUtils.formatDisplay(log.duration || ((new Date(log.endTime)-new Date(log.startTime))/1000));
+                const noteOrTopic = [log.topic, log.notes].filter(Boolean).join(' - ') || '-';
                 
                 tbody.innerHTML += `
                     <tr>
@@ -814,7 +815,8 @@ function renderOverview() {
                             </div>
                         </td>
                         <td style="padding:15px 10px;">${timeStr}</td>
-                        <td style="padding:15px 10px; color:var(--text-muted); font-size:0.85rem;">${log.notes || '-'}</td>
+                        <td style="padding:15px 10px; color:var(--text-muted); font-size:0.85rem;">${durStr}</td>
+                        <td style="padding:15px 10px; color:var(--text-muted); font-size:0.85rem;">${noteOrTopic}</td>
                         <td style="padding:15px 10px; text-align:right; min-width: 100px;">
                             <a href="#" style="color:var(--neon-blue); margin-right:10px; font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); editAttendance('${log.id}')">Edit</a>
                             <a href="#" style="color:var(--neon-red); font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); deleteAttendance('${log.id}')">Delete</a>
@@ -1323,13 +1325,29 @@ function renderAnalytics() {
     }
 
     // 4. Calculate Readiness Formula
-    // Consistency Score (15%) - based on active days in last 30 days
-    const last30DaysAtt = Object.keys(AppState.attendance).filter(k => {
-        const d = new Date(k);
-        const diff = (now - d) / (1000 * 3600 * 24);
-        return diff <= 30 && AppState.attendance[k] === 'present';
-    }).length;
-    const consistencyPct = Math.min(100, (last30DaysAtt / 24) * 100); // 24 days present out of 30 is 100%
+    // Course-specific Consistency Score (15%) - based on active days in last 30 days
+    const getCourseConsistency = (courseName) => {
+        const courseSubjects = AppState.subjects.filter(s => s.course === courseName).map(s => s.id);
+        const courseSessions = AppState.sessions.filter(s => courseSubjects.includes(s.subjectId));
+        const coursePractice = (AppState.questionPractice || []).filter(p => p.course === courseName);
+        const courseMocks = AppState.mockTests.filter(m => m.course === courseName);
+        
+        const activeDates = new Set();
+        courseSessions.forEach(s => { const d = new Date(s.startTime || s.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
+        coursePractice.forEach(p => { const d = new Date(p.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
+        courseMocks.forEach(m => { const d = new Date(m.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
+
+        let activeDaysInLast30 = 0;
+        activeDates.forEach(dateStr => {
+            const d = new Date(dateStr);
+            const diff = (now - d) / (1000 * 3600 * 24);
+            if(diff <= 30 && diff >= -1) activeDaysInLast30++;
+        });
+        return Math.min(100, (activeDaysInLast30 / 24) * 100); // 24 days out of 30 is 100%
+    };
+
+    const accaConsistencyPct = getCourseConsistency('ACCA');
+    const csebConsistencyPct = getCourseConsistency('CSEB');
     
     const accaSylPct = totalAccaTopics > 0 ? (accaTopicsCompleted / totalAccaTopics) * 100 : 0;
     const csebSylPct = totalCsebTopics > 0 ? (csebTopicsCompleted / totalCsebTopics) * 100 : 0;
@@ -1343,7 +1361,7 @@ function renderAnalytics() {
     accaAreas.forEach(r => r.mockScores.forEach((s, i) => { sumAMockS += s; sumAMockM += r.mockMaxScores[i]; }));
     const accaMockPct = sumAMockM > 0 ? (sumAMockS / sumAMockM) * 100 : 0;
     
-    const accaReadiness = (accaSylPct * 0.35) + (accaMockPct * 0.25) + (accaPracPct * 0.25) + (consistencyPct * 0.15);
+    const accaReadiness = (accaSylPct * 0.35) + (accaMockPct * 0.25) + (accaPracPct * 0.25) + (accaConsistencyPct * 0.15);
 
     // Aggregates for CSEB Readiness
     const csebAreas = matrixRows.filter(r => r.course === 'CSEB');
@@ -1354,7 +1372,7 @@ function renderAnalytics() {
     csebAreas.forEach(r => r.mockScores.forEach((s, i) => { sumCMockS += s; sumCMockM += r.mockMaxScores[i]; }));
     const csebMockPct = sumCMockM > 0 ? (sumCMockS / sumCMockM) * 100 : 0;
     
-    const csebReadiness = (csebSylPct * 0.35) + (csebMockPct * 0.25) + (csebPracPct * 0.25) + (consistencyPct * 0.15);
+    const csebReadiness = (csebSylPct * 0.35) + (csebMockPct * 0.25) + (csebPracPct * 0.25) + (csebConsistencyPct * 0.15);
 
     if(e('readinessAcca')) e('readinessAcca').textContent = Math.round(accaReadiness) + '%';
     if(e('readinessCseb')) e('readinessCseb').textContent = Math.round(csebReadiness) + '%';
@@ -1604,7 +1622,9 @@ function initRetrospectiveLogging() {
         const durationSecs = (hours * 3600) + (minutes * 60);
         if (durationSecs <= 0) return alert('Duration must be greater than 0.');
 
-        const sessionStart = new Date(dateKey + 'T12:00:00Z'); // Fake time in middle of day
+        const now = new Date();
+        const sessionStart = new Date(dateKey + 'T00:00:00');
+        sessionStart.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
         const sessionEnd = new Date(sessionStart.getTime() + (durationSecs * 1000));
 
         AppState.sessions.push({
@@ -1970,6 +1990,7 @@ function initMocksAndPractice() {
         
         const topicVal = document.getElementById('practiceTopicInput')?.value || '';
         const confVal = document.getElementById('practiceConfidenceInput')?.value || 'Medium';
+        const notesVal = document.getElementById('practiceNotesInput')?.value || '';
         
         if (!Array.isArray(AppState.questionPractice)) {
             // Migrate legacy object to array
@@ -1989,13 +2010,15 @@ function initMocksAndPractice() {
             topic: topicVal,
             confidence: confVal,
             attempted: addAtt,
-            correct: addCor
+            correct: addCor,
+            notes: notesVal
         });
         
         saveData('practice');
         
         document.getElementById('practiceAddAttempted').value = '';
         document.getElementById('practiceAddCorrect').value = '';
+        if(document.getElementById('practiceNotesInput')) document.getElementById('practiceNotesInput').value = '';
         renderPracticeTotals();
         renderPracticeHistory();
         renderAnalytics();
@@ -2030,6 +2053,7 @@ function initMocksAndPractice() {
         const name = document.getElementById('mockNameInput').value;
         const score = parseFloat(document.getElementById('mockScoreInput').value) || 0;
         const max = parseFloat(document.getElementById('mockMaxScoreInput').value) || 100;
+        const notes = document.getElementById('mockNotesInput')?.value || '';
         
         if(!name) return alert('Mock Name is required!');
         
@@ -2040,12 +2064,14 @@ function initMocksAndPractice() {
             syllabusArea: area,
             name: name,
             score: score,
-            maxScore: max
+            maxScore: max,
+            notes: notes
         });
         
         saveData('mocks');
         document.getElementById('mockNameInput').value = '';
         document.getElementById('mockScoreInput').value = '';
+        if(document.getElementById('mockNotesInput')) document.getElementById('mockNotesInput').value = '';
         renderMocksHistory();
         renderAnalytics();
     };
@@ -2391,26 +2417,50 @@ function renderSearchResults(query) {
     const q = query.trim().toLowerCase();
     
     if (q.length === 0 && currentSearchFilter === 'all') {
-        container.innerHTML = '<div style="color: var(--text-muted); grid-column: 1 / -1; padding: 20px; text-align: center; border: 1px dashed var(--glass-border); border-radius: 12px;">Type above to search, or select a category filter to browse...</div>';
+        container.innerHTML = '<div style="color: var(--text-muted); padding: 20px; text-align: center; border: 1px dashed var(--glass-border); border-radius: 12px;">Type above to search, or select a category filter to browse...</div>';
+        container.style.display = 'block';
         return;
     }
+
+    // Netflix-style normalization: convert & to and, remove special chars, tokenize
+    const normalizeForSearch = (str) => {
+        if (!str) return '';
+        return str.toLowerCase()
+                  .replace(/&/g, 'and')
+                  .replace(/[^a-z0-9 ]/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+    };
+    
+    const normQ = normalizeForSearch(q);
+    const searchTerms = normQ.split(' ').filter(t => t.length > 0);
+    
+    // Helper to check if any string matches all search terms (Netflix style robust search)
+    const matchesSearch = (...fields) => {
+        if (searchTerms.length === 0) return true;
+        const combinedTarget = fields.map(f => normalizeForSearch(f)).join(' ');
+        return searchTerms.every(term => combinedTarget.includes(term));
+    };
     
     let allResults = [];
+    let suggestedNotes = new Set(); // To collect notes that match the query
 
     // 1. Search Sessions
     if (currentSearchFilter === 'all' || currentSearchFilter === 'sessions') {
         AppState.sessions.forEach(s => {
             const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
-            const subjName = subj ? subj.name.toLowerCase() : '';
-            const notes = (s.notes || '').toLowerCase();
-            const topic = (s.topic || '').toLowerCase();
+            const subjName = subj ? subj.name : '';
+            const notes = s.notes || '';
+            const topic = s.topic || '';
             
-            if (subjName.includes(q) || notes.includes(q) || topic.includes(q)) {
+            if (matchesSearch(subjName, notes, topic)) {
+                if (matchesSearch(notes) && notes.trim().length > 0) suggestedNotes.add(s.notes);
                 allResults.push({
                     type: 'session',
-                    date: new Date(s.startTime || s.date), // Fallback for old data
+                    date: new Date(s.startTime || s.date),
                     data: s,
-                    subj: subj
+                    subj: subj,
+                    originalNote: s.notes || ''
                 });
             }
         });
@@ -2419,57 +2469,105 @@ function renderSearchResults(query) {
     // 2. Search Mocks
     if (currentSearchFilter === 'all' || currentSearchFilter === 'mocks') {
         AppState.mockTests.forEach(m => {
-            const examName = (m.name || '').toLowerCase();
-            if (examName.includes(q)) {
+            if (matchesSearch(m.name, m.notes)) {
+                if (matchesSearch(m.notes) && (m.notes || '').trim().length > 0) suggestedNotes.add(m.notes);
                 allResults.push({
                     type: 'mock',
                     date: new Date(m.date),
-                    data: m
+                    data: m,
+                    originalNote: m.notes || ''
                 });
             }
         });
     }
 
-    // 3. Search Subjects
-    if (currentSearchFilter === 'all' || currentSearchFilter === 'subjects') {
-        AppState.subjects.forEach(sub => {
-            if (sub.name.toLowerCase().includes(q)) {
-                allResults.push({
-                    type: 'subject',
-                    date: new Date(), // Subjects don't have a date, just float to top
-                    data: sub
-                });
-            }
-        });
+    // 3. Search Practice
+    if (currentSearchFilter === 'all' || currentSearchFilter === 'practice') {
+        if(Array.isArray(AppState.questionPractice)) {
+            AppState.questionPractice.forEach(p => {
+                if(matchesSearch(p.course, p.syllabusArea, p.topic, p.notes)) {
+                    if (matchesSearch(p.notes) && (p.notes || '').trim().length > 0) suggestedNotes.add(p.notes);
+                    allResults.push({
+                        type: 'practice',
+                        date: new Date(p.date),
+                        data: p,
+                        originalNote: p.notes || ''
+                    });
+                }
+            });
+        }
     }
     
+    container.style.display = 'block';
+    
     if (allResults.length === 0) {
-        container.innerHTML = '<div style="color: var(--text-muted); grid-column: 1 / -1; padding: 20px; text-align: center;">No results found matching your search.</div>';
+        container.innerHTML = '<div style="color: var(--text-muted); padding: 20px; text-align: center;">No results found matching your search.</div>';
         return;
     }
     
-    // Sort newest first
     allResults.sort((a, b) => b.date - a.date);
     
-    allResults.forEach(res => {
-        if (res.type === 'session') {
-            const s = res.data;
-            const durationHrs = s.duration ? (s.duration / 3600).toFixed(2) : ((new Date(s.endTime) - new Date(s.startTime)) / 3600000).toFixed(2);
-            const subtitle = `⏱️ ${durationHrs} Hours ${s.topic ? `• ${s.topic}` : ''}`;
-            const card = createResultCard('session', res.subj ? res.subj.name : 'Unknown Subject', subtitle, res.date.toLocaleDateString(), s.notes, res.subj ? res.subj.color : '#0A84FF');
-            container.appendChild(card);
-        } else if (res.type === 'mock') {
-            const m = res.data;
-            const subtitle = `Score: ${m.score} / ${m.maxScore} (${((m.score/m.maxScore)*100).toFixed(1)}%)`;
-            const card = createResultCard('mock', m.name, subtitle, res.date.toLocaleDateString(), `Mock Test Log`, '#FF453A');
-            container.appendChild(card);
-        } else if (res.type === 'subject') {
-            const sub = res.data;
-            const subtitle = `Course: ${sub.course || 'N/A'} • Target: ${sub.targetHours}h/week`;
-            const card = createResultCard('subject', sub.name, subtitle, 'Course Subject', `Priority: ${sub.priority}. Total logged: ${(sub.totalHours || 0).toFixed(1)} hours.`, sub.color || '#30D158');
-            container.appendChild(card);
+    const renderCardRow = (title, items) => {
+        if(items.length === 0) return;
+        const rowWrap = document.createElement('div');
+        rowWrap.style.marginBottom = '30px';
+        
+        const rowTitle = document.createElement('h3');
+        rowTitle.textContent = title;
+        rowTitle.style.marginBottom = '15px';
+        rowTitle.style.color = 'var(--text-main)';
+        rowTitle.style.borderBottom = '1px solid var(--glass-border)';
+        rowTitle.style.paddingBottom = '8px';
+        rowWrap.appendChild(rowTitle);
+        
+        const cardsWrap = document.createElement('div');
+        cardsWrap.style.display = 'grid';
+        cardsWrap.style.gridTemplateColumns = 'repeat(auto-fill, minmax(300px, 1fr))';
+        cardsWrap.style.gap = '20px';
+        
+        items.forEach(res => {
+            let card;
+            if (res.type === 'session') {
+                const s = res.data;
+                const durationHrs = s.duration ? (s.duration / 3600).toFixed(2) : ((new Date(s.endTime) - new Date(s.startTime)) / 3600000).toFixed(2);
+                const subtitle = `⏱️ ${durationHrs} Hours ${s.topic ? `• ${s.topic}` : ''}`;
+                card = createResultCard('session', res.subj ? res.subj.name : 'Unknown Subject', subtitle, res.date.toLocaleDateString(), s.notes, res.subj ? res.subj.color : '#0A84FF');
+            } else if (res.type === 'mock') {
+                const m = res.data;
+                const subtitle = `Score: ${m.score} / ${m.maxScore} (${((m.score/m.maxScore)*100).toFixed(1)}%)`;
+                card = createResultCard('mock', m.name, subtitle, res.date.toLocaleDateString(), m.notes || `Mock Test Log`, '#FF453A');
+            } else if (res.type === 'practice') {
+                const p = res.data;
+                const pct = Math.round((p.correct / p.attempted) * 100) || 0;
+                const subtitle = `Score: ${p.correct} / ${p.attempted} (${pct}%) • ${p.confidence} Conf`;
+                card = createResultCard('practice', p.topic || p.syllabusArea || 'Practice', subtitle, res.date.toLocaleDateString(), p.notes || `Course: ${p.course}`, '#FF9F0A');
+            }
+            if(card) cardsWrap.appendChild(card);
+        });
+        
+        rowWrap.appendChild(cardsWrap);
+        container.appendChild(rowWrap);
+    };
+
+    let renderedItems = new Set();
+    
+    // 1. Render Grouped Suggestions
+    suggestedNotes.forEach(noteName => {
+        const matchingItems = allResults.filter(r => r.originalNote === noteName && !renderedItems.has(r.data.id || r.data.name));
+        if (matchingItems.length > 0) {
+            renderCardRow(`Suggested Group: "${noteName}"`, matchingItems);
+            matchingItems.forEach(r => renderedItems.add(r.data.id || r.data.name));
         }
     });
+    
+    // 2. Render Remaining by Category
+    const remainingSessions = allResults.filter(r => r.type === 'session' && !renderedItems.has(r.data.id));
+    const remainingPractice = allResults.filter(r => r.type === 'practice' && !renderedItems.has(r.data.id));
+    const remainingMocks = allResults.filter(r => r.type === 'mock' && !renderedItems.has(r.data.id));
+    
+    renderCardRow("Study Sessions", remainingSessions);
+    renderCardRow("Practice Tests", remainingPractice);
+    renderCardRow("Mock Exams", remainingMocks);
 }
 
 // Call initializations
@@ -2732,8 +2830,11 @@ window.saveEditAttendance = function() {
     const durSecs = (h * 3600) + (m * 60);
     if (durSecs <= 0) return alert("Duration must be > 0");
     
-    session.startTime = new Date(date + 'T12:00:00Z').toISOString();
-    session.endTime = new Date(new Date(session.startTime).getTime() + durSecs*1000).toISOString();
+    const now = new Date();
+    const sessionStart = new Date(date + 'T00:00:00');
+    sessionStart.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    session.startTime = sessionStart.toISOString();
+    session.endTime = new Date(sessionStart.getTime() + durSecs*1000).toISOString();
     session.subjectId = subj;
     session.notes = notes;
     session.duration = durSecs;
@@ -2752,6 +2853,7 @@ window.editPractice = function(id) {
     document.getElementById('editPracticeDate').value = session.date;
     document.getElementById('editPracticeAttempted').value = session.attempted;
     document.getElementById('editPracticeCorrect').value = session.correct;
+    document.getElementById('editPracticeNotes').value = session.notes || '';
     
     document.getElementById('editPracticeModal').classList.add('active');
 };
@@ -2761,6 +2863,7 @@ window.saveEditPractice = function() {
     const date = document.getElementById('editPracticeDate').value;
     const attempted = parseInt(document.getElementById('editPracticeAttempted').value) || 0;
     const correct = parseInt(document.getElementById('editPracticeCorrect').value) || 0;
+    const notes = document.getElementById('editPracticeNotes').value || '';
     
     if (!date || attempted < 1) return alert("Valid date and attempted questions > 0 are required.");
     if (correct > attempted) return alert("Correct answers cannot exceed attempted.");
@@ -2771,6 +2874,7 @@ window.saveEditPractice = function() {
     session.date = date;
     session.attempted = attempted;
     session.correct = correct;
+    session.notes = notes;
     
     saveData('practice');
     document.getElementById('editPracticeModal').classList.remove('active');
@@ -2787,6 +2891,7 @@ window.editMock = function(id) {
     document.getElementById('editMockDate').value = session.date;
     document.getElementById('editMockScore').value = session.score;
     document.getElementById('editMockMaxScore').value = session.maxScore;
+    document.getElementById('editMockNotes').value = session.notes || '';
     
     document.getElementById('editMockModal').classList.add('active');
 };
@@ -2796,6 +2901,7 @@ window.saveEditMock = function() {
     const date = document.getElementById('editMockDate').value;
     const score = parseFloat(document.getElementById('editMockScore').value) || 0;
     const maxScore = parseFloat(document.getElementById('editMockMaxScore').value) || 0;
+    const notes = document.getElementById('editMockNotes').value || '';
     
     if (!date || maxScore < 1) return alert("Valid date and max score > 0 are required.");
     if (score > maxScore) return alert("Score cannot exceed max score.");
@@ -2806,6 +2912,7 @@ window.saveEditMock = function() {
     session.date = date;
     session.score = score;
     session.maxScore = maxScore;
+    session.notes = notes;
     
     saveData('mocks');
     document.getElementById('editMockModal').classList.remove('active');

@@ -132,7 +132,7 @@ async function syncDataToCloud(uid) {
             csebSyllabus: JSON.parse(localStorage.getItem(STORAGE_KEYS.CSEB_SYLLABUS) || '{}'),
             notifications: JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || '[]'),
             systemState: JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_STATE) || '{"currentVersion":"v1.1.20"}')
-        }, { merge: true });
+        });
     } catch (error) {
         console.error("Error saving to cloud:", error);
     }
@@ -142,10 +142,7 @@ let syncTimer = null;
 // Global function to trigger sync on saveData
 window.triggerCloudSync = () => {
     if (auth.currentUser) {
-        if (syncTimer) clearTimeout(syncTimer);
-        syncTimer = setTimeout(() => {
-            syncDataToCloud(auth.currentUser.uid);
-        }, 3000); // 3 seconds
+        syncDataToCloud(auth.currentUser.uid);
     }
 }
 

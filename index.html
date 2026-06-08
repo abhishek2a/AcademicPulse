@@ -6,10 +6,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>AcademicPulse</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.json?v=19">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=19">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Firebase Scripts -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -474,6 +474,9 @@
                         </select>
                         <button class="btn btn-outline" id="practiceAddBtn" style="flex:1; min-width: 80px;">Log</button>
                     </div>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input type="text" id="practiceNotesInput" placeholder="Notes (Optional)" style="flex:1; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
+                    </div>
                 </div>
                 <div style="margin-top: 20px; overflow-x: auto;">
                     <table class="table" style="width: 100%; min-width: 500px;">
@@ -520,6 +523,10 @@
                     <div class="form-group">
                         <label>Max Score</label>
                         <input type="number" id="mockMaxScoreInput" class="form-input" placeholder="100">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Notes (Optional)</label>
+                        <input type="text" id="mockNotesInput" class="form-input" placeholder="e.g. Chapter 1 basics">
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
                         <button class="btn" id="saveMockBtn" style="width: 100%;">Save Mock Test</button>
@@ -618,8 +625,8 @@
             <div style="display: flex; gap: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none;" id="searchFilters">
                 <button class="btn search-filter-btn" data-filter="all" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">All</button>
                 <button class="btn btn-outline search-filter-btn" data-filter="sessions" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">Sessions</button>
+                <button class="btn btn-outline search-filter-btn" data-filter="practice" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">Practice</button>
                 <button class="btn btn-outline search-filter-btn" data-filter="mocks" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">Mocks</button>
-                <button class="btn btn-outline search-filter-btn" data-filter="subjects" style="border-radius: 20px; padding: 6px 15px; font-size: 0.9rem;">Subjects</button>
             </div>
             
             <div id="searchResultsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
@@ -988,6 +995,10 @@
                 <label>Correct Answers</label>
                 <input type="number" id="editPracticeCorrect" min="0" required>
             </div>
+            <div class="form-group">
+                <label>Notes (Optional)</label>
+                <input type="text" id="editPracticeNotes">
+            </div>
             <div class="modal-actions">
                 <button class="btn btn-outline" onclick="document.getElementById('editPracticeModal').classList.remove('active')">Cancel</button>
                 <button class="btn" onclick="saveEditPractice()">Save Changes</button>
@@ -1012,6 +1023,10 @@
                 <label>Max Score</label>
                 <input type="number" id="editMockMaxScore" min="1" required>
             </div>
+            <div class="form-group">
+                <label>Notes (Optional)</label>
+                <input type="text" id="editMockNotes">
+            </div>
             <div class="modal-actions">
                 <button class="btn btn-outline" onclick="document.getElementById('editMockModal').classList.remove('active')">Cancel</button>
                 <button class="btn" onclick="saveEditMock()">Save Changes</button>
@@ -1033,8 +1048,8 @@
         </div>
     </div>
 
-    <script src="auth.js?v=8"></script>
+    <script src="auth.js?v=10"></script>
     <script src="export.js?v=5"></script>
-    <script src="app.js?v=12"></script>
+    <script src="app.js?v=19"></script>
 </body>
 </html>

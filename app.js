@@ -15,7 +15,11 @@ const STORAGE_KEYS = {
     PRACTICE: 'cseb_question_practice',
     CSEB_SYLLABUS: 'cseb_syllabus_tracker',
     NOTIFICATIONS: 'cseb_notifications',
-    SYSTEM_STATE: 'cseb_system_state'
+    SYSTEM_STATE: 'cseb_system_state',
+    // Device-local only — never cloud-synced.
+    // Tracks the last version the user installed so sign-out/re-login
+    // never re-triggers the update popup for an already-seen version.
+    LAST_SEEN_VERSION: 'cseb_last_seen_version'
 };
 
 const DEFAULT_GOALS = { daily: 8, weekly: 40, monthly: 160 };
@@ -54,7 +58,7 @@ const AppState = {
     questionPractice: { attempted: 0, correct: 0 },
     csebSyllabus: {},
     notifications: [],
-    currentVersion: 'v1.1.22',
+    currentVersion: 'v1.1.23',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -161,7 +165,7 @@ function loadData() {
 
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.22', availableUpdate: null, dataVersion: 1 });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.23', availableUpdate: null, dataVersion: 1 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
@@ -812,7 +816,7 @@ function renderOverview() {
                 const subjName = escapeHtml(subj ? subj.name : 'Uncategorized');
                 const color = subj ? subj.color : '#aaa';
                 const timeStr = new Date(log.startTime).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
-                const durStr = TimeUtils.formatDisplay(log.duration || ((new Date(log.endTime)-new Date(log.startTime))/1000));
+                const durStr = TimeUtils.formatHours(log.duration || ((new Date(log.endTime)-new Date(log.startTime))/1000));
                 const noteOrTopic = escapeHtml([log.topic, log.notes].filter(Boolean).join(' - ') || '-');
                 
                 rowsHtml += `
@@ -1405,6 +1409,7 @@ function renderAnalytics() {
 
     // Only draw chart canvases if Chart.js is already loaded
     // (it gets loaded on first Analytics tab click; other callers may not have it yet)
+    renderLiveClassAnalytics();
     if (window.Chart) {
         renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr);
         renderConsistencyHeatmap();
@@ -1412,6 +1417,108 @@ function renderAnalytics() {
         // Still render the heatmap — it doesn't need Chart.js
         renderConsistencyHeatmap();
     }
+}
+
+let liveClassTrendChartInst = null;
+
+function renderLiveClassAnalytics() {
+    if (!AppState.analyticsCache) return;
+    const lc = AppState.analyticsCache.liveClass;
+    if (!lc) return;
+
+    const e = id => document.getElementById(id);
+
+    // ── Stats Cards ────────────────────────────────────────────────
+    if (e('lcTotalCount')) e('lcTotalCount').textContent = lc.totalCount;
+    if (e('lcTotalHours')) e('lcTotalHours').textContent = TimeUtils.formatHours(lc.totalSecs);
+    if (e('lcMonthCount')) e('lcMonthCount').textContent = lc.monthCount;
+    if (e('lcAvgDur')) {
+        const avg = lc.totalCount > 0 ? lc.totalSecs / lc.totalCount : 0;
+        e('lcAvgDur').textContent = TimeUtils.formatHours(avg);
+    }
+
+    // ── Per-Subject Breakdown ──────────────────────────────────────
+    const breakdownEl = e('liveClassSubjectBreakdown');
+    if (breakdownEl) {
+        const entries = Object.entries(lc.bySubject);
+        if (entries.length === 0) {
+            breakdownEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.9rem;">No live class sessions recorded yet. Add <b>(live class)</b> in a session\'s notes to start tracking.</div>';
+        } else {
+            // Sort by count descending
+            entries.sort((a, b) => b[1].count - a[1].count);
+            const maxCount = entries[0][1].count;
+            let html = '';
+            entries.forEach(([subjId, data]) => {
+                const subj = AppState.subjects.find(s => s.id === subjId);
+                const name = subj ? escapeHtml(subj.name) : 'Unknown';
+                const color = subj ? subj.color : '#0A84FF';
+                const pct = Math.round((data.count / maxCount) * 100);
+                const hrs = TimeUtils.formatHours(data.totalSecs);
+                html += `
+                    <div style="margin-bottom:14px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.9rem;">
+                            <span style="display:flex; align-items:center; gap:8px;">
+                                <span style="width:10px; height:10px; border-radius:50%; background:${color}; display:inline-block; flex-shrink:0;"></span>
+                                ${name}
+                            </span>
+                            <span style="color:var(--text-muted);">${data.count} class${data.count > 1 ? 'es' : ''} · ${hrs}</span>
+                        </div>
+                        <div style="height:8px; background:rgba(255,255,255,0.06); border-radius:6px; overflow:hidden;">
+                            <div style="height:100%; width:${pct}%; background:${color}; border-radius:6px; transition:width 0.8s cubic-bezier(0.16,1,0.3,1);"></div>
+                        </div>
+                    </div>`;
+            });
+            breakdownEl.innerHTML = html;
+        }
+    }
+
+    // ── Weekly Trend Chart (Chart.js) ──────────────────────────────
+    if (!window.Chart) return;
+    const trendCtx = e('liveClassTrendChart');
+    if (!trendCtx) return;
+
+    // Build last 8 weeks
+    const now = new Date();
+    const weekLabels = [];
+    const weekCounts = [];
+    for (let i = 7; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i * 7);
+        const wk = TimeUtils.getWeekKey(d);
+        // Label as "MMM D"
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        weekLabels.push(label);
+        weekCounts.push(lc.byWeek[wk] || 0);
+    }
+
+    if (liveClassTrendChartInst) liveClassTrendChartInst.destroy();
+    liveClassTrendChartInst = new Chart(trendCtx, {
+        type: 'bar',
+        data: {
+            labels: weekLabels,
+            datasets: [{
+                label: 'Live Classes',
+                data: weekCounts,
+                backgroundColor: 'rgba(10, 132, 255, 0.25)',
+                borderColor: '#0A84FF',
+                borderWidth: 2,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 },
+                    grid: { color: 'rgba(255,255,255,0.06)' }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
 }
 
 function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr) {
@@ -1807,7 +1914,15 @@ function rebuildAnalyticsCache() {
         monthSecs: 0,
         subjTotals: {},
         dailyData: {},
-        monthlyData: {}
+        monthlyData: {},
+        // Live class tracking
+        liveClass: {
+            totalCount: 0,
+            totalSecs: 0,
+            monthCount: 0,
+            bySubject: {},   // subjectId -> { count, totalSecs }
+            byWeek: {}       // weekKey -> count
+        }
     };
     
     const now = new Date();
@@ -1830,6 +1945,20 @@ function rebuildAnalyticsCache() {
         if (s.subjectId) cache.subjTotals[s.subjectId] = (cache.subjTotals[s.subjectId] || 0) + dur;
         cache.dailyData[dKey] = (cache.dailyData[dKey] || 0) + dur;
         cache.monthlyData[mKey] = (cache.monthlyData[mKey] || 0) + dur;
+
+        // Live class detection
+        if (/\(live class\)/i.test(s.notes || '')) {
+            const lc = cache.liveClass;
+            lc.totalCount++;
+            lc.totalSecs += dur;
+            if (mKey === thisMonthKey) lc.monthCount++;
+            lc.byWeek[wKey] = (lc.byWeek[wKey] || 0) + 1;
+            if (s.subjectId) {
+                if (!lc.bySubject[s.subjectId]) lc.bySubject[s.subjectId] = { count: 0, totalSecs: 0 };
+                lc.bySubject[s.subjectId].count++;
+                lc.bySubject[s.subjectId].totalSecs += dur;
+            }
+        }
     });
     
     AppState.analyticsCache = cache;
@@ -2495,7 +2624,7 @@ function renderSearchResults(query) {
     // Detect live class sessions (case-insensitive)
     const isLiveClass = (notes) => /\(live class\)/i.test(notes || '');
     
-    // ---- Live Class filter mode: group by subject ----
+    // ---- Live Class filter mode: group by subject → chapter ----
     if (currentSearchFilter === 'live-class') {
         const liveSessions = AppState.sessions.filter(s => isLiveClass(s.notes));
 
@@ -2515,90 +2644,189 @@ function renderSearchResults(query) {
             return;
         }
 
-        // Group by subject
+        // ── Chapter root normalizer ─────────────────────────────────
+        // Strips trailing part/episode/section numbers so "Chapter 1 Part 1"
+        // and "Chapter 1 Part 2" both resolve to root "Chapter 1".
+        const getChapterRoot = (topic, notes) => {
+            const raw = (topic || notes || '').replace(/\(live class\)/gi, '').trim();
+            return raw
+                // Remove trailing "Part 1", "Pt 2", "Episode 3", "Ep.4", "(1)", "- 2", "1/2" etc.
+                .replace(/[\s\-–—]*(\bpart\b|\bpt\.?\b|\bepisode\b|\bep\.?\b|\bsection\b|\bseg\b|\blecture\b|\blec\b|\bclass\b)\s*[\d]+\s*$/i, '')
+                .replace(/[\s\-–—]*\([\d]+\)\s*$/i, '')  // trailing (1), (2)
+                .replace(/[\s\-–—]*[\d]+\s*\/\s*[\d]+\s*$/i, '')  // trailing 1/2, 2/3
+                .replace(/[\s\-–—]+[\d]+\s*$/i, '')  // trailing bare number "Chapter 3 2"
+                .trim() || raw;  // fallback to raw if stripping removed everything
+        };
+
+        // Extract part label from topic
+        const getPartLabel = (topic, notes) => {
+            const raw = (topic || notes || '').replace(/\(live class\)/gi, '').trim();
+            const m = raw.match(/(\bpart\b|\bpt\.?\b|\bepisode\b|\bep\.?\b|\bsection\b|\blecture\b)\s*([\d]+)/i)
+                      || raw.match(/\(([\d]+)\)/)
+                      || raw.match(/([\d]+)\s*\/\s*([\d]+)/);
+            if (m) return m[0];
+            // Bare trailing number
+            const n = raw.match(/[\s\-–—]+([\d]+)\s*$/);
+            if (n) return n[1];
+            return null;
+        };
+
+        // Group: subject → chapter root → sessions[]
         const bySubject = {};
         filtered.forEach(s => {
             const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
-            const key = subj ? subj.id : '__unknown__';
-            if (!bySubject[key]) bySubject[key] = { subj, sessions: [] };
-            bySubject[key].sessions.push(s);
+            const subjKey = subj ? subj.id : '__unknown__';
+            if (!bySubject[subjKey]) bySubject[subjKey] = { subj, chapters: {} };
+            const root = getChapterRoot(s.topic, s.notes);
+            if (!bySubject[subjKey].chapters[root]) bySubject[subjKey].chapters[root] = [];
+            bySubject[subjKey].chapters[root].push(s);
         });
 
-        // Render each subject group
-        Object.values(bySubject).forEach(({ subj, sessions }) => {
+        // ── Render helper: one individual session card ──────────────
+        const makeSessionCard = (s, subjColor) => {
+            const dateStr = new Date(s.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const timeStr = new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const durStr = s.duration ? TimeUtils.formatHours(s.duration) : '-';
+            const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
+            const partLabel = getPartLabel(s.topic, s.notes);
+
+            const card = document.createElement('div');
+            card.style.cssText = `background:var(--glass-bg); border:1px solid ${subjColor}30; border-left:3px solid ${subjColor}; border-radius:12px; padding:14px; transition:transform 0.2s ease;`;
+            card.onmouseenter = () => card.style.transform = 'translateY(-2px)';
+            card.onmouseleave = () => card.style.transform = '';
+
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:0.75rem; background:rgba(10,132,255,0.15); color:var(--neon-blue); padding:3px 8px; border-radius:8px; font-weight:600;">
+                        🎥 ${partLabel ? escapeHtml(partLabel) : 'Live Class'}
+                    </span>
+                    <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;">${durStr}</span>
+                </div>
+                <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:5px;">${dateStr} at ${timeStr}</div>
+                ${s.topic ? `<div style="font-size:0.88rem; color:var(--text-main); font-weight:500; margin-bottom:3px;">${escapeHtml(s.topic)}</div>` : ''}
+                ${cleanNotes && cleanNotes !== s.topic ? `<div style="font-size:0.82rem; color:var(--text-muted);">${escapeHtml(cleanNotes)}</div>` : ''}
+            `;
+            return card;
+        };
+
+        // ── Render each subject ──────────────────────────────────────
+        Object.values(bySubject).forEach(({ subj, chapters }) => {
             const subjName = subj ? subj.name : 'Unknown Subject';
             const subjColor = subj ? subj.color : '#0A84FF';
-            const totalSecs = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
-            const totalHrs = (totalSecs / 3600).toFixed(1);
+            const allSessions = Object.values(chapters).flat();
+            const totalSecs = allSessions.reduce((sum, s) => sum + (s.duration || 0), 0);
 
             const group = document.createElement('div');
-            group.style.marginBottom = '30px';
+            group.style.marginBottom = '36px';
 
+            // Subject header
             const groupHeader = document.createElement('div');
-            groupHeader.style.cssText = `display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-bottom:10px; border-bottom: 2px solid ${subjColor}40;`;
+            groupHeader.style.cssText = `display:flex; align-items:center; gap:12px; margin-bottom:18px; padding-bottom:10px; border-bottom: 2px solid ${subjColor}40;`;
             groupHeader.innerHTML = `
                 <div style="width:14px; height:14px; border-radius:50%; background:${subjColor}; flex-shrink:0;"></div>
                 <h3 style="margin:0; color:var(--text-main);">${escapeHtml(subjName)}</h3>
                 <span style="margin-left:auto; font-size:0.85rem; color:var(--text-muted); background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:20px;">
-                    🎥 ${sessions.length} class${sessions.length > 1 ? 'es' : ''} · ${totalHrs}h total
+                    🎥 ${allSessions.length} class${allSessions.length > 1 ? 'es' : ''} · ${TimeUtils.formatHours(totalSecs)}
                 </span>`;
             group.appendChild(groupHeader);
 
-            const cardsGrid = document.createElement('div');
-            cardsGrid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:15px;';
+            // Chapter cards grid
+            const chapGrid = document.createElement('div');
+            chapGrid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px;';
 
-            sessions.sort((a, b) => new Date(b.startTime) - new Date(a.startTime)).forEach(s => {
-                const dateStr = new Date(s.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                const timeStr = new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                const durStr = s.duration ? `${(s.duration/3600).toFixed(1)}h` : '-';
-                // Strip (live class) tag from displayed notes
-                const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
+            Object.entries(chapters).forEach(([root, parts]) => {
+                parts.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+                const chapSecs = parts.reduce((sum, s) => sum + (s.duration || 0), 0);
+                const isMultiPart = parts.length > 1;
 
-                const card = document.createElement('div');
-                card.style.cssText = `background:var(--glass-bg); border:1px solid ${subjColor}30; border-left:3px solid ${subjColor}; border-radius:14px; padding:16px; transition:transform 0.2s ease;`;
-                card.onmouseenter = () => card.style.transform = 'translateY(-2px)';
-                card.onmouseleave = () => card.style.transform = '';
+                // Chapter card (merged or single)
+                const chapCard = document.createElement('div');
+                chapCard.style.cssText = `background:var(--glass-bg); border:1px solid ${subjColor}30; border-radius:16px; overflow:hidden; transition:box-shadow 0.2s ease;`;
+
+                // Chapter header
+                const chapHeader = document.createElement('div');
+                chapHeader.style.cssText = `padding:16px; border-left:4px solid ${subjColor}; cursor:${isMultiPart ? 'pointer' : 'default'};`;
 
                 const topRow = document.createElement('div');
-                topRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;';
-                const badge = document.createElement('span');
-                badge.style.cssText = 'font-size:0.75rem; background:rgba(10,132,255,0.15); color:var(--neon-blue); padding:3px 8px; border-radius:8px; font-weight:600;';
-                badge.textContent = '🎥 Live Class';
-                const durBadge = document.createElement('span');
-                durBadge.style.cssText = 'font-size:0.85rem; color:var(--text-muted); font-weight:600;';
-                durBadge.textContent = durStr;
-                topRow.appendChild(badge);
-                topRow.appendChild(durBadge);
+                topRow.style.cssText = 'display:flex; justify-content:space-between; align-items:flex-start; gap:8px;';
 
-                const dateEl = document.createElement('div');
-                dateEl.style.cssText = 'font-size:0.85rem; color:var(--text-muted); margin-bottom:6px;';
-                dateEl.textContent = `${dateStr} at ${timeStr}`;
+                const titleEl = document.createElement('div');
+                titleEl.style.cssText = 'font-weight:700; font-size:0.97rem; color:var(--text-main); flex:1;';
+                titleEl.textContent = root || 'Live Class';
 
-                card.appendChild(topRow);
-                card.appendChild(dateEl);
+                const metaEl = document.createElement('div');
+                metaEl.style.cssText = 'text-align:right; flex-shrink:0;';
+                metaEl.innerHTML = `
+                    <div style="font-size:0.85rem; color:var(--neon-blue); font-weight:700;">${TimeUtils.formatHours(chapSecs)}</div>
+                    ${isMultiPart ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">${parts.length} parts</div>` : ''}
+                `;
 
-                if (s.topic) {
-                    const topicEl = document.createElement('div');
-                    topicEl.style.cssText = 'font-size:0.9rem; color:var(--text-main); font-weight:500; margin-bottom:4px;';
-                    topicEl.textContent = s.topic;
-                    card.appendChild(topicEl);
+                topRow.appendChild(titleEl);
+                topRow.appendChild(metaEl);
+                chapHeader.appendChild(topRow);
+
+                if (isMultiPart) {
+                    // Show parts summary row (latest date + part count)
+                    const latest = new Date(parts[parts.length - 1].startTime);
+                    const summaryEl = document.createElement('div');
+                    summaryEl.style.cssText = 'font-size:0.82rem; color:var(--text-muted); margin-top:8px; display:flex; justify-content:space-between; align-items:center;';
+                    summaryEl.innerHTML = `
+                        <span>Last: ${latest.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        <span style="color:var(--neon-blue); font-size:0.8rem; font-weight:600;" class="lc-toggle-btn">Show all parts ▾</span>
+                    `;
+                    chapHeader.appendChild(summaryEl);
+
+                    // Collapsible parts container
+                    const partsContainer = document.createElement('div');
+                    partsContainer.style.cssText = 'display:none; padding:0 12px 12px 12px; display:none; gap:10px; flex-direction:column;';
+
+                    parts.forEach(s => {
+                        partsContainer.appendChild(makeSessionCard(s, subjColor));
+                    });
+
+                    chapCard.appendChild(chapHeader);
+                    chapCard.appendChild(partsContainer);
+
+                    // Toggle expand/collapse
+                    let expanded = false;
+                    const toggleBtn = summaryEl.querySelector('.lc-toggle-btn');
+                    chapHeader.addEventListener('click', () => {
+                        expanded = !expanded;
+                        partsContainer.style.display = expanded ? 'flex' : 'none';
+                        toggleBtn.textContent = expanded ? 'Hide parts ▴' : 'Show all parts ▾';
+                        chapCard.style.boxShadow = expanded ? `0 0 0 1px ${subjColor}50, 0 8px 24px rgba(0,0,0,0.3)` : '';
+                    });
+                } else {
+                    // Single part — show full detail inline
+                    const s = parts[0];
+                    const dateStr = new Date(s.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    const timeStr = new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
+
+                    const detailEl = document.createElement('div');
+                    detailEl.style.cssText = 'font-size:0.82rem; color:var(--text-muted); margin-top:6px;';
+                    detailEl.textContent = `${dateStr} at ${timeStr}`;
+                    chapHeader.appendChild(detailEl);
+
+                    if (cleanNotes && cleanNotes !== root) {
+                        const noteEl = document.createElement('div');
+                        noteEl.style.cssText = 'font-size:0.82rem; color:var(--text-muted); margin-top:3px;';
+                        noteEl.textContent = cleanNotes;
+                        chapHeader.appendChild(noteEl);
+                    }
+
+                    chapCard.appendChild(chapHeader);
                 }
 
-                if (cleanNotes) {
-                    const notesEl = document.createElement('div');
-                    notesEl.style.cssText = 'font-size:0.85rem; color:var(--text-muted); margin-top:4px;';
-                    notesEl.textContent = cleanNotes;
-                    card.appendChild(notesEl);
-                }
-
-                cardsGrid.appendChild(card);
+                chapGrid.appendChild(chapCard);
             });
 
-            group.appendChild(cardsGrid);
+            group.appendChild(chapGrid);
             container.appendChild(group);
         });
         return;
     }
+
     
     let allResults = [];
 
@@ -2766,7 +2994,13 @@ function renderUpdateBadge() {
 }
 
 function processNewUpdate(updateInfo) {
-    if (updateInfo.version !== AppState.currentVersion && (!AppState.availableUpdate || AppState.availableUpdate.version !== updateInfo.version)) {
+    // Check device-local last-seen version first.
+    // This survives sign-out/sign-in because it's never cloud-synced.
+    const lastSeen = localStorage.getItem(STORAGE_KEYS.LAST_SEEN_VERSION);
+    if (lastSeen === updateInfo.version) return; // Already installed/dismissed on this device
+
+    if (updateInfo.version !== AppState.currentVersion &&
+        (!AppState.availableUpdate || AppState.availableUpdate.version !== updateInfo.version)) {
         AppState.availableUpdate = updateInfo;
         saveData('system');
         addNotification('System Update Available', `Version ${updateInfo.version} is ready to install.`, 'info');
@@ -2787,6 +3021,9 @@ function installUpdate() {
     AppState.currentVersion = newVersion;
     AppState.availableUpdate = null;
     saveData('system');
+
+    // Stamp this device so sign-out/re-login never re-triggers this popup
+    localStorage.setItem(STORAGE_KEYS.LAST_SEEN_VERSION, newVersion);
     
     addNotification('Update Installed', `Successfully updated to ${newVersion}.`, 'success');
     renderUpdateBadge();
@@ -2794,6 +3031,9 @@ function installUpdate() {
     const overviewTab = document.querySelector('.nav-item[data-target="view-overview"]');
     if (overviewTab) overviewTab.click();
     
+    // Force cloud sync with updated systemState so cloud is also up to date
+    if (typeof window.triggerCloudSync === 'function') window.triggerCloudSync();
+
     // If there's a service worker, tell it to skip waiting so new cache takes over
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });

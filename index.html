@@ -306,7 +306,43 @@
                 </div>
             </div>
 
-            <!-- 6. Goals & Attendance -->
+            <!-- 6. Live Class Analytics -->
+            <h2 style="margin-bottom: 15px;">🎥 Live Class Analytics</h2>
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); margin-bottom: 20px;" id="liveClassStatsGrid">
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">Total Classes</div>
+                    <div class="stat-value text-blue" id="lcTotalCount" style="font-size: 2rem;">0</div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">Total Hours</div>
+                    <div class="stat-value text-purple" id="lcTotalHours" style="font-size: 2rem;">0h</div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">This Month</div>
+                    <div class="stat-value text-green" id="lcMonthCount" style="font-size: 2rem;">0</div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">Avg Duration</div>
+                    <div class="stat-value text-gold" id="lcAvgDur" style="font-size: 2rem;">0h</div>
+                </div>
+            </div>
+
+            <div class="charts-grid" style="margin-bottom: 30px;">
+                <!-- Live class trend chart -->
+                <div class="chart-card">
+                    <h3>Live Class Frequency (Last 8 Weeks)</h3>
+                    <div style="height: 220px;"><canvas id="liveClassTrendChart"></canvas></div>
+                </div>
+                <!-- Per-subject breakdown -->
+                <div class="chart-card" style="text-align: left; overflow-x: auto;">
+                    <h3 style="margin-bottom: 15px;">Per-Subject Breakdown</h3>
+                    <div id="liveClassSubjectBreakdown">
+                        <div style="color: var(--text-muted); font-size: 0.9rem;">No live class sessions recorded yet. Add <b>(live class)</b> in a session's notes to start tracking.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. Goals & Attendance -->
             <div class="charts-grid" style="margin-bottom: 30px;">
                 <!-- Goals -->
                 <div class="chart-card" style="text-align: left;">
@@ -1051,6 +1087,6 @@
 
     <script src="auth.js?v=10"></script>
     <script src="export.js?v=7"></script>
-    <script src="app.js?v=24"></script>
+    <script src="app.js?v=28"></script>
 </body>
 </html>

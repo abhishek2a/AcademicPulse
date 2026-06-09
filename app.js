@@ -1589,12 +1589,16 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
 function renderConsistencyHeatmap() {
     const grid = document.getElementById('studyHeatmap');
     if (!grid) return;
+
+    // Ensure cache is built before reading it
+    if (!AppState.analyticsCache) rebuildAnalyticsCache();
     
     const now = new Date();
     const startDate = new Date();
     startDate.setDate(now.getDate() - 120);
     
-    const studyMap = AppState.analyticsCache.dailyData || {};
+    const studyMap = (AppState.analyticsCache && AppState.analyticsCache.dailyData) || {};
+
     
     let bestDur = 0, bestDay = null;
     let currDate = new Date(startDate);

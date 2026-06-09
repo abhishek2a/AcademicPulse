@@ -1403,8 +1403,15 @@ function renderAnalytics() {
     if(e('readinessAccaBar')) e('readinessAccaBar').style.width = Math.round(accaReadiness) + '%';
     if(e('readinessCsebBar')) e('readinessCsebBar').style.width = Math.round(csebReadiness) + '%';
 
-    renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr);
-    renderConsistencyHeatmap();
+    // Only draw chart canvases if Chart.js is already loaded
+    // (it gets loaded on first Analytics tab click; other callers may not have it yet)
+    if (window.Chart) {
+        renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr);
+        renderConsistencyHeatmap();
+    } else {
+        // Still render the heatmap — it doesn't need Chart.js
+        renderConsistencyHeatmap();
+    }
 }
 
 function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr) {
@@ -2456,11 +2463,12 @@ function renderSearchResults(query) {
     if (!container) return;
     
     container.innerHTML = '';
+    // Reset grid when using section-based layout
+    container.style.display = 'block';
     const q = query.trim().toLowerCase();
     
     if (q.length === 0 && currentSearchFilter === 'all') {
         container.innerHTML = '<div style="color: var(--text-muted); padding: 20px; text-align: center; border: 1px dashed var(--glass-border); border-radius: 12px;">Type above to search, or select a category filter to browse...</div>';
-        container.style.display = 'block';
         return;
     }
 
@@ -2477,32 +2485,140 @@ function renderSearchResults(query) {
     const normQ = normalizeForSearch(q);
     const searchTerms = normQ.split(' ').filter(t => t.length > 0);
     
-    // Helper to check if any string matches all search terms (Netflix style robust search)
+    // Helper to check if any string matches all search terms
     const matchesSearch = (...fields) => {
         if (searchTerms.length === 0) return true;
         const combinedTarget = fields.map(f => normalizeForSearch(f)).join(' ');
         return searchTerms.every(term => combinedTarget.includes(term));
     };
+
+    // Detect live class sessions (case-insensitive)
+    const isLiveClass = (notes) => /\(live class\)/i.test(notes || '');
+    
+    // ---- Live Class filter mode: group by subject ----
+    if (currentSearchFilter === 'live-class') {
+        const liveSessions = AppState.sessions.filter(s => isLiveClass(s.notes));
+
+        if (liveSessions.length === 0) {
+            container.innerHTML = '<div style="color: var(--text-muted); padding: 20px; text-align: center;">No live class sessions found. Add <b>(live class)</b> in the notes of a session to track it here.</div>';
+            return;
+        }
+
+        // Filter by search query too
+        const filtered = liveSessions.filter(s => {
+            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            return searchTerms.length === 0 || matchesSearch(subj ? subj.name : '', s.notes, s.topic);
+        });
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div style="color: var(--text-muted); padding: 20px; text-align: center;">No live class sessions match your search.</div>';
+            return;
+        }
+
+        // Group by subject
+        const bySubject = {};
+        filtered.forEach(s => {
+            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const key = subj ? subj.id : '__unknown__';
+            if (!bySubject[key]) bySubject[key] = { subj, sessions: [] };
+            bySubject[key].sessions.push(s);
+        });
+
+        // Render each subject group
+        Object.values(bySubject).forEach(({ subj, sessions }) => {
+            const subjName = subj ? subj.name : 'Unknown Subject';
+            const subjColor = subj ? subj.color : '#0A84FF';
+            const totalSecs = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+            const totalHrs = (totalSecs / 3600).toFixed(1);
+
+            const group = document.createElement('div');
+            group.style.marginBottom = '30px';
+
+            const groupHeader = document.createElement('div');
+            groupHeader.style.cssText = `display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-bottom:10px; border-bottom: 2px solid ${subjColor}40;`;
+            groupHeader.innerHTML = `
+                <div style="width:14px; height:14px; border-radius:50%; background:${subjColor}; flex-shrink:0;"></div>
+                <h3 style="margin:0; color:var(--text-main);">${escapeHtml(subjName)}</h3>
+                <span style="margin-left:auto; font-size:0.85rem; color:var(--text-muted); background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:20px;">
+                    🎥 ${sessions.length} class${sessions.length > 1 ? 'es' : ''} · ${totalHrs}h total
+                </span>`;
+            group.appendChild(groupHeader);
+
+            const cardsGrid = document.createElement('div');
+            cardsGrid.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:15px;';
+
+            sessions.sort((a, b) => new Date(b.startTime) - new Date(a.startTime)).forEach(s => {
+                const dateStr = new Date(s.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                const timeStr = new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const durStr = s.duration ? `${(s.duration/3600).toFixed(1)}h` : '-';
+                // Strip (live class) tag from displayed notes
+                const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
+
+                const card = document.createElement('div');
+                card.style.cssText = `background:var(--glass-bg); border:1px solid ${subjColor}30; border-left:3px solid ${subjColor}; border-radius:14px; padding:16px; transition:transform 0.2s ease;`;
+                card.onmouseenter = () => card.style.transform = 'translateY(-2px)';
+                card.onmouseleave = () => card.style.transform = '';
+
+                const topRow = document.createElement('div');
+                topRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;';
+                const badge = document.createElement('span');
+                badge.style.cssText = 'font-size:0.75rem; background:rgba(10,132,255,0.15); color:var(--neon-blue); padding:3px 8px; border-radius:8px; font-weight:600;';
+                badge.textContent = '🎥 Live Class';
+                const durBadge = document.createElement('span');
+                durBadge.style.cssText = 'font-size:0.85rem; color:var(--text-muted); font-weight:600;';
+                durBadge.textContent = durStr;
+                topRow.appendChild(badge);
+                topRow.appendChild(durBadge);
+
+                const dateEl = document.createElement('div');
+                dateEl.style.cssText = 'font-size:0.85rem; color:var(--text-muted); margin-bottom:6px;';
+                dateEl.textContent = `${dateStr} at ${timeStr}`;
+
+                card.appendChild(topRow);
+                card.appendChild(dateEl);
+
+                if (s.topic) {
+                    const topicEl = document.createElement('div');
+                    topicEl.style.cssText = 'font-size:0.9rem; color:var(--text-main); font-weight:500; margin-bottom:4px;';
+                    topicEl.textContent = s.topic;
+                    card.appendChild(topicEl);
+                }
+
+                if (cleanNotes) {
+                    const notesEl = document.createElement('div');
+                    notesEl.style.cssText = 'font-size:0.85rem; color:var(--text-muted); margin-top:4px;';
+                    notesEl.textContent = cleanNotes;
+                    card.appendChild(notesEl);
+                }
+
+                cardsGrid.appendChild(card);
+            });
+
+            group.appendChild(cardsGrid);
+            container.appendChild(group);
+        });
+        return;
+    }
     
     let allResults = [];
-    let suggestedNotes = new Set(); // To collect notes that match the query
 
     // 1. Search Sessions
     if (currentSearchFilter === 'all' || currentSearchFilter === 'sessions') {
         AppState.sessions.forEach(s => {
+            // Skip live-class sessions in regular search (they have their own filter)
+            if (isLiveClass(s.notes) && currentSearchFilter !== 'sessions') return;
             const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
             const subjName = subj ? subj.name : '';
             const notes = s.notes || '';
             const topic = s.topic || '';
             
             if (matchesSearch(subjName, notes, topic)) {
-                if (matchesSearch(notes) && notes.trim().length > 0) suggestedNotes.add(s.notes);
                 allResults.push({
                     type: 'session',
                     date: new Date(s.startTime || s.date),
                     data: s,
                     subj: subj,
-                    originalNote: s.notes || ''
+                    isLiveClass: isLiveClass(s.notes)
                 });
             }
         });
@@ -2512,12 +2628,10 @@ function renderSearchResults(query) {
     if (currentSearchFilter === 'all' || currentSearchFilter === 'mocks') {
         AppState.mockTests.forEach(m => {
             if (matchesSearch(m.name, m.notes)) {
-                if (matchesSearch(m.notes) && (m.notes || '').trim().length > 0) suggestedNotes.add(m.notes);
                 allResults.push({
                     type: 'mock',
                     date: new Date(m.date),
                     data: m,
-                    originalNote: m.notes || ''
                 });
             }
         });
@@ -2528,19 +2642,15 @@ function renderSearchResults(query) {
         if(Array.isArray(AppState.questionPractice)) {
             AppState.questionPractice.forEach(p => {
                 if(matchesSearch(p.course, p.syllabusArea, p.topic, p.notes)) {
-                    if (matchesSearch(p.notes) && (p.notes || '').trim().length > 0) suggestedNotes.add(p.notes);
                     allResults.push({
                         type: 'practice',
                         date: new Date(p.date),
                         data: p,
-                        originalNote: p.notes || ''
                     });
                 }
             });
         }
     }
-    
-    container.style.display = 'block';
     
     if (allResults.length === 0) {
         container.innerHTML = '<div style="color: var(--text-muted); padding: 20px; text-align: center;">No results found matching your search.</div>';
@@ -2549,17 +2659,17 @@ function renderSearchResults(query) {
     
     allResults.sort((a, b) => b.date - a.date);
     
-    const renderCardRow = (title, items) => {
+    const renderCardRow = (title, items, iconHtml = '') => {
         if(items.length === 0) return;
         const rowWrap = document.createElement('div');
         rowWrap.style.marginBottom = '30px';
         
         const rowTitle = document.createElement('h3');
-        rowTitle.textContent = title;
         rowTitle.style.marginBottom = '15px';
         rowTitle.style.color = 'var(--text-main)';
         rowTitle.style.borderBottom = '1px solid var(--glass-border)';
         rowTitle.style.paddingBottom = '8px';
+        rowTitle.textContent = (iconHtml ? iconHtml + ' ' : '') + title;
         rowWrap.appendChild(rowTitle);
         
         const cardsWrap = document.createElement('div');
@@ -2572,8 +2682,10 @@ function renderSearchResults(query) {
             if (res.type === 'session') {
                 const s = res.data;
                 const durationHrs = s.duration ? (s.duration / 3600).toFixed(2) : ((new Date(s.endTime) - new Date(s.startTime)) / 3600000).toFixed(2);
-                const subtitle = `⏱️ ${durationHrs} Hours ${s.topic ? `• ${s.topic}` : ''}`;
-                card = createResultCard('session', res.subj ? res.subj.name : 'Unknown Subject', subtitle, res.date.toLocaleDateString(), s.notes, res.subj ? res.subj.color : '#0A84FF');
+                const liveTag = res.isLiveClass ? ' 🎥' : '';
+                const subtitle = `⏱️ ${durationHrs} Hours ${s.topic ? `• ${s.topic}` : ''}${liveTag}`;
+                const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
+                card = createResultCard('session', res.subj ? res.subj.name : 'Unknown Subject', subtitle, res.date.toLocaleDateString(), cleanNotes, res.subj ? res.subj.color : '#0A84FF');
             } else if (res.type === 'mock') {
                 const m = res.data;
                 const subtitle = `Score: ${m.score} / ${m.maxScore} (${((m.score/m.maxScore)*100).toFixed(1)}%)`;
@@ -2591,26 +2703,18 @@ function renderSearchResults(query) {
         container.appendChild(rowWrap);
     };
 
-    let renderedItems = new Set();
-    
-    // 1. Render Grouped Suggestions
-    suggestedNotes.forEach(noteName => {
-        const matchingItems = allResults.filter(r => r.originalNote === noteName && !renderedItems.has(r.data.id || r.data.name));
-        if (matchingItems.length > 0) {
-            renderCardRow(`Suggested Group: "${noteName}"`, matchingItems);
-            matchingItems.forEach(r => renderedItems.add(r.data.id || r.data.name));
-        }
-    });
-    
-    // 2. Render Remaining by Category
-    const remainingSessions = allResults.filter(r => r.type === 'session' && !renderedItems.has(r.data.id));
-    const remainingPractice = allResults.filter(r => r.type === 'practice' && !renderedItems.has(r.data.id));
-    const remainingMocks = allResults.filter(r => r.type === 'mock' && !renderedItems.has(r.data.id));
-    
-    renderCardRow("Study Sessions", remainingSessions);
-    renderCardRow("Practice Tests", remainingPractice);
-    renderCardRow("Mock Exams", remainingMocks);
+    // Separate live class sessions from regular sessions
+    const liveClassSessions = allResults.filter(r => r.type === 'session' && r.isLiveClass);
+    const regularSessions = allResults.filter(r => r.type === 'session' && !r.isLiveClass);
+    const practiceSessions = allResults.filter(r => r.type === 'practice');
+    const mockSessions = allResults.filter(r => r.type === 'mock');
+
+    renderCardRow('Study Sessions', regularSessions);
+    renderCardRow('Live Class Sessions', liveClassSessions, '🎥');
+    renderCardRow('Practice Tests', practiceSessions);
+    renderCardRow('Mock Exams', mockSessions);
 }
+
 
 // Call initializations
 document.addEventListener('DOMContentLoaded', () => {

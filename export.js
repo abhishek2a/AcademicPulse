@@ -1,4 +1,3 @@
-// Lazy loading PDF libraries
 async function loadPdfLibraries() {
     if (window.jspdf && window.jspdf.jsPDF && window.pdfjsLib) return;
     
@@ -13,9 +12,12 @@ async function loadPdfLibraries() {
     });
 
     try {
+        // Load jsPDF first (autotable depends on it), then load autotable and pdf.js in parallel
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js');
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js');
+        await Promise.all([
+            loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js'),
+            loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js')
+        ]);
     } catch (e) {
         console.error("Error loading PDF scripts", e);
     }
@@ -62,9 +64,11 @@ function generateStudyReport() {
     });
 
     AppState.sessions.forEach(s => {
-        totalSeconds += s.duration;
+        // Use duration field with fallback to startTime/endTime calculation to avoid NaN
+        const dur = s.duration || (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 1000 : 0);
+        totalSeconds += dur;
         if (subjectStats[s.subjectId]) {
-            subjectStats[s.subjectId].totalSeconds += s.duration;
+            subjectStats[s.subjectId].totalSeconds += dur;
         }
     });
 
@@ -122,9 +126,11 @@ function generateMonthlyReport() {
     AppState.sessions.forEach(s => {
         const d = new Date(s.startTime);
         if (TimeUtils.getMonthKey(d) === monthKey) {
-            monthTotal += s.duration;
+            // Use duration field with fallback to startTime/endTime calculation to avoid NaN
+            const dur = s.duration || (s.endTime ? (new Date(s.endTime) - d) / 1000 : 0);
+            monthTotal += dur;
             const dateStr = d.toLocaleDateString();
-            daysMap[dateStr] = (daysMap[dateStr] || 0) + s.duration;
+            daysMap[dateStr] = (daysMap[dateStr] || 0) + dur;
         }
     });
 

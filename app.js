@@ -54,7 +54,7 @@ const AppState = {
     questionPractice: { attempted: 0, correct: 0 },
     csebSyllabus: {},
     notifications: [],
-    currentVersion: 'v1.1.21',
+    currentVersion: 'v1.1.22',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -63,10 +63,19 @@ const AppState = {
 // ==========================================
 // UTILITIES
 // ==========================================
+// Safely escape user-supplied strings before inserting into innerHTML
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 const Storage = {
     get(key, fallback) {
-        try { return JSON.parse(localStorage.getItem(key)) || fallback; }
-        catch (e) { return fallback; }
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw === null || raw === undefined) return fallback;
+            return JSON.parse(raw) ?? fallback;
+        } catch (e) { return fallback; }
     },
     set(key, val) {
         try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
@@ -152,7 +161,7 @@ function loadData() {
 
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.21', availableUpdate: null, dataVersion: 1 });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.22', availableUpdate: null, dataVersion: 1 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
@@ -347,16 +356,19 @@ function saveData(key) {
 // ==========================================
 // NAVIGATION
 // ==========================================
-// Lazy loading Chart.js
-async function loadChartJS() {
-    if (window.Chart) return;
-    return new Promise((resolve, reject) => {
+// Lazy loading Chart.js — with race-condition guard
+let _chartJsLoadPromise = null;
+function loadChartJS() {
+    if (window.Chart) return Promise.resolve();
+    if (_chartJsLoadPromise) return _chartJsLoadPromise;
+    _chartJsLoadPromise = new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
         script.onload = resolve;
-        script.onerror = reject;
+        script.onerror = (e) => { _chartJsLoadPromise = null; reject(e); };
         document.head.appendChild(script);
     });
+    return _chartJsLoadPromise;
 }
 
 function initNavigation() {
@@ -469,18 +481,13 @@ function renderSubjects() {
     
     grid.innerHTML = '';
     
-    const subjectTotals = {};
-    AppState.sessions.forEach(s => {
-        if (s.subjectId && s.endTime) {
-            const duration = (new Date(s.endTime) - new Date(s.startTime)) / 1000;
-            subjectTotals[s.subjectId] = (subjectTotals[s.subjectId] || 0) + duration;
-        }
-    });
+    // Use analyticsCache to avoid re-iterating all sessions
+    const subjectTotals = AppState.analyticsCache ? AppState.analyticsCache.subjTotals : {};
 
     const filteredSubjects = AppState.subjects.filter(s => s.course === currentViewCourse || (!s.course && currentViewCourse === 'CSEB'));
 
     filteredSubjects.forEach(subj => {
-        subj.totalHours = (subjectTotals[subj.id] || 0) / 3600;
+        const totalHours = ((subjectTotals[subj.id] || 0) / 3600);
         
         const card = document.createElement('div');
         card.className = 'subject-card';
@@ -495,7 +502,7 @@ function renderSubjects() {
             <div class="subject-title"></div>
             <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
                 ${subj.targetHours > 0 ? `<div style="margin-bottom:4px;">Target: ${subj.targetHours}h / week</div>` : ''}
-                <div>Total Studied: ${subj.totalHours.toFixed(1)}h</div>
+                <div>Total Studied: ${totalHours.toFixed(1)}h</div>
             </div>
         `;
         
@@ -798,15 +805,17 @@ function renderOverview() {
         if (recent.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No recent sessions</td></tr>';
         } else {
+            // Build all rows as a single string (avoids O(n²) innerHTML += re-parsing)
+            let rowsHtml = '';
             recent.forEach(log => {
                 const subj = AppState.subjects.find(s => s.id === log.subjectId);
-                const subjName = subj ? subj.name : 'Uncategorized';
+                const subjName = escapeHtml(subj ? subj.name : 'Uncategorized');
                 const color = subj ? subj.color : '#aaa';
                 const timeStr = new Date(log.startTime).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
                 const durStr = TimeUtils.formatDisplay(log.duration || ((new Date(log.endTime)-new Date(log.startTime))/1000));
-                const noteOrTopic = [log.topic, log.notes].filter(Boolean).join(' - ') || '-';
+                const noteOrTopic = escapeHtml([log.topic, log.notes].filter(Boolean).join(' - ') || '-');
                 
-                tbody.innerHTML += `
+                rowsHtml += `
                     <tr>
                         <td style="padding:15px 10px;">
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -824,6 +833,7 @@ function renderOverview() {
                     </tr>
                 `;
             });
+            tbody.innerHTML = rowsHtml;
         }
     }
 }
@@ -891,7 +901,9 @@ function renderAttendance() {
     
     if (sortedDates.length > 0) {
         const todayStr = TimeUtils.getDateKey(now);
-        const yestStr = TimeUtils.getDateKey(new Date(now.setDate(now.getDate()-1)));
+        // FIX: create a new Date to avoid mutating `now` (which is reused below)
+        const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+        const yestStr = TimeUtils.getDateKey(yesterday);
         
         if (sortedDates[0] === todayStr || sortedDates[0] === yestStr) {
             attStreak = 1;
@@ -975,7 +987,7 @@ function renderDayReport(dateKey) {
     }
 
     let totalDuration = 0;
-    let html = '';
+    const sessionDataForRender = [];
 
     daySessions.forEach(s => {
         totalDuration += s.duration;
@@ -987,27 +999,39 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        html += `
-            <div class="report-session-item" style="border-left: 4px solid ${subj.color}">
-                <div class="report-session-header">
-                    <span>${subj.name}</span>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <span style="color: var(--neon-blue);">${timeStr}</span>
-                        <button onclick="editAttendance('${s.id}')" style="background:transparent; border:none; color:var(--neon-blue); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Edit Session">✎</button>
-                        <button onclick="deleteSession('${s.id}')" style="background:transparent; border:none; color:var(--neon-red); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Delete Session">×</button>
-                    </div>
-                </div>
-                <div class="report-session-notes">${s.notes || 'No notes'}</div>
-            </div>
-        `;
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, notes: s.notes });
     });
+
+    // Build HTML with placeholders, then fill in user-supplied text safely via textContent
+    let html = sessionDataForRender.map((d, i) => `
+        <div class="report-session-item" style="border-left: 4px solid ${d.color}">
+            <div class="report-session-header">
+                <span class="rsi-subj-${i}"></span>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span style="color: var(--neon-blue);">${d.timeStr}</span>
+                    <button onclick="editAttendance('${d.id}')" style="background:transparent; border:none; color:var(--neon-blue); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Edit Session">✎</button>
+                    <button onclick="deleteSession('${d.id}')" style="background:transparent; border:none; color:var(--neon-red); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Delete Session">×</button>
+                </div>
+            </div>
+            <div class="rsi-notes-${i} report-session-notes"></div>
+        </div>
+    `).join('');
 
     let totalHrs = Math.floor(totalDuration / 3600);
     let totalMins = Math.floor((totalDuration % 3600) / 60);
     totalDiv.innerHTML = `Total Studied: ${totalHrs}h ${totalMins}m ${statusText}`;
     
     content.innerHTML = statusControls + html;
+
+    // Now safely populate user-controlled text via textContent (XSS-safe)
+    sessionDataForRender.forEach((d, i) => {
+        const subjEl = content.querySelector(`.rsi-subj-${i}`);
+        if (subjEl) subjEl.textContent = d.subjName;
+        const notesEl = content.querySelector(`.rsi-notes-${i}`);
+        if (notesEl) notesEl.textContent = d.notes || 'No notes';
+    });
 }
+
 
 window.setAttendanceStatus = function(dateKey, status) {
     if (status === 'none') {
@@ -1451,13 +1475,6 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
 function renderConsistencyHeatmap() {
     const grid = document.getElementById('studyHeatmap');
     if (!grid) return;
-    grid.innerHTML = '';
-    
-    // Configure GitHub-style layout
-    grid.style.display = 'grid';
-    grid.style.gridTemplateRows = 'repeat(7, 1fr)';
-    grid.style.gridAutoFlow = 'column';
-    grid.style.gap = '4px';
     
     const now = new Date();
     const startDate = new Date();
@@ -1467,25 +1484,24 @@ function renderConsistencyHeatmap() {
     
     let bestDur = 0, bestDay = null;
     let currDate = new Date(startDate);
+    let cellsHtml = '';
     
     while (currDate <= now) {
         const k = TimeUtils.getDateKey(currDate);
         const dur = studyMap[k] || 0;
         if(dur > bestDur) { bestDur = dur; bestDay = k; }
         
-        const cell = document.createElement('div');
-        cell.className = 'heatmap-cell';
-        cell.style.width = '12px'; cell.style.height = '12px'; cell.style.borderRadius = '3px';
-        cell.title = `${k}: ${(dur/3600).toFixed(1)}h`;
+        let bg;
+        if (dur === 0) bg = 'var(--glass-border)';
+        else if (dur < 7200) bg = 'rgba(48, 209, 88, 0.3)';
+        else if (dur < 18000) bg = 'rgba(48, 209, 88, 0.6)';
+        else bg = 'rgba(48, 209, 88, 1)';
         
-        if (dur === 0) cell.style.background = 'var(--glass-border)';
-        else if (dur < 7200) cell.style.background = 'rgba(48, 209, 88, 0.3)';
-        else if (dur < 18000) cell.style.background = 'rgba(48, 209, 88, 0.6)';
-        else cell.style.background = 'rgba(48, 209, 88, 1)';
-        
-        grid.appendChild(cell);
+        cellsHtml += `<div class="heatmap-cell" title="${k}: ${(dur/3600).toFixed(1)}h" style="background:${bg}"></div>`;
         currDate.setDate(currDate.getDate() + 1);
     }
+    
+    grid.innerHTML = cellsHtml;
     
     if(document.getElementById('bestStudyDayStr')) {
         document.getElementById('bestStudyDayStr').textContent = bestDay || '-';
@@ -1510,6 +1526,9 @@ function generateSmartInsights() {
     let morning = 0, afternoon = 0, night = 0;
     const subjLastSeen = {};
 
+    // Pre-build subject lookup map to avoid O(n*m) .find() calls inside the loop
+    const subjMap = new Map(AppState.subjects.map(s => [s.id, s]));
+
     AppState.sessions.forEach(s => {
         const d = new Date(s.startTime);
         const dur = s.duration || ((new Date(s.endTime) - d)/1000);
@@ -1527,7 +1546,7 @@ function generateSmartInsights() {
         // Course Distribution (Last 7 days)
         const diffDays = (now - d) / (1000 * 3600 * 24);
         if (diffDays <= 7) {
-            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const subj = subjMap.get(s.subjectId);
             if (subj) {
                 if (subj.course === 'ACCA') courseTotals.ACCA += dur;
                 else courseTotals.CSEB += dur;
@@ -1746,9 +1765,9 @@ function initEditGoals() {
         AppState.goals.monthly = parseInt(document.getElementById('goalMonthlyInput').value) || 160;
         
         saveData('goals');
-        addNotification('Goals Updated', 'Your study goals have been updated.', 'info');
         renderOverview();
-        document.getElementById('editGoalsModal').classList.add('active');
+        document.getElementById('editGoalsModal').classList.remove('active');
+        addNotification('Goals Updated', 'Your study goals have been updated.', 'info');
     });
 }
 
@@ -1850,7 +1869,6 @@ function migrateData() {
 
         AppState.dataVersion = 2;
         saveData('system');
-        console.log("Data migrated to v2.");
     }
 }
 
@@ -1867,25 +1885,18 @@ window.initApp = function() {
         initMocksAndPractice();
         renderOverview();
         
-        // Start live clock for dashboard
-        setInterval(() => {
+        // Start live clock — only update the date/time display, not full render
+        if (window._overviewInterval) clearInterval(window._overviewInterval);
+        window._overviewInterval = setInterval(() => {
             if (document.getElementById('view-overview').classList.contains('active')) {
-                renderOverview();
+                // Only update clock display elements to avoid full re-render flicker
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const el = document.getElementById('currentDateDisplay');
+                if (el) el.textContent = `${dateStr} • ${timeStr}`;
             }
         }, 30000); // Update every 30 seconds
-        
-        // Unregister Service Worker to prevent extreme mobile caching during development
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
-                    registration.unregister();
-                }
-            });
-            // Purge caches
-            caches.keys().then(function(names) {
-                for (let name of names) caches.delete(name);
-            });
-        }
 
         setTimeout(() => {
             document.getElementById('loadingOverlay').classList.remove('active');
@@ -2116,6 +2127,7 @@ function renderMocksHistory() {
 window.addEventListener('storage', (event) => {
     if (Object.values(STORAGE_KEYS).includes(event.key)) {
         loadData();
+        rebuildAnalyticsCache(); // Ensure cache is fresh after external data change
         renderOverview();
         if (document.getElementById('view-analytics') && document.getElementById('view-analytics').classList.contains('active')) {
             renderAnalytics();

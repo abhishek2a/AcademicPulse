@@ -2161,22 +2161,36 @@ async function processPDF(file) {
     analyzerResults.style.display = 'none';
     
     try {
-        // Load pdf.js if not already loaded
+        // Load pdf.js from unpkg if not already loaded
         if (!window.pdfjsLib) {
             await new Promise((resolve, reject) => {
                 const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                script.src = 'https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js';
                 script.onload = resolve;
-                script.onerror = reject;
+                script.onerror = () => {
+                    // Fallback to cdnjs
+                    const script2 = document.createElement('script');
+                    script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+                    script2.onload = resolve;
+                    script2.onerror = reject;
+                    document.head.appendChild(script2);
+                };
                 document.head.appendChild(script);
             });
         }
 
-        const pdfjsLib = window.pdfjsLib;
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const pdfjsLib = window['pdfjs-dist/build/pdf'] || window.pdfjsLib;
+        if (!pdfjsLib) throw new Error('pdf.js library could not be loaded.');
+
+        // Use fake worker to avoid CORS issues with worker scripts
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
         
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const loadingTask = pdfjsLib.getDocument({ 
+            data: new Uint8Array(arrayBuffer),
+            disableWorker: true
+        });
+        const pdf = await loadingTask.promise;
         
         let fullText = "";
         for (let i = 1; i <= pdf.numPages; i++) {
@@ -2186,14 +2200,19 @@ async function processPDF(file) {
             fullText += pageText + " ";
         }
         
+        if (!fullText.trim()) {
+            throw new Error('No text could be extracted from this PDF.');
+        }
+        
         analyzeReportText(fullText);
     } catch (error) {
         console.error("PDF Parsing Error:", error);
-        alert("There was an error reading the PDF. Please make sure it's a valid PDF file.");
         pdfDropZone.style.display = 'block';
         analyzerLoading.style.display = 'none';
+        alert("Could not read the PDF. Error: " + (error.message || error));
     }
 }
+
 
 function analyzeReportText(text) {
     let totalHours = 0;

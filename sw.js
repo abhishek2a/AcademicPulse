@@ -1,4 +1,4 @@
-const CACHE_NAME = 'academicpulse-v1.1.40';
+const CACHE_NAME = 'academicpulse-v1.1.41';
 
 const STATIC_ASSETS = [
     'index.html',

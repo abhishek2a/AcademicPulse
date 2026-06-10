@@ -393,13 +393,12 @@ function initNavigation() {
             if (targetId === 'view-overview') renderOverview();
             if (targetId === 'view-analytics') {
                 document.getElementById('loadingOverlay').classList.add('active');
-                loadChartJS().then(() => {
-                    renderAnalytics();
-                    document.getElementById('loadingOverlay').classList.remove('active');
-                }).catch(err => {
-                    console.error("Failed to load Chart.js", err);
-                    document.getElementById('loadingOverlay').classList.remove('active');
-                });
+                loadChartJS()
+                    .catch(err => console.warn("Chart.js failed to load, analytics will show without charts:", err))
+                    .finally(() => {
+                        renderAnalytics();
+                        document.getElementById('loadingOverlay').classList.remove('active');
+                    });
             }
             if (targetId === 'view-attendance') renderAttendance();
         });
@@ -1935,11 +1934,26 @@ function rebuildAnalyticsCache() {
     const thisMonthKey = TimeUtils.getMonthKey(now);
     
     AppState.sessions.forEach(s => {
-        const startDate = new Date(s.startTime);
+        // Resolve date — some older sessions may use `date` instead of `startTime`
+        const rawStart = s.startTime || s.date;
+        if (!rawStart) return; // skip sessions with no date at all
+
+        const startDate = new Date(rawStart);
+        if (isNaN(startDate.getTime())) return; // skip sessions with invalid date
+
         const dKey = TimeUtils.getDateKey(startDate);
         const wKey = TimeUtils.getWeekKey(startDate);
         const mKey = TimeUtils.getMonthKey(startDate);
-        const dur = s.duration || ((new Date(s.endTime) - startDate) / 1000);
+
+        // Resolve duration — prefer explicit duration, fallback to end-start diff
+        let dur = s.duration;
+        if (!dur || dur <= 0) {
+            const endDate = new Date(s.endTime);
+            if (!isNaN(endDate.getTime())) {
+                dur = (endDate - startDate) / 1000;
+            }
+        }
+        if (!dur || dur <= 0) return; // skip sessions with no usable duration
         
         cache.totalSecs += dur;
         if (dKey === todayKey) cache.todaySecs += dur;
@@ -1964,6 +1978,7 @@ function rebuildAnalyticsCache() {
             }
         }
     });
+
     
     AppState.analyticsCache = cache;
 }

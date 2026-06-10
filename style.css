@@ -15,12 +15,147 @@
 
 body.light-theme {
     --app-bg: #F5F5F7;
-    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-bg: rgba(255, 255, 255, 0.82);
     --glass-border: rgba(0, 0, 0, 0.1);
     --glass-hover: rgba(0, 0, 0, 0.05);
     --text-main: #1D1D1F;
-    --text-muted: #86868B;
+    --text-muted: #6E6E73;
 }
+
+/* ── Light theme targeted overrides ── */
+
+/* Sidebar title gradient — white-on-white in light mode */
+body.light-theme .sidebar h2 {
+    background: linear-gradient(135deg, #1D1D1F, #6E6E73);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Sidebar background */
+body.light-theme .sidebar {
+    background: rgba(255, 255, 255, 0.9);
+    border-right-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Chart card headings are hardcoded #fff */
+body.light-theme .chart-card h3 {
+    color: var(--text-main);
+}
+
+/* Chart card shadow is too dark for light bg */
+body.light-theme .chart-card,
+body.light-theme .chart-card--goals {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Progress bar track — hardcoded dark rgba */
+body.light-theme .progress-bar-bg {
+    background: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Stat card compact — hardcoded dark background */
+body.light-theme .stat-card--compact {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.07);
+}
+
+/* Export buttons — white/transparent on dark */
+body.light-theme .btn-export {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-main);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+body.light-theme .btn-export:hover {
+    background: rgba(0, 0, 0, 0.09);
+}
+
+/* Report session items */
+body.light-theme .report-session-item {
+    background: rgba(0, 0, 0, 0.02);
+}
+body.light-theme .report-session-header {
+    color: var(--text-main);
+}
+
+/* Day name labels in calendar */
+body.light-theme .day-name {
+    color: #6E6E73;
+}
+
+/* Timer mode pill — dark in dark mode */
+body.light-theme .timer-modes {
+    background: rgba(0, 0, 0, 0.05);
+}
+body.light-theme .mode-btn.active {
+    background: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Close button — white ghost on dark, invisible in light */
+body.light-theme .close-btn {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: var(--text-main);
+}
+
+/* btn-outline text fix */
+body.light-theme .btn-outline {
+    color: var(--text-main);
+    border-color: rgba(0, 0, 0, 0.15);
+}
+body.light-theme .btn-outline:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+/* Main btn — white text on blue always fine, but keep explicit */
+body.light-theme .btn:not(.btn-outline) {
+    color: #fff;
+}
+
+/* stat-card hover border */
+body.light-theme .stat-card:hover {
+    border-color: rgba(0, 0, 0, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* subject-card hover border */
+body.light-theme .subject-card:hover {
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Input placeholders in light */
+body.light-theme input::placeholder,
+body.light-theme textarea::placeholder {
+    color: #A1A1AA;
+}
+
+/* Table rows / borders */
+body.light-theme table tr {
+    border-color: rgba(0, 0, 0, 0.07);
+}
+
+/* Modal backdrop */
+body.light-theme .modal-overlay {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Notification items */
+body.light-theme .notification-item {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Search active filter badge — #000 text on blue */
+body.light-theme .active-filter {
+    color: #fff;
+}
+
+/* Version / software update tag text */
+body.light-theme #softwareVersionTag {
+    color: var(--text-muted);
+}
+
 
 * { box-sizing: border-box; }
 

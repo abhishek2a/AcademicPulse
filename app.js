@@ -392,12 +392,20 @@ function initNavigation() {
             // Re-render views on switch
             if (targetId === 'view-overview') renderOverview();
             if (targetId === 'view-analytics') {
-                document.getElementById('loadingOverlay').classList.add('active');
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) overlay.classList.add('active');
+                const hideOverlay = () => { if (overlay) overlay.classList.remove('active'); };
+
                 loadChartJS()
-                    .catch(err => console.warn("Chart.js failed to load, analytics will show without charts:", err))
+                    .catch(err => console.warn('Chart.js failed to load — showing analytics without charts:', err))
                     .finally(() => {
-                        renderAnalytics();
-                        document.getElementById('loadingOverlay').classList.remove('active');
+                        try {
+                            renderAnalytics();
+                        } catch (e) {
+                            console.error('renderAnalytics error:', e);
+                        } finally {
+                            hideOverlay();
+                        }
                     });
             }
             if (targetId === 'view-attendance') renderAttendance();
@@ -689,8 +697,12 @@ function calculateStreaks() {
     // Group sessions by day
     const activeDays = new Set();
     AppState.sessions.forEach(s => {
-        if (new Date(s.startTime) >= CUTOFF_DATE) {
-            activeDays.add(TimeUtils.getDateKey(new Date(s.startTime)));
+        const raw = s.startTime || s.date;
+        if (!raw) return;
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return;
+        if (d >= CUTOFF_DATE) {
+            activeDays.add(TimeUtils.getDateKey(d));
         }
     });
 
@@ -1647,8 +1659,12 @@ function generateSmartInsights() {
     const subjMap = new Map(AppState.subjects.map(s => [s.id, s]));
 
     AppState.sessions.forEach(s => {
-        const d = new Date(s.startTime);
-        const dur = s.duration || ((new Date(s.endTime) - d)/1000);
+        const raw = s.startTime || s.date;
+        if (!raw) return;
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return;
+        const dur = s.duration || ((new Date(s.endTime) - d) / 1000);
+        if (!dur || dur <= 0) return;
         
         if (TimeUtils.getDateKey(d) === todayStr) {
             todaySecs += dur;

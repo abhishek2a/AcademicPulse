@@ -1094,10 +1094,13 @@ let monthlyAttendanceBarChartInst = null;
 
 function renderAnalytics() {
     const now = new Date();
-    generateSmartInsights();
-    
-    if (!AppState.analyticsCache) rebuildAnalyticsCache();
+
+    // Always rebuild the cache fresh so it reflects current AppState.sessions
+    rebuildAnalyticsCache();
     const cache = AppState.analyticsCache;
+    
+    // Smart insights runs independently — don't let it crash the main render
+    try { generateSmartInsights(); } catch(e) { console.warn('generateSmartInsights error:', e); }
     
     // Core aggregates
     const { totalSecs, todaySecs, weekSecs, monthSecs, subjTotals, dailyData, monthlyData } = cache;
@@ -1121,7 +1124,9 @@ function renderAnalytics() {
     }
 
     // Overview Cards
-    const streaks = calculateStreaks();
+    let streaks = { current: 0, best: 0, totalActive: 0 };
+    try { streaks = calculateStreaks(); } catch(e) { console.warn('calculateStreaks error:', e); }
+
     const e = (id) => document.getElementById(id);
     if(e('anaTotalHours')) e('anaTotalHours').textContent = (totalSecs/3600).toFixed(1) + 'h';
     if(e('anaTodayHours')) e('anaTodayHours').textContent = (todaySecs/3600).toFixed(1) + 'h';
@@ -1209,225 +1214,195 @@ function renderAnalytics() {
     const focusScore = Math.min(100, Math.round((todaySecs/dGoal)*60 + (streaks.current*2)));
     if(e('anaFocusScore')) e('anaFocusScore').textContent = `${focusScore}/100`;
 
-    // --- NEW ANALYTICS ENGINE: Performance Matrix & Readiness ---
-    
-    // 1. Gather all areas and compute metrics
-    const performanceData = {}; // key: areaName
-    
-    // Helper to init
-    const initAreaObj = (area, course) => {
-        if(!performanceData[area]) {
-            performanceData[area] = {
-                course: course, area: area,
-                practiceAtt: 0, practiceCor: 0,
-                mockScores: [], mockMaxScores: [],
-                completedTopics: 0, totalTopics: 0
-            };
-        }
-    };
-
-    // Syllabus
-    let accaTopicsCompleted = 0, totalAccaTopics = 0;
-    Object.entries(AppState.accaTopics).forEach(([area, topics]) => {
-        initAreaObj(area, 'ACCA');
-        topics.forEach(t => {
-            performanceData[area].totalTopics++;
-            totalAccaTopics++;
-            if(t.completed) {
-                performanceData[area].completedTopics++;
-                accaTopicsCompleted++;
+    // --- Performance Matrix & Readiness (isolated) ---
+    try {
+        const performanceData = {};
+        const initAreaObj = (area, course) => {
+            if(!performanceData[area]) {
+                performanceData[area] = {
+                    course: course, area: area,
+                    practiceAtt: 0, practiceCor: 0,
+                    mockScores: [], mockMaxScores: [],
+                    completedTopics: 0, totalTopics: 0
+                };
             }
+        };
+
+        let accaTopicsCompleted = 0, totalAccaTopics = 0;
+        Object.entries(AppState.accaTopics || {}).forEach(([area, topics]) => {
+            if (!Array.isArray(topics)) return;
+            initAreaObj(area, 'ACCA');
+            topics.forEach(t => {
+                performanceData[area].totalTopics++;
+                totalAccaTopics++;
+                if(t.completed) { performanceData[area].completedTopics++; accaTopicsCompleted++; }
+            });
         });
-    });
 
-    let csebTopicsCompleted = 0, totalCsebTopics = 0;
-    Object.entries(AppState.csebSyllabus).forEach(([area, topics]) => {
-        initAreaObj(area, 'CSEB');
-        topics.forEach(t => {
-            performanceData[area].totalTopics++;
-            totalCsebTopics++;
-            if(t.completed) {
-                performanceData[area].completedTopics++;
-                csebTopicsCompleted++;
-            }
+        let csebTopicsCompleted = 0, totalCsebTopics = 0;
+        Object.entries(AppState.csebSyllabus || {}).forEach(([area, topics]) => {
+            if (!Array.isArray(topics)) return;
+            initAreaObj(area, 'CSEB');
+            topics.forEach(t => {
+                performanceData[area].totalTopics++;
+                totalCsebTopics++;
+                if(t.completed) { performanceData[area].completedTopics++; csebTopicsCompleted++; }
+            });
         });
-    });
 
-    // Practice
-    if (Array.isArray(AppState.questionPractice)) {
-        AppState.questionPractice.forEach(p => {
-            if(p.syllabusArea && p.syllabusArea !== 'General') {
-                initAreaObj(p.syllabusArea, p.course);
-                performanceData[p.syllabusArea].practiceAtt += p.attempted || 0;
-                performanceData[p.syllabusArea].practiceCor += p.correct || 0;
-            }
-        });
-    }
-
-    // Mocks
-    AppState.mockTests.forEach(m => {
-        if(m.syllabusArea && m.syllabusArea !== 'General') {
-            initAreaObj(m.syllabusArea, m.course);
-            performanceData[m.syllabusArea].mockScores.push(m.score);
-            performanceData[m.syllabusArea].mockMaxScores.push(m.maxScore);
-        }
-    });
-
-    // Compute derived metrics
-    const matrixRows = [];
-    Object.values(performanceData).forEach(d => {
-        d.accPct = d.practiceAtt > 0 ? (d.practiceCor / d.practiceAtt) * 100 : 0;
-        
-        let sumS = 0, sumM = 0;
-        d.mockScores.forEach((s, i) => { sumS += s; sumM += d.mockMaxScores[i]; });
-        d.mockPct = sumM > 0 ? (sumS / sumM) * 100 : 0;
-        
-        // Syllabus completion pct for this area
-        d.sylPct = d.totalTopics > 0 ? (d.completedTopics / d.totalTopics) * 100 : 0;
-
-        // Composite area score
-        d.compositeScore = (d.accPct * 0.4) + (d.mockPct * 0.6);
-        if(d.practiceAtt === 0 && d.mockScores.length === 0) d.compositeScore = 0; // No data
-
-        let statusText = 'Need Data', color = 'var(--text-muted)';
-        if (d.practiceAtt > 0 || d.mockScores.length > 0) {
-            if (d.compositeScore >= 80) { statusText = 'Strong'; color = 'var(--neon-green)'; }
-            else if (d.compositeScore >= 60) { statusText = 'Average'; color = 'var(--neon-gold)'; }
-            else { statusText = 'Needs Work'; color = 'var(--neon-red)'; }
-        }
-        d.statusText = statusText;
-        d.color = color;
-        
-        matrixRows.push(d);
-    });
-
-    // 2. Render Performance Matrix
-    const matrixBody = e('performanceMatrixBody');
-    if (matrixBody) {
-        matrixBody.innerHTML = '';
-        if (matrixRows.length === 0) {
-            matrixBody.innerHTML = '<tr><td colspan="6" style="padding: 15px; text-align: center; color: var(--text-muted);">No syllabus performance data yet.</td></tr>';
-        } else {
-            matrixRows.sort((a,b) => b.compositeScore - a.compositeScore).forEach(r => {
-                matrixBody.innerHTML += `
-                    <tr style="border-bottom: 1px solid var(--glass-border);">
-                        <td style="padding: 10px;">${r.area}</td>
-                        <td style="padding: 10px; color: var(--text-muted); font-size: 0.85rem;">${r.course}</td>
-                        <td style="padding: 10px;">${r.practiceAtt > 0 ? Math.round(r.accPct)+'%' : '-'}</td>
-                        <td style="padding: 10px;">${r.mockScores.length > 0 ? Math.round(r.mockPct)+'%' : '-'}</td>
-                        <td style="padding: 10px;">${r.practiceAtt}</td>
-                        <td style="padding: 10px; color: ${r.color};">${r.statusText}</td>
-                    </tr>
-                `;
+        if (Array.isArray(AppState.questionPractice)) {
+            AppState.questionPractice.forEach(p => {
+                if(p.syllabusArea && p.syllabusArea !== 'General') {
+                    initAreaObj(p.syllabusArea, p.course);
+                    performanceData[p.syllabusArea].practiceAtt += p.attempted || 0;
+                    performanceData[p.syllabusArea].practiceCor += p.correct || 0;
+                }
             });
         }
-    }
 
-    // 3. Render Weakest Areas & Recommendations
-    const weakestContainer = e('weakestAreasContainer');
-    const topicRecs = e('topicRecommendationsList');
-    const weakestAreas = matrixRows.filter(r => r.statusText === 'Needs Work' || r.statusText === 'Average').sort((a,b) => a.compositeScore - b.compositeScore).slice(0,3);
-    
-    if (weakestContainer) {
-        if (weakestAreas.length === 0) {
-            weakestContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem;">No weaknesses detected. Great job!</div>';
-        } else {
-            weakestContainer.innerHTML = '';
-            weakestAreas.forEach(w => {
-                weakestContainer.innerHTML += `
-                    <div style="background: var(--glass-hover); padding: 15px; border-radius: 8px; flex: 1; min-width: 150px; border-left: 4px solid ${w.color};">
-                        <div style="font-weight: bold; margin-bottom: 5px;">${w.area}</div>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">Avg Score: ${Math.round(w.compositeScore)}%</div>
-                    </div>
-                `;
-            });
-        }
-    }
+        (AppState.mockTests || []).forEach(m => {
+            if(m.syllabusArea && m.syllabusArea !== 'General') {
+                initAreaObj(m.syllabusArea, m.course);
+                performanceData[m.syllabusArea].mockScores.push(m.score);
+                performanceData[m.syllabusArea].mockMaxScores.push(m.maxScore);
+            }
+        });
 
-    if (topicRecs) {
-        topicRecs.innerHTML = '';
-        if (weakestAreas.length === 0) {
-            topicRecs.innerHTML = '<li style="color: var(--text-muted);">Focus on completing remaining syllabus topics.</li>';
-        } else {
-            weakestAreas.forEach(w => {
-                const syllabusObj = w.course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
-                const topics = syllabusObj[w.area] || [];
-                const hardTopics = topics.filter(t => t.difficulty === 'Hard' && !t.completed).slice(0, 2);
-                const focusTopics = hardTopics.length > 0 ? hardTopics : topics.filter(t => !t.completed).slice(0, 2);
-                
-                focusTopics.forEach(ft => {
-                    topicRecs.innerHTML += `<li><strong style="color: var(--text-main);">${w.area}:</strong> ${ft.name}</li>`;
+        const matrixRows = [];
+        Object.values(performanceData).forEach(d => {
+            d.accPct = d.practiceAtt > 0 ? (d.practiceCor / d.practiceAtt) * 100 : 0;
+            let sumS = 0, sumM = 0;
+            d.mockScores.forEach((s, i) => { sumS += s; sumM += d.mockMaxScores[i]; });
+            d.mockPct = sumM > 0 ? (sumS / sumM) * 100 : 0;
+            d.sylPct = d.totalTopics > 0 ? (d.completedTopics / d.totalTopics) * 100 : 0;
+            d.compositeScore = (d.accPct * 0.4) + (d.mockPct * 0.6);
+            if(d.practiceAtt === 0 && d.mockScores.length === 0) d.compositeScore = 0;
+            let statusText = 'Need Data', color = 'var(--text-muted)';
+            if (d.practiceAtt > 0 || d.mockScores.length > 0) {
+                if (d.compositeScore >= 80) { statusText = 'Strong'; color = 'var(--neon-green)'; }
+                else if (d.compositeScore >= 60) { statusText = 'Average'; color = 'var(--neon-gold)'; }
+                else { statusText = 'Needs Work'; color = 'var(--neon-red)'; }
+            }
+            d.statusText = statusText; d.color = color;
+            matrixRows.push(d);
+        });
+
+        const matrixBody = e('performanceMatrixBody');
+        if (matrixBody) {
+            matrixBody.innerHTML = '';
+            if (matrixRows.length === 0) {
+                matrixBody.innerHTML = '<tr><td colspan="6" style="padding: 15px; text-align: center; color: var(--text-muted);">No syllabus performance data yet.</td></tr>';
+            } else {
+                matrixRows.sort((a,b) => b.compositeScore - a.compositeScore).forEach(r => {
+                    matrixBody.innerHTML += `
+                        <tr style="border-bottom: 1px solid var(--glass-border);">
+                            <td style="padding: 10px;">${r.area}</td>
+                            <td style="padding: 10px; color: var(--text-muted); font-size: 0.85rem;">${r.course}</td>
+                            <td style="padding: 10px;">${r.practiceAtt > 0 ? Math.round(r.accPct)+'%' : '-'}</td>
+                            <td style="padding: 10px;">${r.mockScores.length > 0 ? Math.round(r.mockPct)+'%' : '-'}</td>
+                            <td style="padding: 10px;">${r.practiceAtt}</td>
+                            <td style="padding: 10px; color: ${r.color};">${r.statusText}</td>
+                        </tr>
+                    `;
                 });
-            });
-            if(topicRecs.innerHTML === '') topicRecs.innerHTML = '<li style="color: var(--text-muted);">No specific incomplete topics found in weak areas.</li>';
+            }
         }
-    }
 
-    // 4. Calculate Readiness Formula
-    // Course-specific Consistency Score (15%) - based on active days in last 30 days
-    const getCourseConsistency = (courseName) => {
-        const courseSubjects = AppState.subjects.filter(s => s.course === courseName).map(s => s.id);
-        const courseSessions = AppState.sessions.filter(s => courseSubjects.includes(s.subjectId));
-        const coursePractice = (AppState.questionPractice || []).filter(p => p.course === courseName);
-        const courseMocks = AppState.mockTests.filter(m => m.course === courseName);
+        const weakestContainer = e('weakestAreasContainer');
+        const topicRecs = e('topicRecommendationsList');
+        const weakestAreas = matrixRows.filter(r => r.statusText === 'Needs Work' || r.statusText === 'Average').sort((a,b) => a.compositeScore - b.compositeScore).slice(0,3);
         
-        const activeDates = new Set();
-        courseSessions.forEach(s => { const d = new Date(s.startTime || s.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
-        coursePractice.forEach(p => { const d = new Date(p.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
-        courseMocks.forEach(m => { const d = new Date(m.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
+        if (weakestContainer) {
+            weakestContainer.innerHTML = '';
+            if (weakestAreas.length === 0) {
+                weakestContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem;">No weaknesses detected. Great job!</div>';
+            } else {
+                weakestAreas.forEach(w => {
+                    weakestContainer.innerHTML += `
+                        <div style="background: var(--glass-hover); padding: 15px; border-radius: 8px; flex: 1; min-width: 150px; border-left: 4px solid ${w.color};">
+                            <div style="font-weight: bold; margin-bottom: 5px;">${w.area}</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">Avg Score: ${Math.round(w.compositeScore)}%</div>
+                        </div>
+                    `;
+                });
+            }
+        }
 
-        let activeDaysInLast30 = 0;
-        activeDates.forEach(dateStr => {
-            const d = new Date(dateStr);
-            const diff = (now - d) / (1000 * 3600 * 24);
-            if(diff <= 30 && diff >= -1) activeDaysInLast30++;
-        });
-        return Math.min(100, (activeDaysInLast30 / 24) * 100); // 24 days out of 30 is 100%
-    };
+        if (topicRecs) {
+            topicRecs.innerHTML = '';
+            if (weakestAreas.length === 0) {
+                topicRecs.innerHTML = '<li style="color: var(--text-muted);">Focus on completing remaining syllabus topics.</li>';
+            } else {
+                weakestAreas.forEach(w => {
+                    const syllabusObj = w.course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
+                    const topics = syllabusObj[w.area] || [];
+                    const hardTopics = topics.filter(t => t.difficulty === 'Hard' && !t.completed).slice(0, 2);
+                    const focusTopics = hardTopics.length > 0 ? hardTopics : topics.filter(t => !t.completed).slice(0, 2);
+                    focusTopics.forEach(ft => {
+                        topicRecs.innerHTML += `<li><strong style="color: var(--text-main);">${w.area}:</strong> ${ft.name}</li>`;
+                    });
+                });
+                if(topicRecs.innerHTML === '') topicRecs.innerHTML = '<li style="color: var(--text-muted);">No specific incomplete topics found in weak areas.</li>';
+            }
+        }
 
-    const accaConsistencyPct = getCourseConsistency('ACCA');
-    const csebConsistencyPct = getCourseConsistency('CSEB');
-    
-    const accaSylPct = totalAccaTopics > 0 ? (accaTopicsCompleted / totalAccaTopics) * 100 : 0;
-    const csebSylPct = totalCsebTopics > 0 ? (csebTopicsCompleted / totalCsebTopics) * 100 : 0;
-    
-    // Aggregates for ACCA Readiness
-    const accaAreas = matrixRows.filter(r => r.course === 'ACCA');
-    const accaPracAtt = accaAreas.reduce((sum, r) => sum + r.practiceAtt, 0);
-    const accaPracCor = accaAreas.reduce((sum, r) => sum + r.practiceCor, 0);
-    const accaPracPct = accaPracAtt > 0 ? (accaPracCor / accaPracAtt) * 100 : 0;
-    let sumAMockS = 0, sumAMockM = 0;
-    accaAreas.forEach(r => r.mockScores.forEach((s, i) => { sumAMockS += s; sumAMockM += r.mockMaxScores[i]; }));
-    const accaMockPct = sumAMockM > 0 ? (sumAMockS / sumAMockM) * 100 : 0;
-    
-    const accaReadiness = (accaSylPct * 0.35) + (accaMockPct * 0.25) + (accaPracPct * 0.25) + (accaConsistencyPct * 0.15);
+        // Readiness scores
+        const getCourseConsistency = (courseName) => {
+            const courseSubjects = AppState.subjects.filter(s => s.course === courseName).map(s => s.id);
+            const courseSessions = AppState.sessions.filter(s => courseSubjects.includes(s.subjectId));
+            const coursePractice = (AppState.questionPractice || []).filter(p => p.course === courseName);
+            const courseMocks = (AppState.mockTests || []).filter(m => m.course === courseName);
+            const activeDates = new Set();
+            courseSessions.forEach(s => { const d = new Date(s.startTime || s.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
+            coursePractice.forEach(p => { const d = new Date(p.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
+            courseMocks.forEach(m => { const d = new Date(m.date); if(!isNaN(d)) activeDates.add(d.toDateString()); });
+            let activeDaysInLast30 = 0;
+            activeDates.forEach(dateStr => {
+                const d = new Date(dateStr);
+                const diff = (now - d) / (1000 * 3600 * 24);
+                if(diff <= 30 && diff >= -1) activeDaysInLast30++;
+            });
+            return Math.min(100, (activeDaysInLast30 / 24) * 100);
+        };
 
-    // Aggregates for CSEB Readiness
-    const csebAreas = matrixRows.filter(r => r.course === 'CSEB');
-    const csebPracAtt = csebAreas.reduce((sum, r) => sum + r.practiceAtt, 0);
-    const csebPracCor = csebAreas.reduce((sum, r) => sum + r.practiceCor, 0);
-    const csebPracPct = csebPracAtt > 0 ? (csebPracCor / csebPracAtt) * 100 : 0;
-    let sumCMockS = 0, sumCMockM = 0;
-    csebAreas.forEach(r => r.mockScores.forEach((s, i) => { sumCMockS += s; sumCMockM += r.mockMaxScores[i]; }));
-    const csebMockPct = sumCMockM > 0 ? (sumCMockS / sumCMockM) * 100 : 0;
-    
-    const csebReadiness = (csebSylPct * 0.35) + (csebMockPct * 0.25) + (csebPracPct * 0.25) + (csebConsistencyPct * 0.15);
+        const accaConsistencyPct = getCourseConsistency('ACCA');
+        const csebConsistencyPct = getCourseConsistency('CSEB');
+        const accaSylPct = totalAccaTopics > 0 ? (accaTopicsCompleted / totalAccaTopics) * 100 : 0;
+        const csebSylPct = totalCsebTopics > 0 ? (csebTopicsCompleted / totalCsebTopics) * 100 : 0;
+        const accaAreas = matrixRows.filter(r => r.course === 'ACCA');
+        const accaPracAtt = accaAreas.reduce((sum, r) => sum + r.practiceAtt, 0);
+        const accaPracCor = accaAreas.reduce((sum, r) => sum + r.practiceCor, 0);
+        const accaPracPct = accaPracAtt > 0 ? (accaPracCor / accaPracAtt) * 100 : 0;
+        let sumAMockS = 0, sumAMockM = 0;
+        accaAreas.forEach(r => r.mockScores.forEach((s, i) => { sumAMockS += s; sumAMockM += r.mockMaxScores[i]; }));
+        const accaMockPct = sumAMockM > 0 ? (sumAMockS / sumAMockM) * 100 : 0;
+        const accaReadiness = (accaSylPct * 0.35) + (accaMockPct * 0.25) + (accaPracPct * 0.25) + (accaConsistencyPct * 0.15);
+        const csebAreas = matrixRows.filter(r => r.course === 'CSEB');
+        const csebPracAtt = csebAreas.reduce((sum, r) => sum + r.practiceAtt, 0);
+        const csebPracCor = csebAreas.reduce((sum, r) => sum + r.practiceCor, 0);
+        const csebPracPct = csebPracAtt > 0 ? (csebPracCor / csebPracAtt) * 100 : 0;
+        let sumCMockS = 0, sumCMockM = 0;
+        csebAreas.forEach(r => r.mockScores.forEach((s, i) => { sumCMockS += s; sumCMockM += r.mockMaxScores[i]; }));
+        const csebMockPct = sumCMockM > 0 ? (sumCMockS / sumCMockM) * 100 : 0;
+        const csebReadiness = (csebSylPct * 0.35) + (csebMockPct * 0.25) + (csebPracPct * 0.25) + (csebConsistencyPct * 0.15);
 
-    if(e('readinessAcca')) e('readinessAcca').textContent = Math.round(accaReadiness) + '%';
-    if(e('readinessCseb')) e('readinessCseb').textContent = Math.round(csebReadiness) + '%';
-    if(e('readinessAccaBar')) e('readinessAccaBar').style.width = Math.round(accaReadiness) + '%';
-    if(e('readinessCsebBar')) e('readinessCsebBar').style.width = Math.round(csebReadiness) + '%';
-
-    // Only draw chart canvases if Chart.js is already loaded
-    // (it gets loaded on first Analytics tab click; other callers may not have it yet)
-    renderLiveClassAnalytics();
-    if (window.Chart) {
-        renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr);
-        renderConsistencyHeatmap();
-    } else {
-        // Still render the heatmap — it doesn't need Chart.js
-        renderConsistencyHeatmap();
+        if(e('readinessAcca')) e('readinessAcca').textContent = Math.round(accaReadiness) + '%';
+        if(e('readinessCseb')) e('readinessCseb').textContent = Math.round(csebReadiness) + '%';
+        if(e('readinessAccaBar')) e('readinessAccaBar').style.width = Math.round(accaReadiness) + '%';
+        if(e('readinessCsebBar')) e('readinessCsebBar').style.width = Math.round(csebReadiness) + '%';
+    } catch(perfErr) {
+        console.warn('Performance matrix error (non-fatal):', perfErr);
     }
+
+    // Charts & heatmap — each isolated
+    try { renderLiveClassAnalytics(); } catch(e) { console.warn('renderLiveClassAnalytics error:', e); }
+    try {
+        if (window.Chart) {
+            renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr);
+        }
+    } catch(e) { console.warn('renderAnalyticsCharts error:', e); }
+    try { renderConsistencyHeatmap(); } catch(e) { console.warn('renderConsistencyHeatmap error:', e); }
+
 }
 
 let liveClassTrendChartInst = null;

@@ -2061,10 +2061,19 @@ function renderPracticeTotals() {
     const attemptedTxt = document.getElementById('practiceAttemptedTxt');
     const correctTxt = document.getElementById('practiceCorrectTxt');
     
-    // Calculate global totals from array or legacy object
+    // Check if we should filter based on dropdown selections
+    const courseFilter = document.getElementById('practiceCourseInput')?.value;
+    const areaFilter = document.getElementById('practiceAreaInput')?.value;
+    const topicFilter = document.getElementById('practiceTopicInput')?.value;
+
     let totalAtt = 0, totalCor = 0;
     if (Array.isArray(AppState.questionPractice)) {
-        AppState.questionPractice.forEach(p => { totalAtt += p.attempted; totalCor += p.correct; });
+        let filteredPractice = AppState.questionPractice;
+        if (courseFilter && courseFilter !== '') filteredPractice = filteredPractice.filter(p => p.course === courseFilter);
+        if (areaFilter && areaFilter !== '') filteredPractice = filteredPractice.filter(p => p.syllabusArea === areaFilter);
+        if (topicFilter && topicFilter !== '') filteredPractice = filteredPractice.filter(p => p.topic === topicFilter);
+
+        filteredPractice.forEach(p => { totalAtt += p.attempted; totalCor += p.correct; });
     } else {
         totalAtt = AppState.questionPractice.attempted || 0;
         totalCor = AppState.questionPractice.correct || 0;
@@ -2075,8 +2084,6 @@ function renderPracticeTotals() {
 }
 
 function initMocksAndPractice() {
-    renderPracticeTotals();
-    renderPracticeHistory();
 
     const courseSelect = document.getElementById('practiceCourseInput');
     const areaSelect = document.getElementById('practiceAreaInput');
@@ -2126,12 +2133,29 @@ function initMocksAndPractice() {
     };
     
     if(courseSelect) {
-        courseSelect.onchange = (e) => populatePracticeAreas(e.target.value);
+        courseSelect.onchange = (e) => {
+            populatePracticeAreas(e.target.value);
+            renderPracticeTotals();
+            renderPracticeHistory();
+        };
         if (areaSelect) {
-            areaSelect.onchange = (e) => populatePracticeTopics(courseSelect.value, e.target.value);
+            areaSelect.onchange = (e) => {
+                populatePracticeTopics(courseSelect.value, e.target.value);
+                renderPracticeTotals();
+                renderPracticeHistory();
+            };
+        }
+        if (topicSelect) {
+            topicSelect.onchange = () => {
+                renderPracticeTotals();
+                renderPracticeHistory();
+            };
         }
         populatePracticeAreas(courseSelect.value);
     }
+    
+    renderPracticeTotals();
+    renderPracticeHistory();
 
     const addBtn = document.getElementById('practiceAddBtn');
     if (addBtn) {
@@ -3135,9 +3159,18 @@ function renderPracticeHistory() {
         return;
     }
     
-    const sorted = [...AppState.questionPractice].sort((a,b) => new Date(b.date) - new Date(a.date));
+    const courseFilter = document.getElementById('practiceCourseInput')?.value;
+    const areaFilter = document.getElementById('practiceAreaInput')?.value;
+    const topicFilter = document.getElementById('practiceTopicInput')?.value;
+
+    let filteredPractice = AppState.questionPractice;
+    if (courseFilter && courseFilter !== '') filteredPractice = filteredPractice.filter(p => p.course === courseFilter);
+    if (areaFilter && areaFilter !== '') filteredPractice = filteredPractice.filter(p => p.syllabusArea === areaFilter);
+    if (topicFilter && topicFilter !== '') filteredPractice = filteredPractice.filter(p => p.topic === topicFilter);
+
+    const sorted = [...filteredPractice].sort((a,b) => new Date(b.date) - new Date(a.date));
     if(sorted.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No practice sessions logged</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No practice sessions logged for selected topic</td></tr>';
         return;
     }
     

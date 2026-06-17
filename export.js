@@ -79,9 +79,9 @@ function generateStudyReport() {
 
     // Table Data
     const tableBody = Object.values(subjectStats).map(s => {
-        const hrs = (s.totalSeconds / 3600).toFixed(1);
+        const hrs = parseFloat((s.totalSeconds / 3600).toFixed(1));
         const target = s.targetHours || 0;
-        const progress = target > 0 ? Math.round((hrs / target) * 100) + '%' : 'N/A';
+        const progress = target > 0 ? Math.min(100, Math.round((hrs / target) * 100)) + '%' : 'N/A';
         return [
             s.name,
             s.course || 'CSEB',
@@ -95,7 +95,7 @@ function generateStudyReport() {
     // AutoTable
     doc.autoTable({
         startY: 55,
-        head: [['Subject', 'Course', 'Priority', 'Studied', 'Weekly Target', 'Progress']],
+        head: [['Subject', 'Course', 'Priority', 'Lifetime Hours', 'Weekly Target', 'Progress (capped 100%)']],
         body: tableBody,
         theme: 'striped',
         headStyles: { fillColor: [41, 151, 255] },

@@ -1,41 +1,50 @@
-const CACHE_NAME = 'academicpulse-v1.1.54';
+const CACHE_NAME = 'academicpulse-v1.1.28';
 
 const STATIC_ASSETS = [
     'index.html',
-    'style.css?v=14',
-    'app.js?v=33',
+    'style.css?v=15',
+    'app.js?v=38',
     'auth.js?v=10',
-    'export.js?v=7',
+    'export.js?v=9',
     'manifest.json',
     'icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
+    // skipWaiting inside waitUntil so it's tracked as part of the install lifecycle
     event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => {
-            return cache.addAll(STATIC_ASSETS).catch(err => console.log('Static assets not found yet'));
-        })
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(STATIC_ASSETS).catch(err => console.warn('Static assets cache warning:', err)))
+            .then(() => self.skipWaiting())
     );
-    self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+    // Chain both operations into a single waitUntil so clients.claim() is guaranteed
     event.waitUntil(
-        caches.keys().then(keys => Promise.all(
-            keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-        ))
+        caches.keys()
+            .then(keys => Promise.all(
+                keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+            ))
+            .then(() => self.clients.claim())
     );
-    event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
-    
+
     // Ignore non-GET and extension requests
     if (event.request.method !== 'GET' || url.protocol === 'chrome-extension:') return;
 
-    // Cache First for static CSS/manifest/icons
-    if (STATIC_ASSETS.some(asset => url.pathname.endsWith(asset))) {
+    // Cache First for static assets — match by pathname + search (handles ?v= versioned URLs)
+    const fullPath = url.pathname + url.search;
+    const isStaticAsset = STATIC_ASSETS.some(asset => {
+        // Match by pathname only (strip query) or by full pathname+search
+        const assetPath = asset.includes('?') ? asset : asset;
+        return fullPath.endsWith(asset) || url.pathname.endsWith(asset.split('?')[0]);
+    });
+
+    if (isStaticAsset) {
         event.respondWith(
             caches.match(event.request).then(response => {
                 return response || fetch(event.request).then(fetchRes => {
@@ -65,7 +74,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Network First for HTML, JS, and API endpoints (fallback to cache)
+    // Network First for HTML, JS, API endpoints (fallback to cache for offline)
     event.respondWith(
         fetch(event.request).then(response => {
             const resClone = response.clone();
@@ -88,7 +97,7 @@ self.addEventListener('message', (event) => {
                     payload: updateInfo
                 });
             })
-            .catch(err => console.error("Error checking updates:", err));
+            .catch(err => console.error('Error checking updates:', err));
     }
 
     if (event.data && event.data.type === 'SKIP_WAITING') {

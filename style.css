@@ -3,6 +3,7 @@
     --neon-green: #30D158;
     --neon-purple: #BF5AF2;
     --neon-gold: #FFD60A;
+    --neon-yellow: #FFD60A;  /* alias for --neon-gold — used in Leave status */
     --neon-red: #FF453A;
     --glass-bg: rgba(0, 0, 0, 0.75);
     --glass-border: rgba(255, 255, 255, 0.08);
@@ -156,6 +157,135 @@ body.light-theme #softwareVersionTag {
     color: var(--text-muted);
 }
 
+/* ── Form inputs & selects ── */
+body.light-theme input[type="text"],
+body.light-theme input[type="number"],
+body.light-theme input[type="date"],
+body.light-theme input[type="time"],
+body.light-theme input[type="email"],
+body.light-theme input[type="password"],
+body.light-theme select,
+body.light-theme textarea {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-main);
+    border-color: rgba(0, 0, 0, 0.15);
+}
+body.light-theme input[type="text"]:focus,
+body.light-theme input[type="number"]:focus,
+body.light-theme input[type="date"]:focus,
+body.light-theme input[type="time"]:focus,
+body.light-theme select:focus,
+body.light-theme textarea:focus {
+    border-color: var(--neon-blue);
+    background: rgba(255, 255, 255, 0.9);
+}
+body.light-theme select option {
+    background: #fff;
+    color: #1D1D1F;
+}
+
+/* ── Modal card ── */
+body.light-theme .modal-card {
+    background: rgba(255, 255, 255, 0.97);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: var(--text-main);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+body.light-theme .modal-card h2,
+body.light-theme .modal-card h3,
+body.light-theme .modal-card label {
+    color: var(--text-main);
+}
+
+/* ── Insight boxes ── */
+body.light-theme .insight-box {
+    background: rgba(0, 0, 0, 0.03);
+    color: var(--text-main);
+}
+
+/* ── Stat cards ── */
+body.light-theme .stat-card,
+body.light-theme .chart-card {
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--text-main);
+}
+body.light-theme .stat-value,
+body.light-theme .stat-label {
+    color: var(--text-main);
+}
+
+/* ── Navigation items ── */
+body.light-theme .nav-item {
+    color: var(--text-muted);
+}
+body.light-theme .nav-item.active,
+body.light-theme .nav-item:hover {
+    color: var(--neon-blue);
+    background: rgba(10, 132, 255, 0.08);
+}
+
+/* ── Subject & attendance cards ── */
+body.light-theme .subject-card {
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--text-main);
+}
+body.light-theme .attendance-day {
+    background: rgba(0, 0, 0, 0.03);
+    color: var(--text-main);
+}
+body.light-theme .attendance-day.selected {
+    background: rgba(10, 132, 255, 0.1);
+}
+
+/* ── Performance matrix table ── */
+body.light-theme #performanceMatrixTable th,
+body.light-theme #performanceMatrixTable td,
+body.light-theme #subjectRankingTableBody td {
+    color: var(--text-main);
+    border-color: rgba(0, 0, 0, 0.07);
+}
+
+/* ── Live class session time section ── */
+body.light-theme [style*="var(--glass-hover)"] {
+    background: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* ── Dropdown for syllabus topics ── */
+body.light-theme .syllabus-topic-label {
+    color: var(--text-main);
+}
+
+/* ── Notification badge ── */
+body.light-theme .notification-badge {
+    color: #fff;
+}
+
+/* ── Search results ── */
+body.light-theme .search-result-item {
+    background: rgba(0, 0, 0, 0.03);
+    color: var(--text-main);
+    border-color: rgba(0, 0, 0, 0.07);
+}
+body.light-theme .search-result-item:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+/* ── Chapter / live class cards ── */
+body.light-theme [style*="var(--glass-bg)"] {
+    background: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* ── Calendar day cells & legend ── */
+body.light-theme .day-cell {
+    color: #1D1D1F;
+    background: rgba(0, 0, 0, 0.04);
+}
+body.light-theme .day-cell:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+body.light-theme .calendar-legend {
+    color: #6E6E73;
+}
 
 * { box-sizing: border-box; }
 

@@ -1,16 +1,26 @@
 {
-  "version": "1.1.23",
-  "build": "2026.06.09",
+  "version": "1.1.28",
+  "build": "2026.06.17",
   "features": [
-    "Welcome to <b>AcademicPulse v1.1.23</b> — this update brings Live Class tracking to Analytics, fixes the update popup re-appearing after sign-out, and several other improvements.",
-    "<b>🎥 Live Class Analytics (New)</b>",
-    "The Analytics Dashboard now has a dedicated <b>Live Class Analytics</b> section. Any session you log with <b>(live class)</b> anywhere in the notes is automatically counted and tracked separately from regular study sessions.",
-    "New analytics for live classes include: Total Classes attended, Total Hours, This Month's count, Average session duration, a Weekly Frequency bar chart (last 8 weeks), and a Per-Subject breakdown with animated progress bars showing which subjects you attend the most live classes for.",
-    "Live classes also appear in a separate <b>🎥 Live Classes</b> tab in Global Search, grouped neatly by subject with total hours and class count per subject. The <b>(live class)</b> tag is automatically stripped from displayed notes to keep things clean.",
-    "<b>🐛 Bug Fix — Update Popup After Sign-Out</b>",
-    "Fixed a bug where installing an update, signing out, and signing back in would show the update popup again. The app now stamps the installed version locally on the device (separate from cloud data), so even if the cloud sync restores an older system state, the update notification will never re-appear for a version you've already installed.",
-    "As part of this fix, installing an update now immediately triggers a cloud sync so your updated version state is pushed to the cloud right away.",
-    "<b>⚡ Dashboard Session Duration Fix</b>",
-    "Session durations in the Recent Sessions table on the Dashboard now correctly display in hours and minutes (e.g. <b>1h 30m</b>) instead of the old MM:SS format which looked like minutes."
+    "Welcome to <b>AcademicPulse v1.1.28</b> — the final deep audit release. Every known bug has been fixed.",
+    "<b>🐛 Critical Bug Fixes</b>",
+    "<b>editPractice / editMock date field blank:</b> The edit modal for mock tests and question practice sessions was leaving the date field blank. Fixed — date is now correctly pre-filled as YYYY-MM-DD.",
+    "<b>XSS safety:</b> Subject names in the Smart Insights panel are now properly HTML-escaped before rendering.",
+    "<b>Duration NaN:</b> Sessions without a pre-computed duration field (e.g. older data) now correctly fall back to calculating duration from startTime/endTime instead of producing NaN.",
+    "<b>Delete session from Overview:</b> Deleting a session from the Overview's Recent Logs table now also correctly refreshes the Attendance calendar and Day Report panel.",
+    "<b>Edit session day report stale:</b> Editing a session now always refreshes the Day Report for the correct date.",
+    "<b>⚡ Performance Optimisations</b>",
+    "Debounced render wrappers are now actually used. Every hot path that previously fired a full renderAnalytics() synchronously (syllabus topic ticks, mark-attendance changes, delete session, log session) now uses the 200ms debounced version — preventing dozens of redundant re-renders during rapid interactions.",
+    "Double rebuildAnalyticsCache() call in saveEditAttendance removed — saveData already triggers a rebuild internally.",
+    "<b>🛠 Service Worker — Fixed</b>",
+    "skipWaiting() is now correctly inside event.waitUntil() so it participates in the install lifecycle.",
+    "clients.claim() is now chained in a single waitUntil() in the activate handler (the previous two-waitUntil pattern meant claim() was not guaranteed to run).",
+    "Static asset cache matching now correctly handles versioned query strings (?v=XX) — CSS and JS files now get Cache First as intended.",
+    "<b>🌓 Light Mode — Comprehensive Fix</b>",
+    "All form inputs (text, number, date, time, email, password), selects, and textareas now have correct dark-text-on-light-background styling.",
+    "Modal cards, stat cards, chart cards, insight boxes, nav items, subject cards, attendance day cells, and search result items all fully visible in light mode.",
+    "Calendar day numbers and legend text are no longer white-on-white in light mode.",
+    "<b>🎨 CSS Variable Fix</b>",
+    "--neon-yellow added as an alias for --neon-gold. The 'Marked Leave' status label now correctly shows in gold/yellow instead of being invisible."
   ]
 }

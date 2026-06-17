@@ -8,7 +8,7 @@
     <title>AcademicPulse</title>
     <link rel="manifest" href="manifest.json?v=19">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=15">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Firebase Scripts -->
@@ -943,17 +943,33 @@
             </div>
             <div class="form-group">
                 <label>Additional Notes</label>
-                <input type="text" id="logNotesInput" placeholder="e.g. Chapter 4 Review" required>
+                <input type="text" id="logNotesInput" placeholder="e.g. Chapter 4 Review">
             </div>
-            <div style="display: flex; gap: 15px;">
-                <div class="form-group" style="flex: 1;">
-                    <label>Hours</label>
-                    <input type="number" id="logHoursInput" min="0" value="1">
+            <!-- Time-based OR duration-based entry -->
+            <div style="background: var(--glass-hover); border-radius: 12px; padding: 14px; margin-bottom: 15px;">
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 600;">⏱ Session Time</div>
+                <div style="display: flex; gap: 12px; margin-bottom: 10px;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label style="font-size:0.82rem;">Start Time <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+                        <input type="time" id="logStartTimeInput" style="width:100%;">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label style="font-size:0.82rem;">End Time <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+                        <input type="time" id="logEndTimeInput" style="width:100%;">
+                    </div>
                 </div>
-                <div class="form-group" style="flex: 1;">
-                    <label>Minutes</label>
-                    <input type="number" id="logMinutesInput" min="0" max="59" value="0">
+                <div style="text-align:center; font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">— or enter duration manually —</div>
+                <div style="display: flex; gap: 12px;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label style="font-size:0.82rem;">Hours</label>
+                        <input type="number" id="logHoursInput" min="0" value="1">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label style="font-size:0.82rem;">Minutes</label>
+                        <input type="number" id="logMinutesInput" min="0" max="59" value="0">
+                    </div>
                 </div>
+                <div id="logTimeDurationPreview" style="margin-top:8px; font-size:0.82rem; color:var(--neon-blue); display:none; text-align:center;"></div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-outline" id="closeLogModalBtn">Cancel</button>
@@ -996,17 +1012,32 @@
             </div>
             <div class="form-group">
                 <label>Notes</label>
-                <input type="text" id="editAttendanceNotes" required>
+                <input type="text" id="editAttendanceNotes">
             </div>
-            <div style="display: flex; gap: 15px;">
-                <div class="form-group" style="flex: 1;">
-                    <label>Hours</label>
-                    <input type="number" id="editAttendanceHours" min="0">
+            <div style="background: var(--glass-hover); border-radius: 12px; padding: 14px; margin-bottom: 15px;">
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 600;">⏱ Session Time</div>
+                <div style="display: flex; gap: 12px; margin-bottom: 10px;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label style="font-size:0.82rem;">Start Time <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+                        <input type="time" id="editStartTimeInput" style="width:100%;">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label style="font-size:0.82rem;">End Time <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+                        <input type="time" id="editEndTimeInput" style="width:100%;">
+                    </div>
                 </div>
-                <div class="form-group" style="flex: 1;">
-                    <label>Minutes</label>
-                    <input type="number" id="editAttendanceMinutes" min="0" max="59">
+                <div style="text-align:center; font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">— or enter duration manually —</div>
+                <div style="display: flex; gap: 12px;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label style="font-size:0.82rem;">Hours</label>
+                        <input type="number" id="editAttendanceHours" min="0">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label style="font-size:0.82rem;">Minutes</label>
+                        <input type="number" id="editAttendanceMinutes" min="0" max="59">
+                    </div>
                 </div>
+                <div id="editTimeDurationPreview" style="margin-top:8px; font-size:0.82rem; color:var(--neon-blue); display:none; text-align:center;"></div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-outline" onclick="document.getElementById('editAttendanceModal').classList.remove('active')">Cancel</button>
@@ -1086,7 +1117,7 @@
     </div>
 
     <script src="auth.js?v=10"></script>
-    <script src="export.js?v=7"></script>
-    <script src="app.js?v=33"></script>
+    <script src="export.js?v=9"></script>
+    <script src="app.js?v=38"></script>
 </body>
 </html>

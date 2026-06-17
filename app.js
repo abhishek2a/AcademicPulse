@@ -27,6 +27,23 @@ const CUTOFF_DATE = new Date('2026-02-15T00:00:00');
 
 const generateId = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
 
+// ── Performance helpers ────────────────────────────────────────────────────
+/** Returns a debounced version of fn that fires after `wait` ms of silence */
+const debounce = (fn, wait = 150) => {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+};
+
+/** Schedules fn in the next animation frame (keeps heavy renders off the main thread) */
+const nextFrame = (fn) => requestAnimationFrame(fn);
+
+// Debounced wrappers for the three heaviest render functions
+// (safe to call many times in quick succession – only the last call fires)
+const debouncedRenderOverview  = debounce(() => renderOverview(),  80);
+const debouncedRenderAnalytics = debounce(() => renderAnalytics(), 200);
+const debouncedRenderAttendance= debounce(() => renderAttendance(),120);
+
+
 const DEFAULT_SUBJECTS = [
     // CSEB Subjects
     { id: generateId(), name: 'Banking (CSEB)', course: 'CSEB', color: '#2997FF', priority: 'High', targetHours: 5, totalHours: 0 },
@@ -58,7 +75,7 @@ const AppState = {
     questionPractice: { attempted: 0, correct: 0 },
     csebSyllabus: {},
     notifications: [],
-    currentVersion: 'v1.1.23',
+    currentVersion: 'v1.1.28',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -165,7 +182,7 @@ function loadData() {
 
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.23', availableUpdate: null, dataVersion: 1 });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.28', availableUpdate: null, dataVersion: 2 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
@@ -272,32 +289,62 @@ function loadData() {
         saveData('csebSyllabus');
     }
 
+    // ACCA FR Topics — 23 authorised topics (18 Standards + 5 Core Topics)
     if (Object.keys(AppState.accaTopics).length === 0) {
-        AppState.accaTopics = {
-            "IAS Standards": [
-                { name: "IAS 1 Presentation of Financial Statements", completed: false, difficulty: "Medium" },
-                { name: "IAS 16 Property, Plant & Equipment", completed: false, difficulty: "Medium" },
-                { name: "IAS 38 Intangible Assets", completed: false, difficulty: "Medium" },
-                { name: "IAS 36 Impairment", completed: false, difficulty: "Medium" },
-                { name: "IAS 37 Provisions", completed: false, difficulty: "Medium" },
-                { name: "IAS 2 Inventories", completed: false, difficulty: "Medium" },
-                { name: "IAS 7 Cash Flow Statements", completed: false, difficulty: "Medium" }
-            ],
-            "IFRS Standards": [
-                { name: "IFRS 15 Revenue", completed: false, difficulty: "Medium" }
-            ],
-            "Consolidation": [
-                { name: "Consolidation P&L and Balance Sheet", completed: false, difficulty: "Medium" }
-            ],
-            "Interpretation": [
-                { name: "Interpretation Questions", completed: false, difficulty: "Medium" }
-            ],
-            "Ethics": [
-                { name: "Conceptual Framework & Ethics", completed: false, difficulty: "Medium" }
-            ]
-        };
+        AppState.accaTopics = buildDefaultAccaTopics();
+        saveData('accaTopics');
+    } else {
+        // Migration: rebuild to ONLY the 17 authorised topics, preserving completion state
+        const defaults = buildDefaultAccaTopics();
+        // Collect existing completion states by topic name (any category)
+        const existingCompletion = {};
+        Object.values(AppState.accaTopics).flat().forEach(t => {
+            existingCompletion[t.name] = t.completed || false;
+        });
+        // Rebuild from scratch — carry over completion, strip everything else
+        const rebuilt = {};
+        Object.entries(defaults).forEach(([cat, topics]) => {
+            rebuilt[cat] = topics.map(t => ({
+                ...t,
+                completed: existingCompletion[t.name] ?? t.completed
+            }));
+        });
+        AppState.accaTopics = rebuilt;
         saveData('accaTopics');
     }
+}
+
+function buildDefaultAccaTopics() {
+    // Complete ACCA Financial Reporting topic list (23 topics)
+    return {
+        "Standards": [
+            { name: "IFRS 13 (Fair Value)",           completed: false, difficulty: "Hard"   },
+            { name: "IFRS 5 (Non-current Assets)",    completed: false, difficulty: "Medium" },
+            { name: "IFRS 18 (Presentation)",         completed: false, difficulty: "Medium" },
+            { name: "IAS 36 (Impairment)",            completed: false, difficulty: "Hard"   },
+            { name: "IAS 37 (Provisions)",            completed: false, difficulty: "Medium" },
+            { name: "IFRS 16 (Leases)",               completed: false, difficulty: "Hard"   },
+            { name: "IFRS 9 (Financial Instruments)", completed: false, difficulty: "Hard"   },
+            { name: "IFRS 9 (Hedging)",               completed: false, difficulty: "Hard"   },
+            { name: "IAS 8 (Accounting Policies)",    completed: false, difficulty: "Medium" },
+            { name: "IAS 12 (Deferred Tax)",          completed: false, difficulty: "Hard"   },
+            { name: "IFRS 15 (Revenue)",              completed: false, difficulty: "Hard"   },
+            { name: "IAS 16 (PPE)",                   completed: false, difficulty: "Medium" },
+            { name: "IAS 38 (Intangibles)",           completed: false, difficulty: "Medium" },
+            { name: "IAS 40 (Investment Property)",   completed: false, difficulty: "Medium" },
+            { name: "IAS 23 (Borrowing Costs)",       completed: false, difficulty: "Easy"   },
+            { name: "IAS 33 (EPS)",                   completed: false, difficulty: "Hard"   },
+            { name: "IAS 20 (Gov Grants)",            completed: false, difficulty: "Easy"   },
+            { name: "IAS 21 (Foreign Exchange)",      completed: false, difficulty: "Medium" }
+        ],
+        "Core Topics": [
+            { name: "CONCEPTUAL FRAMEWORK",           completed: false, difficulty: "Medium" },
+            { name: "FS PREPARATION",                 completed: false, difficulty: "Hard"   },
+            { name: "CONSOLIDATION",                  completed: false, difficulty: "Hard"   },
+            { name: "CASHFLOW STATEMENT",             completed: false, difficulty: "Hard"   },
+            { name: "INTERPRETATION",                 completed: false, difficulty: "Hard"   }
+        ]
+    };
 }
 
 window.showWhatsNewPopup = async function() {
@@ -658,7 +705,7 @@ window.openSyllabusModal = (subjId) => {
             }
             
             renderSubjects();
-            renderAnalytics();
+            debouncedRenderAnalytics();
         });
         
         label.appendChild(cb);
@@ -1005,7 +1052,7 @@ function renderDayReport(dateKey) {
     const sessionDataForRender = [];
 
     daySessions.forEach(s => {
-        totalDuration += s.duration;
+        totalDuration += (s.duration || ((new Date(s.endTime) - new Date(s.startTime)) / 1000) || 0);
         const subj = AppState.subjects.find(sub => sub.id === s.subjectId) || { name: 'Unknown', color: 'var(--text-main)' };
         
         let hrs = Math.floor(s.duration / 3600);
@@ -1057,7 +1104,7 @@ window.setAttendanceStatus = function(dateKey, status) {
     saveData('attendance');
     renderAttendance();
     renderDayReport(dateKey);
-    renderAnalytics();
+    debouncedRenderAnalytics();
 };
 
 window.deleteSession = function(sessionId) {
@@ -1077,7 +1124,7 @@ window.deleteSession = function(sessionId) {
         
         renderOverview();
         renderAttendance();
-        renderAnalytics();
+        debouncedRenderAnalytics();
         
         // Re-render the currently open day report
         renderDayReport(dateKey);
@@ -1270,7 +1317,7 @@ function renderAnalytics() {
 
         const matrixRows = [];
         Object.values(performanceData).forEach(d => {
-            d.accPct = d.practiceAtt > 0 ? (d.practiceCor / d.practiceAtt) * 100 : 0;
+            d.accPct = d.practiceAtt > 0 ? Math.min(100, (d.practiceCor / d.practiceAtt) * 100) : 0;
             let sumS = 0, sumM = 0;
             d.mockScores.forEach((s, i) => { sumS += s; sumM += d.mockMaxScores[i]; });
             d.mockPct = sumM > 0 ? (sumS / sumM) * 100 : 0;
@@ -1386,10 +1433,10 @@ function renderAnalytics() {
         const csebMockPct = sumCMockM > 0 ? (sumCMockS / sumCMockM) * 100 : 0;
         const csebReadiness = (csebSylPct * 0.35) + (csebMockPct * 0.25) + (csebPracPct * 0.25) + (csebConsistencyPct * 0.15);
 
-        if(e('readinessAcca')) e('readinessAcca').textContent = Math.round(accaReadiness) + '%';
-        if(e('readinessCseb')) e('readinessCseb').textContent = Math.round(csebReadiness) + '%';
-        if(e('readinessAccaBar')) e('readinessAccaBar').style.width = Math.round(accaReadiness) + '%';
-        if(e('readinessCsebBar')) e('readinessCsebBar').style.width = Math.round(csebReadiness) + '%';
+        if(e('readinessAcca')) e('readinessAcca').textContent = Math.min(100, Math.round(accaReadiness)) + '%';
+        if(e('readinessCseb')) e('readinessCseb').textContent = Math.min(100, Math.round(csebReadiness)) + '%';
+        if(e('readinessAccaBar')) e('readinessAccaBar').style.width = Math.min(100, Math.round(accaReadiness)) + '%';
+        if(e('readinessCsebBar')) e('readinessCsebBar').style.width = Math.min(100, Math.round(csebReadiness)) + '%';
     } catch(perfErr) {
         console.warn('Performance matrix error (non-fatal):', perfErr);
     }
@@ -1438,7 +1485,7 @@ function renderLiveClassAnalytics() {
                 const subj = AppState.subjects.find(s => s.id === subjId);
                 const name = subj ? escapeHtml(subj.name) : 'Unknown';
                 const color = subj ? subj.color : '#0A84FF';
-                const pct = Math.round((data.count / maxCount) * 100);
+                const pct = Math.min(100, Math.round((data.count / maxCount) * 100));
                 const hrs = TimeUtils.formatHours(data.totalSecs);
                 html += `
                     <div style="margin-bottom:14px;">
@@ -1715,7 +1762,7 @@ function generateSmartInsights() {
         if (lastSeen) {
             const daysSince = Math.floor((now - lastSeen) / (1000 * 3600 * 24));
             if (daysSince >= 5 && subj.priority === 'High') {
-                html += `<div class="insight-box" style="border-left-color: var(--neon-red);"><strong>Review Needed:</strong> You haven't studied High Priority subject '${subj.name}' in ${daysSince} days.</div>`;
+                html += `<div class="insight-box" style="border-left-color: var(--neon-red);"><strong>Review Needed:</strong> You haven't studied High Priority subject '${escapeHtml(subj.name)}' in ${daysSince} days.</div>`;
                 neglectCount++;
             }
         }
@@ -1736,6 +1783,29 @@ function initRetrospectiveLogging() {
         document.getElementById('logSessionModal').classList.remove('active');
     });
 
+    // Live preview: when both start & end times are set, show calculated duration
+    const updateLogPreview = () => {
+        const startVal = document.getElementById('logStartTimeInput').value;
+        const endVal = document.getElementById('logEndTimeInput').value;
+        const preview = document.getElementById('logTimeDurationPreview');
+        if (startVal && endVal) {
+            const [sh, sm] = startVal.split(':').map(Number);
+            const [eh, em] = endVal.split(':').map(Number);
+            let totalMins = (eh * 60 + em) - (sh * 60 + sm);
+            if (totalMins <= 0) totalMins += 24 * 60; // overnight
+            const calcH = Math.floor(totalMins / 60);
+            const calcM = totalMins % 60;
+            preview.style.display = 'block';
+            preview.textContent = `⏱ Duration from times: ${calcH}h ${calcM}m (will override manual entry)`;
+            document.getElementById('logHoursInput').value = calcH;
+            document.getElementById('logMinutesInput').value = calcM;
+        } else {
+            preview.style.display = 'none';
+        }
+    };
+    document.getElementById('logStartTimeInput').addEventListener('change', updateLogPreview);
+    document.getElementById('logEndTimeInput').addEventListener('change', updateLogPreview);
+
     document.getElementById('saveLogBtn').addEventListener('click', () => {
         const dateKey = document.getElementById('logDateInput').value;
         const subjectId = document.getElementById('logSubjectInput').value;
@@ -1749,10 +1819,29 @@ function initRetrospectiveLogging() {
         const durationSecs = (hours * 3600) + (minutes * 60);
         if (durationSecs <= 0) return alert('Duration must be greater than 0.');
 
-        const now = new Date();
-        const sessionStart = new Date(dateKey + 'T00:00:00');
-        sessionStart.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-        const sessionEnd = new Date(sessionStart.getTime() + (durationSecs * 1000));
+        // Use start/end time if provided, otherwise use current time
+        const startTimeVal = document.getElementById('logStartTimeInput').value;
+        const endTimeVal = document.getElementById('logEndTimeInput').value;
+        let sessionStart, sessionEnd;
+
+        if (startTimeVal) {
+            const [sh, sm] = startTimeVal.split(':').map(Number);
+            sessionStart = new Date(dateKey + 'T00:00:00');
+            sessionStart.setHours(sh, sm, 0, 0);
+        } else {
+            const now = new Date();
+            sessionStart = new Date(dateKey + 'T00:00:00');
+            sessionStart.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+        }
+
+        if (endTimeVal) {
+            const [eh, em] = endTimeVal.split(':').map(Number);
+            sessionEnd = new Date(dateKey + 'T00:00:00');
+            sessionEnd.setHours(eh, em, 0, 0);
+            if (sessionEnd <= sessionStart) sessionEnd.setDate(sessionEnd.getDate() + 1); // overnight
+        } else {
+            sessionEnd = new Date(sessionStart.getTime() + (durationSecs * 1000));
+        }
 
         AppState.sessions.push({
             id: generateId(),
@@ -1777,7 +1866,7 @@ function initRetrospectiveLogging() {
         document.getElementById('logSessionModal').classList.remove('active');
         renderOverview();
         renderAttendance();
-        renderAnalytics();
+        debouncedRenderAnalytics();
     });
 
     document.getElementById('logCourseInput').addEventListener('change', (e) => {
@@ -1844,6 +1933,9 @@ function openLogSessionModal(dateKey) {
     document.getElementById('logNotesInput').value = '';
     document.getElementById('logHoursInput').value = '1';
     document.getElementById('logMinutesInput').value = '0';
+    document.getElementById('logStartTimeInput').value = '';
+    document.getElementById('logEndTimeInput').value = '';
+    document.getElementById('logTimeDurationPreview').style.display = 'none';
     
     const courseInput = document.getElementById('logCourseInput');
     courseInput.value = 'CSEB'; // Default
@@ -3209,10 +3301,13 @@ window.deleteAttendance = function(id) {
     if (!confirm("Are you sure you want to delete this session?")) return;
     const session = AppState.sessions.find(s => s.id === id);
     if (!session) return;
+    const dateKey = session.startTime ? session.startTime.split('T')[0] : null;
     AppState.sessions = AppState.sessions.filter(s => s.id !== id);
     saveData('sessions');
     renderOverview();
-    renderAnalytics();
+    renderAttendance();
+    debouncedRenderAnalytics();
+    if (dateKey) renderDayReport(dateKey);
 };
 
 window.editAttendance = function(id) {
@@ -3240,6 +3335,37 @@ window.editAttendance = function(id) {
     
     document.getElementById('editAttendanceHours').value = h;
     document.getElementById('editAttendanceMinutes').value = m;
+
+    // Pre-fill start/end time from existing session data
+    const startDate = new Date(session.startTime);
+    const endDate = new Date(session.endTime);
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('editStartTimeInput').value = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`;
+    document.getElementById('editEndTimeInput').value = endDate && !isNaN(endDate) ? `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}` : '';
+    document.getElementById('editTimeDurationPreview').style.display = 'none';
+
+    // Wire up live preview for edit modal (re-bind each open to avoid duplicates via { once: true })
+    const updateEditPreview = () => {
+        const startVal = document.getElementById('editStartTimeInput').value;
+        const endVal = document.getElementById('editEndTimeInput').value;
+        const preview = document.getElementById('editTimeDurationPreview');
+        if (startVal && endVal) {
+            const [sh, sm] = startVal.split(':').map(Number);
+            const [eh, em] = endVal.split(':').map(Number);
+            let totalMins = (eh * 60 + em) - (sh * 60 + sm);
+            if (totalMins <= 0) totalMins += 24 * 60;
+            const calcH = Math.floor(totalMins / 60);
+            const calcM = totalMins % 60;
+            preview.style.display = 'block';
+            preview.textContent = `⏱ Duration from times: ${calcH}h ${calcM}m`;
+            document.getElementById('editAttendanceHours').value = calcH;
+            document.getElementById('editAttendanceMinutes').value = calcM;
+        } else {
+            document.getElementById('editTimeDurationPreview').style.display = 'none';
+        }
+    };
+    document.getElementById('editStartTimeInput').onchange = updateEditPreview;
+    document.getElementById('editEndTimeInput').onchange = updateEditPreview;
     
     document.getElementById('editAttendanceModal').classList.add('active');
 };
@@ -3259,11 +3385,32 @@ window.saveEditAttendance = function() {
     const durSecs = (h * 3600) + (m * 60);
     if (durSecs <= 0) return alert("Duration must be > 0");
     
-    const now = new Date();
-    const sessionStart = new Date(date + 'T00:00:00');
-    sessionStart.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    // Use start/end time inputs if provided
+    const startTimeVal = document.getElementById('editStartTimeInput').value;
+    const endTimeVal = document.getElementById('editEndTimeInput').value;
+    let sessionStart, sessionEnd;
+
+    if (startTimeVal) {
+        const [sh, sm] = startTimeVal.split(':').map(Number);
+        sessionStart = new Date(date + 'T00:00:00');
+        sessionStart.setHours(sh, sm, 0, 0);
+    } else {
+        const now = new Date();
+        sessionStart = new Date(date + 'T00:00:00');
+        sessionStart.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    }
+
+    if (endTimeVal) {
+        const [eh, em] = endTimeVal.split(':').map(Number);
+        sessionEnd = new Date(date + 'T00:00:00');
+        sessionEnd.setHours(eh, em, 0, 0);
+        if (sessionEnd <= sessionStart) sessionEnd.setDate(sessionEnd.getDate() + 1);
+    } else {
+        sessionEnd = new Date(sessionStart.getTime() + durSecs * 1000);
+    }
+
     session.startTime = sessionStart.toISOString();
-    session.endTime = new Date(sessionStart.getTime() + durSecs*1000).toISOString();
+    session.endTime = sessionEnd.toISOString();
     session.subjectId = subj;
     session.notes = notes;
     session.duration = durSecs;
@@ -3271,7 +3418,9 @@ window.saveEditAttendance = function() {
     saveData('sessions');
     document.getElementById('editAttendanceModal').classList.remove('active');
     renderOverview();
-    renderAnalytics();
+    renderAttendance();
+    debouncedRenderAnalytics();
+    renderDayReport(date);
 };
 
 window.editPractice = function(id) {
@@ -3279,7 +3428,7 @@ window.editPractice = function(id) {
     if (!session) return;
     
     document.getElementById('editPracticeId').value = id;
-    document.getElementById('editPracticeDate').value = session.date;
+    document.getElementById('editPracticeDate').value = (session.date || '').split('T')[0];
     document.getElementById('editPracticeAttempted').value = session.attempted;
     document.getElementById('editPracticeCorrect').value = session.correct;
     document.getElementById('editPracticeNotes').value = session.notes || '';
@@ -3317,7 +3466,7 @@ window.editMock = function(id) {
     if (!session) return;
     
     document.getElementById('editMockId').value = id;
-    document.getElementById('editMockDate').value = session.date;
+    document.getElementById('editMockDate').value = (session.date || '').split('T')[0];
     document.getElementById('editMockScore').value = session.score;
     document.getElementById('editMockMaxScore').value = session.maxScore;
     document.getElementById('editMockNotes').value = session.notes || '';

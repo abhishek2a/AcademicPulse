@@ -1,26 +1,13 @@
 {
-  "version": "1.1.28",
+  "version": "1.1.29",
   "build": "2026.06.17",
   "features": [
-    "Welcome to <b>AcademicPulse v1.1.28</b> — the final deep audit release. Every known bug has been fixed.",
-    "<b>🐛 Critical Bug Fixes</b>",
-    "<b>editPractice / editMock date field blank:</b> The edit modal for mock tests and question practice sessions was leaving the date field blank. Fixed — date is now correctly pre-filled as YYYY-MM-DD.",
-    "<b>XSS safety:</b> Subject names in the Smart Insights panel are now properly HTML-escaped before rendering.",
-    "<b>Duration NaN:</b> Sessions without a pre-computed duration field (e.g. older data) now correctly fall back to calculating duration from startTime/endTime instead of producing NaN.",
-    "<b>Delete session from Overview:</b> Deleting a session from the Overview's Recent Logs table now also correctly refreshes the Attendance calendar and Day Report panel.",
-    "<b>Edit session day report stale:</b> Editing a session now always refreshes the Day Report for the correct date.",
-    "<b>⚡ Performance Optimisations</b>",
-    "Debounced render wrappers are now actually used. Every hot path that previously fired a full renderAnalytics() synchronously (syllabus topic ticks, mark-attendance changes, delete session, log session) now uses the 200ms debounced version — preventing dozens of redundant re-renders during rapid interactions.",
-    "Double rebuildAnalyticsCache() call in saveEditAttendance removed — saveData already triggers a rebuild internally.",
-    "<b>🛠 Service Worker — Fixed</b>",
-    "skipWaiting() is now correctly inside event.waitUntil() so it participates in the install lifecycle.",
-    "clients.claim() is now chained in a single waitUntil() in the activate handler (the previous two-waitUntil pattern meant claim() was not guaranteed to run).",
-    "Static asset cache matching now correctly handles versioned query strings (?v=XX) — CSS and JS files now get Cache First as intended.",
-    "<b>🌓 Light Mode — Comprehensive Fix</b>",
-    "All form inputs (text, number, date, time, email, password), selects, and textareas now have correct dark-text-on-light-background styling.",
-    "Modal cards, stat cards, chart cards, insight boxes, nav items, subject cards, attendance day cells, and search result items all fully visible in light mode.",
-    "Calendar day numbers and legend text are no longer white-on-white in light mode.",
-    "<b>🎨 CSS Variable Fix</b>",
-    "--neon-yellow added as an alias for --neon-gold. The 'Marked Leave' status label now correctly shows in gold/yellow instead of being invisible."
+    "Welcome to <b>AcademicPulse v1.1.29</b> — time picker overhaul.",
+    "<b>⏱ Time Inputs — Fully Fixed</b>",
+    "<b>No more lag:</b> The duration preview now fires on the <code>input</code> event (every keystroke / scroll wheel change) instead of <code>change</code> (which only fired after you clicked away). The preview appears the instant you set a time.",
+    "<b>Selection now visible:</b> Time inputs now use <code>color-scheme: dark</code> so the native browser clock popup renders in dark mode correctly. The clock icon is tinted blue with a hover highlight. In light mode the picker switches to <code>color-scheme: light</code> automatically.",
+    "<b>Visual redesign:</b> The ⏱ Session Time section now has a blue-tinted border, a Start → End arrow layout, and the calculated duration appears in a highlighted pill badge above the manual duration fields.",
+    "<b>Edit modal pre-shows duration:</b> When you open Edit Session, the duration badge is shown immediately from the existing start/end times — no need to re-select anything.",
+    "<b>No stacking listeners:</b> Re-opening the Edit Session modal no longer stacks up duplicate event handlers — handlers are assigned via <code>oninput</code>/<code>onchange</code> properties which auto-replace on each open."
   ]
 }

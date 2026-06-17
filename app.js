@@ -75,7 +75,7 @@ const AppState = {
     questionPractice: { attempted: 0, correct: 0 },
     csebSyllabus: {},
     notifications: [],
-    currentVersion: 'v1.1.28',
+    currentVersion: 'v1.1.29',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -182,7 +182,7 @@ function loadData() {
 
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.28', availableUpdate: null, dataVersion: 2 });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.29', availableUpdate: null, dataVersion: 2 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
@@ -1803,6 +1803,10 @@ function initRetrospectiveLogging() {
             preview.style.display = 'none';
         }
     };
+    // Use 'input' event (fires on every keystroke/scroll) instead of 'change' (fires only on blur)
+    document.getElementById('logStartTimeInput').addEventListener('input', updateLogPreview);
+    document.getElementById('logEndTimeInput').addEventListener('input', updateLogPreview);
+    // Also keep change as fallback for browsers that only fire change on time pickers
     document.getElementById('logStartTimeInput').addEventListener('change', updateLogPreview);
     document.getElementById('logEndTimeInput').addEventListener('change', updateLogPreview);
 
@@ -3338,36 +3342,50 @@ window.editAttendance = function(id) {
 
     // Pre-fill start/end time from existing session data
     const startDate = new Date(session.startTime);
-    const endDate = new Date(session.endTime);
+    const endDate   = new Date(session.endTime);
     const pad = n => String(n).padStart(2, '0');
-    document.getElementById('editStartTimeInput').value = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`;
-    document.getElementById('editEndTimeInput').value = endDate && !isNaN(endDate) ? `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}` : '';
-    document.getElementById('editTimeDurationPreview').style.display = 'none';
 
-    // Wire up live preview for edit modal (re-bind each open to avoid duplicates via { once: true })
+    // Cache elements once for this modal open
+    const editStartEl   = document.getElementById('editStartTimeInput');
+    const editEndEl     = document.getElementById('editEndTimeInput');
+    const editPreviewEl = document.getElementById('editTimeDurationPreview');
+    const editHoursEl   = document.getElementById('editAttendanceHours');
+    const editMinsEl    = document.getElementById('editAttendanceMinutes');
+
+    editStartEl.value = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`;
+    editEndEl.value   = endDate && !isNaN(endDate) ? `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}` : '';
+
+    // Instant preview calculation (no setTimeout, no debounce needed — it's trivial math)
     const updateEditPreview = () => {
-        const startVal = document.getElementById('editStartTimeInput').value;
-        const endVal = document.getElementById('editEndTimeInput').value;
-        const preview = document.getElementById('editTimeDurationPreview');
+        const startVal = editStartEl.value;
+        const endVal   = editEndEl.value;
         if (startVal && endVal) {
             const [sh, sm] = startVal.split(':').map(Number);
             const [eh, em] = endVal.split(':').map(Number);
             let totalMins = (eh * 60 + em) - (sh * 60 + sm);
-            if (totalMins <= 0) totalMins += 24 * 60;
+            if (totalMins <= 0) totalMins += 24 * 60; // overnight
             const calcH = Math.floor(totalMins / 60);
             const calcM = totalMins % 60;
-            preview.style.display = 'block';
-            preview.textContent = `⏱ Duration from times: ${calcH}h ${calcM}m`;
-            document.getElementById('editAttendanceHours').value = calcH;
-            document.getElementById('editAttendanceMinutes').value = calcM;
+            editPreviewEl.style.display = 'block';
+            editPreviewEl.textContent = `⏱ ${calcH}h ${calcM}m calculated`;
+            editHoursEl.value = calcH;
+            editMinsEl.value  = calcM;
         } else {
-            document.getElementById('editTimeDurationPreview').style.display = 'none';
+            editPreviewEl.style.display = 'none';
         }
     };
-    document.getElementById('editStartTimeInput').onchange = updateEditPreview;
-    document.getElementById('editEndTimeInput').onchange = updateEditPreview;
-    
+
+    // Clear any previous handlers (prevents stacking on repeated modal opens)
+    editStartEl.oninput  = updateEditPreview;
+    editStartEl.onchange = updateEditPreview;
+    editEndEl.oninput    = updateEditPreview;
+    editEndEl.onchange   = updateEditPreview;
+
+    // Show preview immediately since times are already pre-filled
+    updateEditPreview();
+
     document.getElementById('editAttendanceModal').classList.add('active');
+
 };
 
 window.saveEditAttendance = function() {

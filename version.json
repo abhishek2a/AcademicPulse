@@ -1,13 +1,18 @@
 {
-  "version": "1.1.29",
-  "build": "2026.06.17",
+  "version": "1.1.30",
+  "build": "2026.06.19",
   "features": [
-    "Welcome to <b>AcademicPulse v1.1.29</b> — time picker overhaul.",
-    "<b>⏱ Time Inputs — Fully Fixed</b>",
-    "<b>No more lag:</b> The duration preview now fires on the <code>input</code> event (every keystroke / scroll wheel change) instead of <code>change</code> (which only fired after you clicked away). The preview appears the instant you set a time.",
-    "<b>Selection now visible:</b> Time inputs now use <code>color-scheme: dark</code> so the native browser clock popup renders in dark mode correctly. The clock icon is tinted blue with a hover highlight. In light mode the picker switches to <code>color-scheme: light</code> automatically.",
-    "<b>Visual redesign:</b> The ⏱ Session Time section now has a blue-tinted border, a Start → End arrow layout, and the calculated duration appears in a highlighted pill badge above the manual duration fields.",
-    "<b>Edit modal pre-shows duration:</b> When you open Edit Session, the duration badge is shown immediately from the existing start/end times — no need to re-select anything.",
-    "<b>No stacking listeners:</b> Re-opening the Edit Session modal no longer stacks up duplicate event handlers — handlers are assigned via <code>oninput</code>/<code>onchange</code> properties which auto-replace on each open."
+    "<b>Welcome to AcademicPulse v1.1.30!</b> This update delivers a massive overhaul to our time-tracking interfaces for a frictionless logging experience, alongside a highly requested feature designed for deep work.",
+    "<b>🎯 What's New: Focus Mode</b>",
+    "<b>Dedicated Focus Tab:</b> We have introduced a brand new \"Focus\" tab under the Attendance section, giving you access to customizable Pomodoro, Short/Long Break, and Stopwatch study modes.",
+    "<b>Achievement Badges:</b> When you finish a Focus session, you can instantly log your time to earn a shiny gold <code>🎯 FOCUS</code> badge right on your dashboard's Recent Sessions table.",
+    "<b>⏱️ Time Input & UI Enhancements</b>",
+    "<b>Instant Duration Previews:</b> The duration preview now fires on the input event, meaning the calculated time updates instantly with every keystroke or scroll wheel change, eliminating the old lag.",
+    "<b>Native Theme Integration:</b> Time inputs now intelligently use <code>color-scheme: dark</code> (or <code>color-scheme: light</code> when in Light Mode) so your browser's native clock popup renders perfectly with your app's theme.",
+    "<b>Clock Icon Styling:</b> The time picker's clock icon has been upgraded with a blue tint and a new hover highlight for better visibility.",
+    "<b>Session Time Redesign:</b> The \"Session Time\" logging block features a cleaner layout with a visual Start → End arrow, and the calculated duration now appears inside a highlighted pill badge above the manual entry fields.",
+    "<b>🐛 Bug Fixes & Stability</b>",
+    "<b>Pre-filled Edit Modals:</b> When opening the Edit Session modal, the duration badge is now pre-calculated and displayed immediately based on your existing start and end times.",
+    "<b>Duplicate Event Handlers:</b> Fixed a bug where opening the Edit Session modal multiple times would stack duplicate event listeners; this was resolved by replacing standard listeners with <code>oninput</code> and <code>onchange</code> property assignments."
   ]
 }

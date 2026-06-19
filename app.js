@@ -75,7 +75,7 @@ const AppState = {
     questionPractice: { attempted: 0, correct: 0 },
     csebSyllabus: {},
     notifications: [],
-    currentVersion: 'v1.1.29',
+    currentVersion: 'v1.1.30',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -182,7 +182,7 @@ function loadData() {
 
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.29', availableUpdate: null, dataVersion: 2 });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.30', availableUpdate: null, dataVersion: 2 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
@@ -356,21 +356,18 @@ window.showWhatsNewPopup = async function() {
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
         features = [
-            "Welcome to the AcademicPulse update! This release brings powerful new analytics, enhanced performance, and intuitive tools.",
-            "<b>✨ Major Features</b>",
-            "Exam Readiness Engine 🎯: Track your preparation for specific courses like ACCA FR and CSEB.",
-            "Performance Matrix: Comprehensive Performance Matrix by Syllabus Area.",
-            "PDF Report Analyzer 🔍: Upload exported PDF reports for personalized improvement suggestions.",
-            "Global Search 🔎: Find past data easily.",
-            "Inactivity Auto-Pause: Detects 5 minutes of inactivity to keep tracking accurate.",
-            "<b>📈 Analytics Enhancements</b>",
-            "Study Heatmap & Consistency Analytics.",
-            "30-Day Forecast.",
-            "Goal Achievement Rates.",
-            "<b>🛠️ UI & Performance Improvements</b>",
-            "Optimized Loading: Much faster initial app startup time.",
-            "Theme Toggle: Switch between dark and light themes.",
-            "In-App Software Updates: See release notes instantly."
+            "<b>Welcome to AcademicPulse v1.1.30!</b> This update delivers a massive overhaul to our time-tracking interfaces for a frictionless logging experience, alongside a highly requested feature designed for deep work.",
+            "<b>🎯 What's New: Focus Mode</b>",
+            "<b>Dedicated Focus Tab:</b> We have introduced a brand new \"Focus\" tab under the Attendance section, giving you access to customizable Pomodoro, Short/Long Break, and Stopwatch study modes.",
+            "<b>Achievement Badges:</b> When you finish a Focus session, you can instantly log your time to earn a shiny gold <code>🎯 FOCUS</code> badge right on your dashboard's Recent Sessions table.",
+            "<b>⏱️ Time Input & UI Enhancements</b>",
+            "<b>Instant Duration Previews:</b> The duration preview now fires on the input event, meaning the calculated time updates instantly with every keystroke or scroll wheel change, eliminating the old lag.",
+            "<b>Native Theme Integration:</b> Time inputs now intelligently use <code>color-scheme: dark</code> (or <code>color-scheme: light</code> when in Light Mode) so your browser's native clock popup renders perfectly with your app's theme.",
+            "<b>Clock Icon Styling:</b> The time picker's clock icon has been upgraded with a neutral tint and a new hover highlight for better visibility.",
+            "<b>Session Time Redesign:</b> The \"Session Time\" logging block features a cleaner layout with a visual Start → End arrow, and the calculated duration now appears inside a highlighted pill badge above the manual entry fields.",
+            "<b>🐛 Bug Fixes & Stability</b>",
+            "<b>Pre-filled Edit Modals:</b> When opening the Edit Session modal, the duration badge is now pre-calculated and displayed immediately based on your existing start and end times.",
+            "<b>Duplicate Event Handlers:</b> Fixed a bug where opening the Edit Session modal multiple times would stack duplicate event listeners; this was resolved by replacing standard listeners with <code>oninput</code> and <code>onchange</code> property assignments."
         ];
     }
     const list = document.getElementById('whatsNewModalList');
@@ -876,13 +873,14 @@ function renderOverview() {
                 const timeStr = new Date(log.startTime).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
                 const durStr = TimeUtils.formatHours(log.duration || ((new Date(log.endTime)-new Date(log.startTime))/1000));
                 const noteOrTopic = escapeHtml([log.topic, log.notes].filter(Boolean).join(' - ') || '-');
+                const focusBadge = log.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">🎯 FOCUS</span>` : '';
                 
                 rowsHtml += `
                     <tr>
                         <td style="padding:15px 10px;">
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <div style="width:10px; height:10px; border-radius:50%; background:${color}"></div>
-                                ${subjName}
+                                ${subjName} ${focusBadge}
                             </div>
                         </td>
                         <td style="padding:15px 10px;">${timeStr}</td>
@@ -1061,14 +1059,17 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, notes: s.notes });
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, notes: s.notes, isFocusMode: s.isFocusMode });
     });
 
     // Build HTML with placeholders, then fill in user-supplied text safely via textContent
     let html = sessionDataForRender.map((d, i) => `
         <div class="report-session-item" style="border-left: 4px solid ${d.color}">
             <div class="report-session-header">
-                <span class="rsi-subj-${i}"></span>
+                <div>
+                    <span class="rsi-subj-${i}"></span>
+                    ${d.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">🎯 FOCUS</span>` : ''}
+                </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: var(--neon-blue);">${d.timeStr}</span>
                     <button onclick="editAttendance('${d.id}')" style="background:transparent; border:none; color:var(--neon-blue); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Edit Session">✎</button>
@@ -1781,6 +1782,7 @@ function generateSmartInsights() {
 function initRetrospectiveLogging() {
     document.getElementById('closeLogModalBtn').addEventListener('click', () => {
         document.getElementById('logSessionModal').classList.remove('active');
+        window._isLoggingFocusSession = false;
     });
 
     // Live preview: when both start & end times are set, show calculated duration
@@ -1854,8 +1856,11 @@ function initRetrospectiveLogging() {
             notes: notes,
             startTime: sessionStart.toISOString(),
             endTime: sessionEnd.toISOString(),
-            duration: durationSecs
+            duration: durationSecs,
+            isFocusMode: window._isLoggingFocusSession || false
         });
+        
+        window._isLoggingFocusSession = false; // Reset the flag
 
         // Mark present
         AppState.attendance[dateKey] = 'present';
@@ -2125,6 +2130,7 @@ window.initApp = function() {
         initRetrospectiveLogging();
         initEditGoals();
         initMocksAndPractice();
+        initFocusMode();
         renderOverview();
         
         // Start live clock — only update the date/time display, not full render
@@ -3515,3 +3521,184 @@ window.saveEditMock = function() {
     renderMocksHistory();
     renderAnalytics();
 };
+
+// ==========================================
+// FOCUS MODE LOGIC
+// ==========================================
+let focusTimerInterval = null;
+let focusMode = 'pomodoro'; // pomodoro, shortBreak, longBreak, stopwatch
+let focusState = 'stopped'; // stopped, running, paused
+let focusSecondsRemaining = 25 * 60;
+let focusStopwatchSeconds = 0;
+
+function initFocusMode() {
+    const startBtn = document.getElementById('focusStartBtn');
+    const pauseBtn = document.getElementById('focusPauseBtn');
+    const resetBtn = document.getElementById('focusResetBtn');
+    const display = document.getElementById('focusTimerDisplay');
+    const durationInput = document.getElementById('focusDurationInput');
+    const logBtn = document.getElementById('focusLogSessionBtn');
+    const logContainer = document.getElementById('focusLogContainer');
+    const logMsg = document.getElementById('focusLogMsg');
+
+    const modePomodoroBtn = document.getElementById('modePomodoroBtn');
+    const modeShortBreakBtn = document.getElementById('modeShortBreakBtn');
+    const modeLongBreakBtn = document.getElementById('modeLongBreakBtn');
+    const modeStopwatchBtn = document.getElementById('modeStopwatchBtn');
+    
+    function formatTime(secs) {
+        const h = Math.floor(secs / 3600);
+        const m = Math.floor((secs % 3600) / 60).toString().padStart(2, '0');
+        const s = (secs % 60).toString().padStart(2, '0');
+        if (h > 0) return `${h}:${m}:${s}`;
+        return `${m}:${s}`;
+    }
+
+    function updateDisplay() {
+        if (focusMode === 'stopwatch') {
+            display.textContent = formatTime(focusStopwatchSeconds);
+        } else {
+            display.textContent = formatTime(focusSecondsRemaining);
+        }
+    }
+
+    function setMode(mode) {
+        if (focusState !== 'stopped') resetTimer();
+        focusMode = mode;
+        
+        [modePomodoroBtn, modeShortBreakBtn, modeLongBreakBtn, modeStopwatchBtn].forEach(b => b.classList.remove('active'));
+        
+        if (mode === 'pomodoro') {
+            modePomodoroBtn.classList.add('active');
+            document.getElementById('pomodoroConfigContainer').style.display = 'inline-block';
+            let mins = parseInt(durationInput.value) || 25;
+            focusSecondsRemaining = mins * 60;
+        } else {
+            document.getElementById('pomodoroConfigContainer').style.display = 'none';
+        }
+        
+        if (mode === 'shortBreak') {
+            modeShortBreakBtn.classList.add('active');
+            focusSecondsRemaining = 5 * 60;
+        } else if (mode === 'longBreak') {
+            modeLongBreakBtn.classList.add('active');
+            focusSecondsRemaining = 15 * 60;
+        } else if (mode === 'stopwatch') {
+            modeStopwatchBtn.classList.add('active');
+            focusStopwatchSeconds = 0;
+        }
+        
+        logContainer.style.display = 'none';
+        updateDisplay();
+    }
+
+    durationInput.addEventListener('change', () => {
+        if (focusMode === 'pomodoro' && focusState === 'stopped') {
+            let mins = parseInt(durationInput.value) || 25;
+            focusSecondsRemaining = mins * 60;
+            updateDisplay();
+        }
+    });
+
+    modePomodoroBtn.addEventListener('click', () => setMode('pomodoro'));
+    modeShortBreakBtn.addEventListener('click', () => setMode('shortBreak'));
+    modeLongBreakBtn.addEventListener('click', () => setMode('longBreak'));
+    modeStopwatchBtn.addEventListener('click', () => setMode('stopwatch'));
+
+    function startTimer() {
+        if (focusState === 'running') return;
+        if (focusMode !== 'stopwatch' && focusSecondsRemaining <= 0) return;
+        
+        focusState = 'running';
+        startBtn.style.display = 'none';
+        pauseBtn.style.display = 'inline-block';
+        logContainer.style.display = 'none';
+        
+        focusTimerInterval = setInterval(() => {
+            if (focusMode === 'stopwatch') {
+                focusStopwatchSeconds++;
+                updateDisplay();
+            } else {
+                focusSecondsRemaining--;
+                updateDisplay();
+                if (focusSecondsRemaining <= 0) {
+                    clearInterval(focusTimerInterval);
+                    focusState = 'stopped';
+                    startBtn.style.display = 'inline-block';
+                    pauseBtn.style.display = 'none';
+                    showLogOptions();
+                }
+            }
+        }, 1000);
+    }
+
+    function pauseTimer() {
+        if (focusState !== 'running') return;
+        clearInterval(focusTimerInterval);
+        focusState = 'paused';
+        startBtn.style.display = 'inline-block';
+        pauseBtn.style.display = 'none';
+    }
+
+    function resetTimer() {
+        clearInterval(focusTimerInterval);
+        focusState = 'stopped';
+        startBtn.style.display = 'inline-block';
+        pauseBtn.style.display = 'none';
+        
+        if (focusMode === 'pomodoro') {
+            let mins = parseInt(durationInput.value) || 25;
+            focusSecondsRemaining = mins * 60;
+        } else if (focusMode === 'shortBreak') {
+            focusSecondsRemaining = 5 * 60;
+        } else if (focusMode === 'longBreak') {
+            focusSecondsRemaining = 15 * 60;
+        } else if (focusMode === 'stopwatch') {
+            if (focusStopwatchSeconds > 60) {
+                showLogOptions(); // Ask to log if stopwatch ran > 1 min
+            }
+            focusStopwatchSeconds = 0;
+        }
+        updateDisplay();
+        logContainer.style.display = 'none';
+    }
+
+    function showLogOptions() {
+        if (focusMode === 'shortBreak' || focusMode === 'longBreak') return; 
+        
+        let totalSecs = focusMode === 'stopwatch' ? focusStopwatchSeconds : (parseInt(durationInput.value) || 25) * 60;
+        let mins = Math.floor(totalSecs / 60);
+        
+        if (mins < 1) return; 
+        
+        logContainer.style.display = 'block';
+        logMsg.textContent = `🎯 Focus Session Complete! (${mins} mins)`;
+        
+        logBtn.onclick = () => {
+            document.getElementById('logDateInput').value = new Date().toISOString().split('T')[0];
+            document.getElementById('logHoursInput').value = Math.floor(mins / 60);
+            document.getElementById('logMinutesInput').value = mins % 60;
+            document.getElementById('logNotesInput').value = focusMode === 'pomodoro' ? 'Pomodoro Session 🎯' : 'Focus Session 🎯';
+            
+            // Auto calculate end time = now, start time = now - duration
+            const now = new Date();
+            const start = new Date(now.getTime() - (mins * 60000));
+            const pad = n => String(n).padStart(2, '0');
+            
+            document.getElementById('logStartTimeInput').value = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+            document.getElementById('logEndTimeInput').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            
+            window._isLoggingFocusSession = true;
+            document.getElementById('logSessionModal').classList.add('active');
+            
+            // Dispatch input event to trigger duration preview recalculation
+            document.getElementById('logStartTimeInput').dispatchEvent(new Event('input'));
+        };
+    }
+
+    startBtn.addEventListener('click', startTimer);
+    pauseBtn.addEventListener('click', pauseTimer);
+    resetBtn.addEventListener('click', resetTimer);
+
+    setMode('pomodoro');
+}

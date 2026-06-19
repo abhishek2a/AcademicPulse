@@ -179,7 +179,8 @@ body.light-theme textarea:focus {
     border-color: var(--neon-blue);
     background: rgba(255, 255, 255, 0.9);
 }
-body.light-theme select option {
+body.light-theme select option,
+body.light-theme select optgroup {
     background: #fff;
     color: #1D1D1F;
 }
@@ -373,6 +374,10 @@ body.light-theme .ambient-bg { opacity: 0.6; }
     position: relative;
     scrollbar-width: thin;
     scrollbar-color: var(--glass-border) transparent;
+}
+
+.main-content:focus {
+    outline: none;
 }
 
 .main-content::-webkit-scrollbar { width: 6px; }
@@ -603,7 +608,7 @@ body.light-theme input[type="time"]::-webkit-calendar-picker-indicator {
 
 
 @media (min-width: 769px) {
-    select option { background-color: var(--app-bg); color: var(--text-main); }
+    select option, select optgroup { background-color: var(--app-bg); color: var(--text-main); }
 }
 
 .goals-section { background: var(--glass-bg); padding: 35px; border-radius: 28px; border: 1px solid var(--glass-border); margin-bottom: 40px; }

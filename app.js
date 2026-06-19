@@ -15,7 +15,9 @@ const STORAGE_KEYS = {
     PRACTICE: 'cseb_question_practice',
     CSEB_SYLLABUS: 'cseb_syllabus_tracker',
     NOTIFICATIONS: 'cseb_notifications',
+    SCHEDULE: 'cseb_study_schedule',
     SYSTEM_STATE: 'cseb_system_state',
+    ACHIEVEMENTS: 'cseb_achievements',
     // Device-local only — never cloud-synced.
     // Tracks the last version the user installed so sign-out/re-login
     // never re-triggers the update popup for an already-seen version.
@@ -75,7 +77,9 @@ const AppState = {
     questionPractice: { attempted: 0, correct: 0 },
     csebSyllabus: {},
     notifications: [],
-    currentVersion: 'v1.1.30',
+    schedule: [],
+    achievements: [],
+    currentVersion: 'v1.0.40',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -181,8 +185,10 @@ function loadData() {
     }
 
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
+    AppState.schedule = Storage.get(STORAGE_KEYS.SCHEDULE, []);
+    AppState.achievements = Storage.get(STORAGE_KEYS.ACHIEVEMENTS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.1.30', availableUpdate: null, dataVersion: 2 });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.40', availableUpdate: null, dataVersion: 2 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
@@ -356,18 +362,15 @@ window.showWhatsNewPopup = async function() {
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
         features = [
-            "<b>Welcome to AcademicPulse v1.1.30!</b> This update delivers a massive overhaul to our time-tracking interfaces for a frictionless logging experience, alongside a highly requested feature designed for deep work.",
-            "<b>🎯 What's New: Focus Mode</b>",
-            "<b>Dedicated Focus Tab:</b> We have introduced a brand new \"Focus\" tab under the Attendance section, giving you access to customizable Pomodoro, Short/Long Break, and Stopwatch study modes.",
-            "<b>Achievement Badges:</b> When you finish a Focus session, you can instantly log your time to earn a shiny gold <code>🎯 FOCUS</code> badge right on your dashboard's Recent Sessions table.",
-            "<b>⏱️ Time Input & UI Enhancements</b>",
-            "<b>Instant Duration Previews:</b> The duration preview now fires on the input event, meaning the calculated time updates instantly with every keystroke or scroll wheel change, eliminating the old lag.",
-            "<b>Native Theme Integration:</b> Time inputs now intelligently use <code>color-scheme: dark</code> (or <code>color-scheme: light</code> when in Light Mode) so your browser's native clock popup renders perfectly with your app's theme.",
-            "<b>Clock Icon Styling:</b> The time picker's clock icon has been upgraded with a neutral tint and a new hover highlight for better visibility.",
-            "<b>Session Time Redesign:</b> The \"Session Time\" logging block features a cleaner layout with a visual Start → End arrow, and the calculated duration now appears inside a highlighted pill badge above the manual entry fields.",
-            "<b>🐛 Bug Fixes & Stability</b>",
-            "<b>Pre-filled Edit Modals:</b> When opening the Edit Session modal, the duration badge is now pre-calculated and displayed immediately based on your existing start and end times.",
-            "<b>Duplicate Event Handlers:</b> Fixed a bug where opening the Edit Session modal multiple times would stack duplicate event listeners; this was resolved by replacing standard listeners with <code>oninput</code> and <code>onchange</code> property assignments."
+            "<b>Welcome to AcademicPulse v1.0.40!</b> This is a major update bringing an entirely new interconnected experience and a background gamification engine.",
+            "<b>🏆 Gamification Engine</b>",
+            "<b>The 100-Hour Club:</b> Secret achievement unlocked when you surpass 100 hours of study time.",
+            "<b>Flawless Week:</b> Hit your daily goal 7 days in a row to earn this streak badge.",
+            "<b>Mock Master:</b> Score above 85% on 3 consecutive mocks in a single subject.",
+            "<b>Premium Banners:</b> New achievements trigger a beautiful glowing banner that cleanly disappears after 24 hours.",
+            "<b>🔗 Interconnected UI & Smart Routing</b>",
+            "<b>Contextual Workflows:</b> All pages are now heavily integrated. You can instantly jump from Subjects to Analytics, from Analytics Weak Areas straight into Focus Mode, or from low Attendance straight into Schedule planning.",
+            "<b>Smart Auto-fill:</b> Jumping into Focus Mode from any 'Practice Now' or 'Focus' button smartly passes the subject context so you don't have to manually select your subject when logging the session."
         ];
     }
     const list = document.getElementById('whatsNewModalList');
@@ -390,14 +393,115 @@ function saveData(key) {
     if (key === 'practice' || key === 'all') Storage.set(STORAGE_KEYS.PRACTICE, AppState.questionPractice);
     if (key === 'csebSyllabus' || key === 'all') Storage.set(STORAGE_KEYS.CSEB_SYLLABUS, AppState.csebSyllabus);
     if (key === 'notifications' || key === 'all') Storage.set(STORAGE_KEYS.NOTIFICATIONS, AppState.notifications);
+    if (key === 'schedule' || key === 'all') Storage.set(STORAGE_KEYS.SCHEDULE, AppState.schedule);
+    if (key === 'achievements' || key === 'all') Storage.set(STORAGE_KEYS.ACHIEVEMENTS, AppState.achievements);
     if (key === 'system' || key === 'all') Storage.set(STORAGE_KEYS.SYSTEM_STATE, {
         currentVersion: AppState.currentVersion,
         availableUpdate: AppState.availableUpdate,
         dataVersion: AppState.dataVersion
     });
 
+    if (key === 'sessions' || key === 'mocks' || key === 'all') {
+        setTimeout(checkAchievements, 100);
+    }
+
     if (typeof window.triggerCloudSync === 'function') {
         window.triggerCloudSync();
+    }
+}
+
+function checkAchievements() {
+    const hasAchievement = (id) => AppState.achievements.some(a => a.id === id);
+    const unlock = (id, title, desc, icon) => {
+        if (!hasAchievement(id)) {
+            AppState.achievements.push({ id, title, desc, icon, dateUnlocked: new Date().toISOString() });
+            saveData('achievements');
+            addNotification('🏆 Achievement Unlocked!', `${title}: ${desc}`, 'success');
+            updateAchievementsBanners();
+        }
+    };
+
+    // 1. The 100-Hour Club
+    let totalMinutes = AppState.sessions.reduce((acc, s) => {
+        if(s.durationMinutes !== undefined) return acc + s.durationMinutes;
+        if(s.duration) return acc + Math.floor(s.duration / 60);
+        return acc;
+    }, 0);
+    if (totalMinutes >= 6000) {
+        unlock('100_hours', 'The 100-Hour Club', 'You have logged over 100 hours of study time.', '💯');
+    }
+
+    // 2. Flawless Week
+    const streaks = calculateStreaks();
+    if (streaks.current >= 7) {
+        unlock('flawless_week', 'Flawless Week', 'You hit your daily goal 7 days in a row.', '🔥');
+    }
+
+    // 3. Mock Master (Single Subject)
+    const mocksBySubj = {};
+    AppState.mockTests.forEach(m => {
+        if (!m.subjectId) return;
+        if (!mocksBySubj[m.subjectId]) mocksBySubj[m.subjectId] = [];
+        mocksBySubj[m.subjectId].push(m);
+    });
+    
+    Object.keys(mocksBySubj).forEach(subjId => {
+        const mocks = mocksBySubj[subjId].sort((a,b) => new Date(a.date) - new Date(b.date));
+        if (mocks.length >= 3) {
+            const last3 = mocks.slice(-3);
+            const allAbove85 = last3.every(m => (m.score / m.maxScore) >= 0.85);
+            if (allAbove85) {
+                const subj = AppState.subjects.find(s => s.id === subjId);
+                const subjName = subj ? subj.name : 'a subject';
+                unlock(`mock_master_${subjId}`, 'Mock Master', `Scored 85%+ on 3 consecutive mocks in ${subjName}.`, '🎓');
+            }
+        }
+    });
+}
+
+function updateAchievementsBanners() {
+    const bannerOverview = document.getElementById('achievementsBannerOverview');
+    const bannerProfile = document.getElementById('achievementsBannerProfile');
+    
+    const now = new Date();
+    const recent = AppState.achievements.filter(a => {
+        const diff = now - new Date(a.dateUnlocked);
+        return diff < 24 * 60 * 60 * 1000;
+    });
+
+    const renderHtml = (items, showDate = false) => {
+        if (items.length === 0) return '';
+        let html = '<div style="display:flex; flex-direction:column; gap:10px; margin-bottom: 25px;">';
+        items.forEach(a => {
+            const dateStr = showDate ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">Unlocked: ${new Date(a.dateUnlocked).toLocaleDateString()}</div>` : '';
+            html += `
+                <div style="background: linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(255,215,0,0.05) 100%); border: 1px solid var(--neon-gold); border-radius: 12px; padding: 15px; display:flex; align-items:center; gap:15px; box-shadow: 0 0 15px rgba(255,215,0,0.1); text-align: left;">
+                    <div style="font-size: 2.5rem; filter: drop-shadow(0 0 5px rgba(255,215,0,0.5));">${a.icon}</div>
+                    <div style="flex: 1;">
+                        <div style="color: var(--neon-gold); font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px;">Achievement Unlocked</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin-bottom: 2px;">${a.title}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">${a.desc}</div>
+                        ${dateStr}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        return html;
+    };
+
+    if(bannerOverview) {
+        if (recent.length > 0) bannerOverview.innerHTML = renderHtml(recent);
+        else bannerOverview.innerHTML = '';
+    }
+    
+    if(bannerProfile) {
+        if (AppState.achievements.length > 0) {
+            const allSorted = [...AppState.achievements].sort((a,b) => new Date(b.dateUnlocked) - new Date(a.dateUnlocked));
+            bannerProfile.innerHTML = renderHtml(allSorted, true);
+        } else {
+            bannerProfile.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9rem;">No achievements unlocked yet. Keep studying!</p>';
+        }
     }
 }
 
@@ -419,6 +523,16 @@ function loadChartJS() {
     return _chartJsLoadPromise;
 }
 
+window.navigateTo = function(targetId, context = null) {
+    if (context) {
+        sessionStorage.setItem('navigationContext', JSON.stringify(context));
+    } else {
+        sessionStorage.removeItem('navigationContext');
+    }
+    const navItem = document.querySelector(`.nav-item[data-target="${targetId}"]`);
+    if (navItem) navItem.click();
+};
+
 function initNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
     const sections = document.querySelectorAll('.view-section');
@@ -432,6 +546,10 @@ function initNavigation() {
 
             sections.forEach(sec => sec.classList.remove('active'));
             document.getElementById(targetId).classList.add('active');
+            
+            // Give focus to scroll area for keyboard navigation
+            const mainContent = document.getElementById('mainContentArea');
+            if (mainContent) mainContent.focus();
 
             // Re-render views on switch
             if (targetId === 'view-overview') renderOverview();
@@ -453,6 +571,34 @@ function initNavigation() {
                     });
             }
             if (targetId === 'view-attendance') renderAttendance();
+            if (targetId === 'view-schedule') {
+                const todayTab = document.getElementById('tabScheduleToday');
+                if(todayTab) todayTab.click();
+            }
+            if (targetId === 'view-focus') {
+                try {
+                    const ctxStr = sessionStorage.getItem('navigationContext');
+                    if (ctxStr) {
+                        const ctx = JSON.parse(ctxStr);
+                        if (ctx.subjectId) {
+                            window._focusContextSubjectId = ctx.subjectId;
+                            
+                            let display = document.getElementById('focusContextDisplay');
+                            if (!display) {
+                                display = document.createElement('div');
+                                display.id = 'focusContextDisplay';
+                                display.style.cssText = 'color: var(--neon-blue); font-weight: bold; margin-bottom: 15px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;';
+                                const container = document.querySelector('.session-setup');
+                                container.insertBefore(display, container.firstChild);
+                            }
+                            const subj = AppState.subjects.find(s => s.id === ctx.subjectId);
+                            display.textContent = subj ? `Focusing on: ${subj.name}` : '';
+                            display.style.display = 'block';
+                        }
+                        sessionStorage.removeItem('navigationContext');
+                    }
+                } catch(e) {}
+            }
         });
     });
 }
@@ -601,9 +747,10 @@ function renderSubjects() {
         }
         
         html += `
-            <div class="subject-actions" style="margin-top: auto; padding-top: 15px;">
-                <button class="btn btn-outline" onclick="event.stopPropagation(); editSubject('${subj.id}')" style="padding: 6px 12px; font-size:0.8rem;">Edit</button>
-                <button class="btn btn-outline" onclick="event.stopPropagation(); deleteSubject('${subj.id}')" style="padding: 6px 12px; font-size:0.8rem; color:var(--neon-red); border-color:var(--neon-red);">Delete</button>
+            <div class="subject-actions" style="margin-top: auto; padding-top: 15px; display:flex; gap:5px; flex-wrap:wrap; justify-content:center;">
+                <button class="btn btn-outline" onclick="event.stopPropagation(); navigateTo('view-analytics')" style="padding: 6px 12px; font-size:0.8rem; border-color:var(--neon-purple); color:var(--neon-purple); flex:1; min-width: 100%;">View Analytics</button>
+                <button class="btn btn-outline" onclick="event.stopPropagation(); editSubject('${subj.id}')" style="padding: 6px 12px; font-size:0.8rem; flex:1;">Edit</button>
+                <button class="btn btn-outline" onclick="event.stopPropagation(); deleteSubject('${subj.id}')" style="padding: 6px 12px; font-size:0.8rem; color:var(--neon-red); border-color:var(--neon-red); flex:1;">Delete</button>
             </div>
         `;
         
@@ -861,19 +1008,26 @@ function renderOverview() {
     if (tbody) {
         tbody.innerHTML = '';
         const recent = [...AppState.sessions].sort((a,b) => new Date(b.startTime) - new Date(a.startTime)).slice(0, 5);
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const nowTimeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        
         if (recent.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No recent sessions</td></tr>';
         } else {
-            // Build all rows as a single string (avoids O(n²) innerHTML += re-parsing)
+            // Build all rows as a single string
             let rowsHtml = '';
+            
+            // 2. Regular Recent Sessions
             recent.forEach(log => {
                 const subj = AppState.subjects.find(s => s.id === log.subjectId);
                 const subjName = escapeHtml(subj ? subj.name : 'Uncategorized');
                 const color = subj ? subj.color : '#aaa';
                 const timeStr = new Date(log.startTime).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
-                const durStr = TimeUtils.formatHours(log.duration || ((new Date(log.endTime)-new Date(log.startTime))/1000));
+                const durStr = TimeUtils.formatHours(log.duration || (log.durationMinutes ? log.durationMinutes * 60 : ((new Date(log.endTime)-new Date(log.startTime))/1000)));
                 const noteOrTopic = escapeHtml([log.topic, log.notes].filter(Boolean).join(' - ') || '-');
-                const focusBadge = log.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">🎯 FOCUS</span>` : '';
+                const focusBadge = log.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">✨ FOCUS</span>` : '';
                 
                 rowsHtml += `
                     <tr>
@@ -896,6 +1050,12 @@ function renderOverview() {
             tbody.innerHTML = rowsHtml;
         }
     }
+    
+    // Render the dashboard widget for schedule
+    renderOverviewScheduleWidget();
+
+    // Update achievement banners
+    updateAchievementsBanners();
 }
 
 // ==========================================
@@ -978,7 +1138,12 @@ function renderAttendance() {
 
     document.getElementById('attendanceStreakVal').textContent = attStreak;
     const pct = totalMarked > 0 ? Math.round((presentDays / totalMarked) * 100) : 0;
-    document.getElementById('attendancePercentVal').textContent = `${pct}%`;
+    
+    let attHtml = `${pct}%`;
+    if (pct < 80 && totalMarked > 5) {
+        attHtml += `<div style="margin-top:10px;"><button onclick="navigateTo('view-schedule')" style="background:var(--neon-purple); color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer; width: 100%;">Plan Recovery</button></div>`;
+    }
+    document.getElementById('attendancePercentVal').innerHTML = attHtml;
     
     // Default to showing today's report
     renderDayReport(TimeUtils.getDateKey(now));
@@ -1040,7 +1205,44 @@ function renderDayReport(dateKey) {
         </div>
     `;
     
-    if (daySessions.length === 0) {
+    // Add Pending Scheduled Items for this day
+    const now = new Date();
+    const todayKey = now.toISOString().split('T')[0];
+    const nowTimeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    
+    const pendingSchedule = AppState.schedule.filter(s => s.date === dateKey && s.status === 'pending');
+    let pendingHtml = '';
+    
+    pendingSchedule.forEach(item => {
+        // Only skip if the scheduled item is completely in the future (tomorrow onwards)
+        // If the user clicks today's date, show ALL of today's schedule.
+        if (dateKey > todayKey) return;
+        
+        const subj = AppState.subjects.find(sub => sub.id === item.subjectId) || { name: 'Unknown Subject', color: 'var(--neon-blue)' };
+        const timeStr = `${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}`;
+        const noteOrTopic = escapeHtml([item.topic, item.title].filter(Boolean).join(' - ') || '-');
+        
+        pendingHtml += `
+            <div class="report-session-item" style="border-left: 4px solid var(--neon-blue); background: rgba(10,132,255,0.05); margin-bottom: 15px;">
+                <div class="report-session-header" style="margin-bottom: 5px;">
+                    <div>
+                        <span style="font-weight:600;">${escapeHtml(subj.name)}</span>
+                        <span style="background:var(--glass-bg); color:var(--neon-blue); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid var(--neon-blue);">SCHEDULED</span>
+                    </div>
+                    <div style="color: var(--neon-blue); font-size: 0.9rem;">${timeStr}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.85rem; color:var(--text-muted);">${noteOrTopic}</div>
+                    <div style="display:flex; gap: 5px;">
+                        <button style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="completeScheduleItem('${item.id}')">✓ Log</button>
+                        <button style="background:rgba(255,69,58,0.15); color:var(--neon-red); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="missScheduleItem('${item.id}')">✕</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    if (daySessions.length === 0 && !pendingHtml) {
         totalDiv.innerHTML = `Total Studied: 0h 0m ${statusText}`;
         content.innerHTML = statusControls + '<div style="text-align: center; color: var(--text-muted); margin-top: 40px;">No sessions logged for this day.</div>';
         return;
@@ -1050,11 +1252,22 @@ function renderDayReport(dateKey) {
     const sessionDataForRender = [];
 
     daySessions.forEach(s => {
-        totalDuration += (s.duration || ((new Date(s.endTime) - new Date(s.startTime)) / 1000) || 0);
+        totalDuration += (s.durationMinutes || ((new Date(s.endTime) - new Date(s.startTime)) / 60000) || 0);
         const subj = AppState.subjects.find(sub => sub.id === s.subjectId) || { name: 'Unknown', color: 'var(--text-main)' };
         
-        let hrs = Math.floor(s.duration / 3600);
-        let mins = Math.floor((s.duration % 3600) / 60);
+        let hrs = Math.floor(s.durationMinutes / 60) || Math.floor(totalDuration / 60); // handle old duration sec logic roughly
+        if(s.durationMinutes !== undefined) {
+             hrs = Math.floor(s.durationMinutes / 60);
+        } else if(s.duration) {
+             hrs = Math.floor(s.duration / 3600);
+        }
+        let mins = 0;
+        if(s.durationMinutes !== undefined) {
+             mins = s.durationMinutes % 60;
+        } else if(s.duration) {
+             mins = Math.floor((s.duration % 3600) / 60);
+        }
+        
         let timeStr = '';
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
@@ -1068,7 +1281,7 @@ function renderDayReport(dateKey) {
             <div class="report-session-header">
                 <div>
                     <span class="rsi-subj-${i}"></span>
-                    ${d.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">🎯 FOCUS</span>` : ''}
+                    ${d.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">✨ FOCUS</span>` : ''}
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: var(--neon-blue);">${d.timeStr}</span>
@@ -1080,11 +1293,22 @@ function renderDayReport(dateKey) {
         </div>
     `).join('');
 
-    let totalHrs = Math.floor(totalDuration / 3600);
-    let totalMins = Math.floor((totalDuration % 3600) / 60);
+    let totalHrs = 0;
+    let totalMins = 0;
+    
+    // Calculate precise total using new durationMinutes where possible
+    let sumMins = daySessions.reduce((acc, s) => {
+        if(s.durationMinutes !== undefined) return acc + s.durationMinutes;
+        if(s.duration) return acc + Math.floor(s.duration / 60);
+        return acc;
+    }, 0);
+    
+    totalHrs = Math.floor(sumMins / 60);
+    totalMins = sumMins % 60;
+    
     totalDiv.innerHTML = `Total Studied: ${totalHrs}h ${totalMins}m ${statusText}`;
     
-    content.innerHTML = statusControls + html;
+    content.innerHTML = statusControls + pendingHtml + html;
 
     // Now safely populate user-controlled text via textContent (XSS-safe)
     sessionDataForRender.forEach((d, i) => {
@@ -1323,12 +1547,27 @@ function renderAnalytics() {
             d.mockScores.forEach((s, i) => { sumS += s; sumM += d.mockMaxScores[i]; });
             d.mockPct = sumM > 0 ? (sumS / sumM) * 100 : 0;
             d.sylPct = d.totalTopics > 0 ? (d.completedTopics / d.totalTopics) * 100 : 0;
-            d.compositeScore = (d.accPct * 0.4) + (d.mockPct * 0.6);
-            if(d.practiceAtt === 0 && d.mockScores.length === 0) d.compositeScore = 0;
+            
+            // Improved Accuracy & Knowledge Logic
+            let compositeScore = 0;
+            if (d.practiceAtt > 0 && d.mockScores.length > 0) {
+                // Both available: blend them (Mocks 60%, Practice 40%)
+                compositeScore = (d.accPct * 0.4) + (d.mockPct * 0.6);
+            } else if (d.practiceAtt > 0) {
+                // Only practice available
+                compositeScore = d.accPct;
+            } else if (d.mockScores.length > 0) {
+                // Only mocks available
+                compositeScore = d.mockPct;
+            }
+            
+            d.compositeScore = compositeScore;
+            
             let statusText = 'Need Data', color = 'var(--text-muted)';
             if (d.practiceAtt > 0 || d.mockScores.length > 0) {
-                if (d.compositeScore >= 80) { statusText = 'Strong'; color = 'var(--neon-green)'; }
-                else if (d.compositeScore >= 60) { statusText = 'Average'; color = 'var(--neon-gold)'; }
+                if (d.compositeScore >= 85) { statusText = 'Excellent'; color = 'var(--neon-green)'; }
+                else if (d.compositeScore >= 65) { statusText = 'Good'; color = '#8ddb8d'; } // Lighter green
+                else if (d.compositeScore >= 50) { statusText = 'Average'; color = 'var(--neon-gold)'; }
                 else { statusText = 'Needs Work'; color = 'var(--neon-red)'; }
             }
             d.statusText = statusText; d.color = color;
@@ -1344,12 +1583,12 @@ function renderAnalytics() {
                 matrixRows.sort((a,b) => b.compositeScore - a.compositeScore).forEach(r => {
                     matrixBody.innerHTML += `
                         <tr style="border-bottom: 1px solid var(--glass-border);">
-                            <td style="padding: 10px;">${r.area}</td>
-                            <td style="padding: 10px; color: var(--text-muted); font-size: 0.85rem;">${r.course}</td>
-                            <td style="padding: 10px;">${r.practiceAtt > 0 ? Math.round(r.accPct)+'%' : '-'}</td>
-                            <td style="padding: 10px;">${r.mockScores.length > 0 ? Math.round(r.mockPct)+'%' : '-'}</td>
-                            <td style="padding: 10px;">${r.practiceAtt}</td>
-                            <td style="padding: 10px; color: ${r.color};">${r.statusText}</td>
+                            <td style="padding: 10px 5px; font-size: 0.9rem;">${r.area}</td>
+                            <td style="padding: 10px 5px; color: var(--text-muted); font-size: 0.85rem;">${r.course}</td>
+                            <td style="padding: 10px 5px; font-size: 0.9rem;">${r.practiceAtt > 0 ? Math.round(r.accPct)+'%' : '-'}</td>
+                            <td style="padding: 10px 5px; font-size: 0.9rem;">${r.mockScores.length > 0 ? Math.round(r.mockPct)+'%' : '-'}</td>
+                            <td style="padding: 10px 5px; font-size: 0.9rem;">${r.practiceAtt}</td>
+                            <td style="padding: 10px 5px; text-align:right; font-weight: 500; font-size: 0.9rem; color: ${r.color};">${r.statusText}</td>
                         </tr>
                     `;
                 });
@@ -1366,10 +1605,15 @@ function renderAnalytics() {
                 weakestContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem;">No weaknesses detected. Great job!</div>';
             } else {
                 weakestAreas.forEach(w => {
+                    const subjObj = AppState.subjects.find(s => s.name === w.area);
+                    const subjId = subjObj ? subjObj.id : '';
                     weakestContainer.innerHTML += `
                         <div style="background: var(--glass-hover); padding: 15px; border-radius: 8px; flex: 1; min-width: 150px; border-left: 4px solid ${w.color};">
                             <div style="font-weight: bold; margin-bottom: 5px;">${w.area}</div>
-                            <div style="font-size: 0.85rem; color: var(--text-muted);">Avg Score: ${Math.round(w.compositeScore)}%</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">Avg Score: ${Math.round(w.compositeScore)}%</div>
+                                ${subjId ? `<button onclick="navigateTo('view-focus', {subjectId: '${subjId}'})" style="background:var(--neon-gold); color:#000; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer;">Practice Now</button>` : ''}
+                            </div>
                         </div>
                     `;
                 });
@@ -1798,7 +2042,7 @@ function initRetrospectiveLogging() {
             const calcH = Math.floor(totalMins / 60);
             const calcM = totalMins % 60;
             preview.style.display = 'block';
-            preview.textContent = `⏱ Duration from times: ${calcH}h ${calcM}m (will override manual entry)`;
+            preview.textContent = `⏱ Live Duration: ${calcH}h ${calcM}m (overrides manual entry)`;
             document.getElementById('logHoursInput').value = calcH;
             document.getElementById('logMinutesInput').value = calcM;
         } else {
@@ -1861,6 +2105,15 @@ function initRetrospectiveLogging() {
         });
         
         window._isLoggingFocusSession = false; // Reset the flag
+        
+        if (window._completingScheduleId) {
+            const schedItem = AppState.schedule.find(s => s.id === window._completingScheduleId);
+            if (schedItem) {
+                schedItem.status = 'completed';
+                saveData('schedule');
+            }
+            window._completingScheduleId = null;
+        }
 
         // Mark present
         AppState.attendance[dateKey] = 'present';
@@ -1875,6 +2128,7 @@ function initRetrospectiveLogging() {
         document.getElementById('logSessionModal').classList.remove('active');
         renderOverview();
         renderAttendance();
+        renderDayReport(dateKey);
         debouncedRenderAnalytics();
     });
 
@@ -1927,9 +2181,10 @@ function populateLogTopics(subjId) {
     
     if (syllabusTopics && syllabusTopics.length > 0) {
         syllabusTopics.forEach(t => {
+            const name = t.name || t.topic || t;
             const opt = document.createElement('option');
-            opt.value = t.name;
-            opt.textContent = t.name + (t.completed ? ' (Completed)' : '');
+            opt.value = name;
+            opt.textContent = name;
             topicDropdown.appendChild(opt);
         });
     } else {
@@ -1975,7 +2230,7 @@ function initEditGoals() {
         
         saveData('goals');
         renderOverview();
-        document.getElementById('editGoalsModal').classList.remove('active');
+        document.getElementById('editGoalsModal').classList.add('active');
         addNotification('Goals Updated', 'Your study goals have been updated.', 'info');
     });
 }
@@ -2131,6 +2386,7 @@ window.initApp = function() {
         initEditGoals();
         initMocksAndPractice();
         initFocusMode();
+        initSchedule();
         renderOverview();
         
         // Start live clock — only update the date/time display, not full render
@@ -2149,6 +2405,22 @@ window.initApp = function() {
         setTimeout(() => {
             document.getElementById('loadingOverlay').classList.remove('active');
         }, 500);
+        
+        const openAchBtn = document.getElementById('btnOpenAchievements');
+        if (openAchBtn) {
+            openAchBtn.addEventListener('click', () => {
+                const modal = document.getElementById('achievementsModal');
+                if (modal) modal.classList.add('active');
+            });
+        }
+
+        const closeAchBtn = document.getElementById('closeAchievementsModalBtn');
+        if (closeAchBtn) {
+            closeAchBtn.addEventListener('click', () => {
+                const modal = document.getElementById('achievementsModal');
+                if (modal) modal.classList.remove('active');
+            });
+        }
         
     } catch (error) {
         console.error("Init Error:", error);
@@ -2312,6 +2584,8 @@ function initMocksAndPractice() {
     const mockCourseSelect = document.getElementById('mockCourseInput');
     const mockAreaSelect = document.getElementById('mockAreaInput');
 
+    const mockTopicSelect = document.getElementById('mockTopicInput');
+
     const populateMockAreas = (course) => {
         if(!mockAreaSelect) return;
         mockAreaSelect.innerHTML = '<option value="">General</option>';
@@ -2323,16 +2597,45 @@ function initMocksAndPractice() {
             mockAreaSelect.appendChild(opt);
         });
     };
+    
+    const populateMockTopics = (course, area) => {
+        if(!mockTopicSelect) return;
+        mockTopicSelect.innerHTML = '<option value="">All Topics</option>';
+        if(!area || area === 'General') return;
+        
+        const syllabusObj = course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
+        const topics = syllabusObj[area];
+        if (topics && Array.isArray(topics)) {
+            topics.forEach(t => {
+                const name = t.name || t.topic || t;
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                mockTopicSelect.appendChild(opt);
+            });
+        }
+    };
 
     if(mockCourseSelect) {
-        mockCourseSelect.onchange = (e) => populateMockAreas(e.target.value);
+        mockCourseSelect.onchange = (e) => {
+            populateMockAreas(e.target.value);
+            populateMockTopics(e.target.value, '');
+        };
         populateMockAreas(mockCourseSelect.value);
+    }
+    
+    if(mockAreaSelect) {
+        mockAreaSelect.onchange = (e) => {
+            const course = document.getElementById('mockCourseInput').value;
+            populateMockTopics(course, e.target.value);
+        };
     }
 
     if (saveMockBtn) {
         saveMockBtn.onclick = () => {
         const course = document.getElementById('mockCourseInput').value;
         const area = document.getElementById('mockAreaInput').value || 'General';
+        const topic = document.getElementById('mockTopicInput')?.value || '';
         const name = document.getElementById('mockNameInput').value;
         const score = parseFloat(document.getElementById('mockScoreInput').value) || 0;
         const max = parseFloat(document.getElementById('mockMaxScoreInput').value) || 100;
@@ -2345,6 +2648,7 @@ function initMocksAndPractice() {
             date: new Date().toISOString(),
             course: course,
             syllabusArea: area,
+            topic: topic,
             name: name,
             score: score,
             maxScore: max,
@@ -2384,14 +2688,21 @@ function renderMocksHistory() {
         tr.style.borderBottom = '1px solid var(--glass-border)';
         tr.innerHTML = `
             <td style="padding:15px 10px;">${new Date(m.date).toLocaleDateString()}</td>
-            <td class="mock-name" style="padding:15px 10px;"></td>
+            <td style="padding:15px 10px;">
+                <div class="mock-name-title" style="font-weight: 600; color: var(--text-main);"></div>
+                <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 4px;">
+                    ${m.course} - ${m.syllabusArea}
+                    ${m.topic && m.topic !== 'All Topics' && m.topic !== '' ? ' &bull; ' + m.topic : ''}
+                </div>
+            </td>
             <td style="padding:15px 10px;">${m.score} / ${m.maxScore} (${pct}%)</td>
-            <td style="padding:15px 10px; text-align:right; min-width: 100px;">
-                <a href="#" style="color:var(--neon-blue); margin-right:10px; font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); editMock('${m.id}')">Edit</a>
+            <td style="padding:15px 10px; text-align:right; min-width: 150px;">
+                <button onclick="alert('Detailed mistake analysis coming in next update! Stay tuned.')" style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid var(--glass-border); padding:4px 8px; border-radius:4px; font-size:0.7rem; cursor:pointer; margin-right: 8px;">Review Mistakes</button>
+                <a href="#" style="color:var(--neon-blue); margin-right:8px; font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); editMock('${m.id}')">Edit</a>
                 <a href="#" style="color:var(--neon-red); font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); deleteMock('${m.id}')">Delete</a>
             </td>
         `;
-        tr.querySelector('.mock-name').textContent = m.name;
+        tr.querySelector('.mock-name-title').textContent = m.name;
         tbody.appendChild(tr);
     });
 }
@@ -3219,7 +3530,36 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW failed:', err));
         navigator.serviceWorker.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-                processNewUpdate(event.data.payload);
+                const payload = event.data.payload;
+                
+                // Phased Rollout Logic
+                // Heavy users (10+ sessions OR active streak) get updates instantly
+                // Casual users receive the update after 3 days of stability validation
+                const totalSessions = AppState.sessions ? AppState.sessions.length : 0;
+                const studyStreak = calculateStreaks().current;
+                const isPowerUser = totalSessions > 10 || studyStreak >= 2;
+                
+                let requiredWaitDays = 0;
+                if (!isPowerUser) {
+                    requiredWaitDays = 3;
+                }
+                
+                let diffDays = 0;
+                if (payload.build) {
+                    const buildParts = payload.build.split('-');
+                    const datePart = buildParts[0]; // e.g. "2026.06.19"
+                    const buildDate = new Date(datePart.replace(/\./g, '-'));
+                    if (!isNaN(buildDate.getTime())) {
+                        const now = new Date();
+                        diffDays = Math.floor((now - buildDate) / (1000 * 60 * 60 * 24));
+                    }
+                }
+                
+                if (diffDays >= requiredWaitDays) {
+                    processNewUpdate(payload);
+                } else {
+                    console.log(`[Phased Rollout] Update ${payload.version} deferred. Casual user logic active (Requires ${requiredWaitDays} days since release, currently at ${diffDays} days).`);
+                }
             }
         });
         
@@ -3530,6 +3870,7 @@ let focusMode = 'pomodoro'; // pomodoro, shortBreak, longBreak, stopwatch
 let focusState = 'stopped'; // stopped, running, paused
 let focusSecondsRemaining = 25 * 60;
 let focusStopwatchSeconds = 0;
+let focusLastTick = 0;
 
 function initFocusMode() {
     const startBtn = document.getElementById('focusStartBtn');
@@ -3614,22 +3955,32 @@ function initFocusMode() {
         pauseBtn.style.display = 'inline-block';
         logContainer.style.display = 'none';
         
+        focusLastTick = Date.now();
         focusTimerInterval = setInterval(() => {
-            if (focusMode === 'stopwatch') {
-                focusStopwatchSeconds++;
-                updateDisplay();
-            } else {
-                focusSecondsRemaining--;
-                updateDisplay();
-                if (focusSecondsRemaining <= 0) {
-                    clearInterval(focusTimerInterval);
-                    focusState = 'stopped';
-                    startBtn.style.display = 'inline-block';
-                    pauseBtn.style.display = 'none';
-                    showLogOptions();
+            const now = Date.now();
+            const diff = Math.floor((now - focusLastTick) / 1000);
+            
+            if (diff > 0) {
+                focusLastTick += diff * 1000;
+                
+                if (focusMode === 'stopwatch') {
+                    focusStopwatchSeconds += diff;
+                    updateDisplay();
+                } else {
+                    focusSecondsRemaining -= diff;
+                    if (focusSecondsRemaining < 0) focusSecondsRemaining = 0;
+                    updateDisplay();
+                    
+                    if (focusSecondsRemaining <= 0) {
+                        clearInterval(focusTimerInterval);
+                        focusState = 'stopped';
+                        startBtn.style.display = 'inline-block';
+                        pauseBtn.style.display = 'none';
+                        showLogOptions();
+                    }
                 }
             }
-        }, 1000);
+        }, 500); // 500ms for fast responsiveness, logic handles catch-up
     }
 
     function pauseTimer() {
@@ -3678,7 +4029,7 @@ function initFocusMode() {
             document.getElementById('logDateInput').value = new Date().toISOString().split('T')[0];
             document.getElementById('logHoursInput').value = Math.floor(mins / 60);
             document.getElementById('logMinutesInput').value = mins % 60;
-            document.getElementById('logNotesInput').value = focusMode === 'pomodoro' ? 'Pomodoro Session 🎯' : 'Focus Session 🎯';
+            document.getElementById('logNotesInput').value = focusMode === 'pomodoro' ? 'Pomodoro Session 🍅' : 'Focus Session 🎯';
             
             // Auto calculate end time = now, start time = now - duration
             const now = new Date();
@@ -3687,6 +4038,13 @@ function initFocusMode() {
             
             document.getElementById('logStartTimeInput').value = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
             document.getElementById('logEndTimeInput').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            
+            if (window._focusContextSubjectId) {
+                document.getElementById('logSubjectInput').value = window._focusContextSubjectId;
+                window._focusContextSubjectId = null; // Clear it so it doesn't leak
+                const display = document.getElementById('focusContextDisplay');
+                if (display) display.style.display = 'none';
+            }
             
             window._isLoggingFocusSession = true;
             document.getElementById('logSessionModal').classList.add('active');
@@ -3702,3 +4060,533 @@ function initFocusMode() {
 
     setMode('pomodoro');
 }
+
+// ==========================================
+// SCHEDULE LOGIC
+// ==========================================
+let currentScheduleTab = 'today';
+
+function initSchedule() {
+    document.getElementById('tabScheduleToday').addEventListener('click', () => setScheduleTab('today'));
+    document.getElementById('tabScheduleUpcoming').addEventListener('click', () => setScheduleTab('upcoming'));
+    document.getElementById('tabSchedulePast').addEventListener('click', () => setScheduleTab('past'));
+    
+    document.getElementById('addScheduleBtn').addEventListener('click', () => openScheduleModal());
+    document.getElementById('saveScheduleBtn').addEventListener('click', saveSchedulePlan);
+    
+    document.getElementById('closeScheduleModalBtn').addEventListener('click', () => {
+        document.getElementById('scheduleModal').classList.remove('active');
+    });
+
+    document.getElementById('scheduleTypeInput').addEventListener('change', updateScheduleExamAlert);
+    
+    document.getElementById('scheduleCourseInput').addEventListener('change', (e) => {
+        populateScheduleSubjects(e.target.value);
+        updateScheduleExamAlert();
+    });
+
+    document.getElementById('scheduleSubjectInput').addEventListener('change', (e) => {
+        populateScheduleTopics(e.target.value);
+    });
+
+    document.getElementById('scheduleTopicDropdown').addEventListener('change', (e) => {
+        // ... (removed custom topic logic)
+    });
+}
+
+function updateScheduleExamAlert() {
+    const type = document.getElementById('scheduleTypeInput').value;
+    const alertEl = document.getElementById('scheduleExamAlert');
+    if (!alertEl) return;
+    
+    if (type !== 'pending_topic') {
+        alertEl.style.display = 'none';
+        return;
+    }
+    
+    const course = document.getElementById('scheduleCourseInput').value;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    
+    let nextExam = null;
+    let minDiff = Infinity;
+    
+    EXAMS.forEach(exam => {
+        if (course === 'CSEB' && !exam.category.includes('CAT')) return;
+        if (course === 'ACCA' && !exam.category.includes('ACCA')) return;
+        
+        const examDate = new Date(exam.date);
+        const diffTime = examDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays >= 0 && diffDays < minDiff) {
+            minDiff = diffDays;
+            nextExam = exam;
+        }
+    });
+    
+    if (nextExam) {
+        alertEl.style.display = 'block';
+        alertEl.innerHTML = `🚨 <strong>Next Exam:</strong> ${course === 'CSEB' ? 'CSEB' : 'ACCA FR'} is in <strong>${minDiff} days!</strong>`;
+    } else {
+        alertEl.style.display = 'none';
+    }
+}
+
+function addCustomTopicToSyllabus(subjId, topicName) {
+    const subj = AppState.subjects.find(s => s.id === subjId);
+    if (!subj) return;
+    
+    const currentViewCourse = subj.course || 'CSEB';
+    const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
+    
+    if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
+        const key = Object.keys(AppState.csebSyllabus).find(k => {
+            const cleanK = k.toLowerCase();
+            return cleanName === cleanK || cleanName.includes(cleanK) || cleanK.includes(cleanName);
+        });
+        if (key) {
+            AppState.csebSyllabus[key].push({ name: topicName, completed: false, difficulty: 'Medium' });
+        } else {
+            AppState.csebSyllabus[subj.name] = [{ name: topicName, completed: false, difficulty: 'Medium' }];
+        }
+        saveData('csebSyllabus');
+    } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
+        const key = Object.keys(AppState.accaTopics).find(k => {
+            const cleanK = k.toLowerCase();
+            return cleanName === cleanK || cleanName.includes(cleanK) || cleanK.includes(cleanName);
+        });
+        if (key) {
+            AppState.accaTopics[key].push({ name: topicName, completed: false, difficulty: 'Medium' });
+        } else {
+            AppState.accaTopics[subj.name] = [{ name: topicName, completed: false, difficulty: 'Medium' }];
+        }
+        saveData('accaTopics');
+    }
+}
+
+function populateScheduleSubjects(course) {
+    const select = document.getElementById('scheduleSubjectInput');
+    select.innerHTML = '';
+    const filtered = AppState.subjects.filter(s => s.course === course || (!s.course && course === 'CSEB'));
+    filtered.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        select.appendChild(opt);
+    });
+    if(filtered.length > 0) {
+        populateScheduleTopics(filtered[0].id);
+    } else {
+        document.getElementById('scheduleTopicDropdown').innerHTML = '<option value="">-- Select a Topic (Optional) --</option>';
+    }
+}
+
+function populateScheduleTopics(subjId) {
+    const topicDropdown = document.getElementById('scheduleTopicDropdown');
+    topicDropdown.innerHTML = '<option value="">-- Select a Topic (Optional) --</option>';
+    
+    const subj = AppState.subjects.find(s => s.id === subjId);
+    if (!subj) return;
+    
+    let syllabusTopics = null;
+    const currentViewCourse = subj.course || 'CSEB';
+    const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
+    
+    if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
+        const key = Object.keys(AppState.csebSyllabus).find(k => {
+            const cleanK = k.toLowerCase();
+            return cleanName === cleanK || cleanName.includes(cleanK) || cleanK.includes(cleanName);
+        });
+        if (key) syllabusTopics = AppState.csebSyllabus[key];
+    } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
+        syllabusTopics = [].concat(...Object.values(AppState.accaTopics));
+    }
+    
+    if (syllabusTopics) {
+        syllabusTopics.forEach(t => {
+            const name = t.name || t.topic || t;
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            topicDropdown.appendChild(opt);
+        });
+    }
+}
+
+function setScheduleTab(tab) {
+    currentScheduleTab = tab;
+    ['tabScheduleToday', 'tabScheduleUpcoming', 'tabSchedulePast'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (id.toLowerCase().includes(tab)) {
+            el.style.background = 'var(--glass-bg)';
+            el.style.border = '1px solid var(--glass-border)';
+            el.style.color = 'var(--text-main)';
+            el.style.boxShadow = 'none';
+        } else {
+            el.style.background = 'transparent';
+            el.style.border = '1px solid transparent';
+            el.style.color = 'var(--text-muted)';
+            el.style.boxShadow = 'none';
+        }
+    });
+    renderScheduleList();
+}
+
+window.openScheduleModal = function(id = null) {
+    const modal = document.getElementById('scheduleModal');
+    if (id) {
+        const item = AppState.schedule.find(s => s.id === id);
+        if (!item) return;
+        document.getElementById('scheduleModalTitle').textContent = 'Edit Schedule Plan';
+        document.getElementById('scheduleIdInput').value = item.id;
+        document.getElementById('scheduleTypeInput').value = item.type;
+        document.getElementById('scheduleCourseInput').value = item.course || 'CSEB';
+        populateScheduleSubjects(item.course || 'CSEB');
+        if (item.subjectId) {
+            document.getElementById('scheduleSubjectInput').value = item.subjectId;
+            populateScheduleTopics(item.subjectId);
+            if (item.topic) document.getElementById('scheduleTopicDropdown').value = item.topic;
+        }
+        document.getElementById('scheduleTitleInput').value = item.title || '';
+        document.getElementById('scheduleDateInput').value = item.date;
+        document.getElementById('scheduleStartTimeInput').value = item.startTime;
+        document.getElementById('scheduleEndTimeInput').value = item.endTime;
+    } else {
+        document.getElementById('scheduleModalTitle').textContent = 'Add Schedule Plan';
+        document.getElementById('scheduleIdInput').value = '';
+        document.getElementById('scheduleTypeInput').value = 'study';
+        document.getElementById('scheduleCourseInput').value = 'CSEB';
+        populateScheduleSubjects('CSEB');
+        document.getElementById('scheduleTitleInput').value = '';
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('scheduleDateInput').value = today;
+        document.getElementById('scheduleStartTimeInput').value = '10:00';
+        document.getElementById('scheduleEndTimeInput').value = '11:00';
+    }
+    updateScheduleExamAlert();
+    modal.classList.add('active');
+};
+
+function saveSchedulePlan() {
+    const id = document.getElementById('scheduleIdInput').value;
+    const type = document.getElementById('scheduleTypeInput').value;
+    const course = document.getElementById('scheduleCourseInput').value;
+    const subjectId = document.getElementById('scheduleSubjectInput').value;
+    const topic = document.getElementById('scheduleTopicDropdown').value;
+    const title = document.getElementById('scheduleTitleInput').value.trim();
+    const date = document.getElementById('scheduleDateInput').value;
+    const startTime = document.getElementById('scheduleStartTimeInput').value;
+    const endTime = document.getElementById('scheduleEndTimeInput').value;
+    
+    if (!subjectId || !date || !startTime || !endTime) {
+        return alert("Please fill in all required fields (Subject, Date, Times).");
+    }
+    
+    if (id) {
+        const item = AppState.schedule.find(s => s.id === id);
+        if (item) {
+            item.type = type;
+            item.course = course;
+            item.subjectId = subjectId;
+            item.topic = topic;
+            item.title = title;
+            item.date = date;
+            item.startTime = startTime;
+            item.endTime = endTime;
+        }
+    } else {
+        AppState.schedule.push({
+            id: generateId(),
+            type,
+            course,
+            subjectId,
+            topic,
+            title,
+            date,
+            startTime,
+            endTime,
+            status: 'pending' // pending, completed
+        });
+    }
+    
+    saveData('schedule');
+    document.getElementById('scheduleModal').classList.remove('active');
+    renderScheduleList();
+    renderOverview();
+}
+
+window.deleteScheduleItem = function(id) {
+    if (!confirm('Are you sure you want to delete this scheduled plan?')) return;
+    AppState.schedule = AppState.schedule.filter(s => s.id !== id);
+    saveData('schedule');
+    renderScheduleList();
+    renderOverview();
+};
+
+window.missScheduleItem = function(id) {
+    const item = AppState.schedule.find(s => s.id === id);
+    if (!item) return;
+    item.status = 'missed';
+    saveData('schedule');
+    renderScheduleList();
+    renderOverview();
+};
+
+window.completeScheduleItem = function(id) {
+    const item = AppState.schedule.find(s => s.id === id);
+    if (!item) return;
+
+    // Auto-fill logSessionModal instead of silently logging
+    document.getElementById('logDateInput').value = item.date;
+    
+    const start = new Date(`${item.date}T${item.startTime}:00`);
+    let end = new Date(`${item.date}T${item.endTime}:00`);
+    if (end < start) end.setDate(end.getDate() + 1); // overnight
+    const diffMins = Math.round((end - start) / 60000);
+    
+    document.getElementById('logHoursInput').value = Math.floor(diffMins / 60);
+    document.getElementById('logMinutesInput').value = diffMins % 60;
+    
+    document.getElementById('logStartTimeInput').value = item.startTime;
+    document.getElementById('logEndTimeInput').value = item.endTime;
+    
+    const courseInput = document.getElementById('logCourseInput');
+    courseInput.value = item.course || 'CSEB';
+    populateLogSubjects(item.course || 'CSEB');
+    document.getElementById('logSubjectInput').value = item.subjectId;
+    populateLogTopics(item.subjectId);
+    
+    if (item.topic) document.getElementById('logTopicDropdown').value = item.topic;
+    document.getElementById('logNotesInput').value = item.title || '';
+    
+    window._completingScheduleId = id;
+    document.getElementById('logSessionModal').classList.add('active');
+    
+    // Dispatch input event to trigger preview
+    document.getElementById('logStartTimeInput').dispatchEvent(new Event('input'));
+};
+
+function renderScheduleList() {
+    const container = document.getElementById('scheduleListContainer');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    let filtered = AppState.schedule.filter(s => {
+        if (currentScheduleTab === 'today') return s.date === todayStr;
+        if (currentScheduleTab === 'upcoming') return s.date > todayStr;
+        if (currentScheduleTab === 'past') return s.date < todayStr;
+        return false;
+    });
+    
+    // Sort by date, then by time
+    filtered.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.startTime.localeCompare(b.startTime);
+    });
+    
+    if (filtered.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding: 40px 20px; color: var(--text-muted);">No plans scheduled for ${currentScheduleTab}.</div>`;
+        return;
+    }
+    
+    filtered.forEach(item => {
+        const isClass = item.type === 'class';
+        const isPending = item.type === 'pending_topic';
+        let color = 'var(--neon-blue)';
+        let icon = '📖';
+        if (isClass) { color = 'var(--neon-purple)'; icon = '🎥'; }
+        else if (isPending) { color = 'var(--neon-gold)'; icon = '⏳'; }
+        
+        const card = document.createElement('div');
+        card.style.background = 'var(--glass-bg)';
+        card.style.border = '1px solid var(--glass-border)';
+        card.style.borderLeft = `3px solid ${item.status === 'completed' ? 'var(--glass-border)' : color}`;
+        card.style.borderRadius = '12px';
+        card.style.padding = '15px';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.gap = '10px';
+        if (item.status === 'completed') card.style.opacity = '0.6';
+        
+        const subj = AppState.subjects.find(s => s.id === item.subjectId);
+        const subjName = subj ? subj.name : 'Unknown Subject';
+        const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');
+        
+        const formatTimeStr = (t) => {
+            let [h, m] = t.split(':').map(Number);
+            let ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return `${h}:${m.toString().padStart(2,'0')} ${ampm}`;
+        };
+        
+        const dateDisp = currentScheduleTab !== 'today' ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:5px;">${new Date(item.date).toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'})}</div>` : '';
+        
+        card.innerHTML = `
+            ${dateDisp}
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:30px; height:30px; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
+                    <div>
+                        <div style="font-weight:600; font-size:1.05rem; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${escapeHtml(displayTitle)}</div>
+                        <div style="font-size:0.85rem; color:var(--text-muted);">${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:5px;">
+                    ${item.status !== 'completed' ? `
+                        <button onclick="completeScheduleItem('${item.id}')" style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer;" title="Complete & Log">✓</button>
+                    ` : `<span style="color:var(--neon-green); font-size:0.8rem; border:1px solid var(--neon-green); border-radius:4px; padding:2px 6px;">Completed</span>`}
+                    <button onclick="openScheduleModal('${item.id}')" style="background:transparent; color:var(--neon-blue); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Edit">✎</button>
+                    <button onclick="deleteScheduleItem('${item.id}')" style="background:transparent; color:var(--neon-red); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Delete">×</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function renderOverviewScheduleWidget() {
+    const container = document.getElementById('overviewScheduleContainer');
+    if (!container) return;
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    let todayItems = AppState.schedule.filter(s => s.date === todayStr);
+    
+    if (todayItems.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:15px; color:var(--text-muted); font-size:0.9rem;">No plans scheduled for today.</div>`;
+        return;
+    }
+    
+    // Sort by time
+    todayItems.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    
+    // Take up to 3 items
+    const displayItems = todayItems.slice(0, 3);
+    
+    const formatTimeStr = (t) => {
+        let [h, m] = t.split(':').map(Number);
+        let ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `${h}:${m.toString().padStart(2,'0')} ${ampm}`;
+    };
+    
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    displayItems.forEach(item => {
+        const isClass = item.type === 'class';
+        const isPending = item.type === 'pending_topic';
+        let color = 'var(--neon-blue)';
+        let icon = '📖';
+        if (isClass) { color = 'var(--neon-purple)'; icon = '🎥'; }
+        else if (isPending) { color = 'var(--neon-gold)'; icon = '⏳'; }
+        
+        const subj = AppState.subjects.find(sub => sub.id === item.subjectId);
+        const courseStr = subj ? (subj.course || 'CSEB') : '';
+        
+        html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--glass-bg); padding:10px 12px; border-radius:10px; border-left: 3px solid ${item.status === 'completed' ? 'var(--glass-border)' : color}; ${item.status === 'completed' ? 'opacity:0.6;' : ''}">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:24px; height:24px; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:0.8rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
+                    <div>
+                        ${courseStr ? `<div style="font-size:0.65rem; color:${color}; font-weight:700; text-transform:uppercase; margin-bottom:2px; letter-spacing:0.5px;">${courseStr}</div>` : ''}
+                        <div style="font-size:0.9rem; font-weight:600; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${escapeHtml(item.title)}</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">
+                        ${formatTimeStr(item.startTime)}
+                    </div>
+                    ${(!isClass && item.status !== 'completed') ? `<button onclick="navigateTo('view-focus', {subjectId: '${item.subjectId}'})" style="background:var(--neon-blue); color:#000; border:none; padding:4px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; cursor:pointer;">FOCUS</button>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    if (todayItems.length > 3) {
+        html += `<div style="text-align:center; padding-top:5px; font-size:0.8rem; color:var(--neon-blue); cursor:pointer;" onclick="document.querySelector('.nav-item[data-target=\\'view-schedule\\']').click()">+ ${todayItems.length - 3} more</div>`;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// ==========================================
+// NOTIFICATIONS MODAL
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const openBtn = document.getElementById('openNotificationsModalBtn');
+    const closeBtn = document.getElementById('closeNotificationsModalBtn');
+    const modal = document.getElementById('notificationsModal');
+
+    if (openBtn) {
+        openBtn.addEventListener('click', () => {
+            renderNotifications();
+            if (modal) modal.classList.add('active');
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            if (modal) modal.classList.remove('active');
+        });
+    }
+    
+    // Give focus to scroll area on initial load for keyboard navigation
+    const mainContent = document.getElementById('mainContentArea');
+    if (mainContent) mainContent.focus();
+});
+
+// Tab Visibility handler to instantly refresh UI when user returns
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        // Force the interval to tick immediately if focus is running
+        if (typeof focusState !== 'undefined' && focusState === 'running' && typeof focusTimerInterval !== 'undefined') {
+            const now = Date.now();
+            const diff = Math.floor((now - focusLastTick) / 1000);
+            if (diff > 0) {
+                focusLastTick += diff * 1000;
+                if (typeof focusMode !== 'undefined' && focusMode === 'stopwatch') {
+                    focusStopwatchSeconds += diff;
+                    const display = document.getElementById('focusTimerDisplay');
+                    if (display) {
+                        const h = Math.floor(focusStopwatchSeconds / 3600);
+                        const m = Math.floor((focusStopwatchSeconds % 3600) / 60).toString().padStart(2, '0');
+                        const s = (focusStopwatchSeconds % 60).toString().padStart(2, '0');
+                        display.textContent = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+                    }
+                } else if (typeof focusSecondsRemaining !== 'undefined') {
+                    focusSecondsRemaining -= diff;
+                    if (focusSecondsRemaining < 0) focusSecondsRemaining = 0;
+                    
+                    const display = document.getElementById('focusTimerDisplay');
+                    if (display) {
+                        const h = Math.floor(focusSecondsRemaining / 3600);
+                        const m = Math.floor((focusSecondsRemaining % 3600) / 60).toString().padStart(2, '0');
+                        const s = (focusSecondsRemaining % 60).toString().padStart(2, '0');
+                        display.textContent = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+                    }
+                    
+                    if (focusSecondsRemaining <= 0 && typeof focusState !== 'undefined') {
+                        clearInterval(focusTimerInterval);
+                        focusState = 'stopped';
+                        document.getElementById('focusStartBtn').style.display = 'inline-block';
+                        document.getElementById('focusPauseBtn').style.display = 'none';
+                        const logContainer = document.getElementById('focusLogContainer');
+                        if (logContainer) logContainer.style.display = 'block';
+                    }
+                }
+            }
+        }
+        
+        // Ensure the dashboard overview updates instantly
+        const overview = document.getElementById('view-overview');
+        if (overview && overview.classList.contains('active')) {
+            if (typeof renderOverview === 'function') {
+                renderOverview();
+            }
+        }
+    }
+});

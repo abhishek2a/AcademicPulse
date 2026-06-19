@@ -1,18 +1,11 @@
 {
-  "version": "1.1.30",
-  "build": "2026.06.19",
+  "version": "v1.0.41",
+  "build": "2026.06.19-phased",
   "features": [
-    "<b>Welcome to AcademicPulse v1.1.30!</b> This update delivers a massive overhaul to our time-tracking interfaces for a frictionless logging experience, alongside a highly requested feature designed for deep work.",
-    "<b>🎯 What's New: Focus Mode</b>",
-    "<b>Dedicated Focus Tab:</b> We have introduced a brand new \"Focus\" tab under the Attendance section, giving you access to customizable Pomodoro, Short/Long Break, and Stopwatch study modes.",
-    "<b>Achievement Badges:</b> When you finish a Focus session, you can instantly log your time to earn a shiny gold <code>🎯 FOCUS</code> badge right on your dashboard's Recent Sessions table.",
-    "<b>⏱️ Time Input & UI Enhancements</b>",
-    "<b>Instant Duration Previews:</b> The duration preview now fires on the input event, meaning the calculated time updates instantly with every keystroke or scroll wheel change, eliminating the old lag.",
-    "<b>Native Theme Integration:</b> Time inputs now intelligently use <code>color-scheme: dark</code> (or <code>color-scheme: light</code> when in Light Mode) so your browser's native clock popup renders perfectly with your app's theme.",
-    "<b>Clock Icon Styling:</b> The time picker's clock icon has been upgraded with a blue tint and a new hover highlight for better visibility.",
-    "<b>Session Time Redesign:</b> The \"Session Time\" logging block features a cleaner layout with a visual Start → End arrow, and the calculated duration now appears inside a highlighted pill badge above the manual entry fields.",
-    "<b>🐛 Bug Fixes & Stability</b>",
-    "<b>Pre-filled Edit Modals:</b> When opening the Edit Session modal, the duration badge is now pre-calculated and displayed immediately based on your existing start and end times.",
-    "<b>Duplicate Event Handlers:</b> Fixed a bug where opening the Edit Session modal multiple times would stack duplicate event listeners; this was resolved by replacing standard listeners with <code>oninput</code> and <code>onchange</code> property assignments."
+    "<b>Welcome to AcademicPulse v1.0.41!</b> This update introduces our intelligent phased rollout engine.",
+    "<b>🚀 Phased Rollouts</b>",
+    "<b>Power Users First:</b> Our most active users with high streaks or session counts will now receive the newest cutting-edge updates immediately upon release.",
+    "<b>Stability for Casual Users:</b> Users who study less frequently will receive updates 3 days after the initial release to guarantee maximum stability.",
+    "<b>🏆 Achievements Modal:</b> We completely redesigned the Profile achievements section into a sleek scrollable Trophy Room that tracks all of your lifetime awards."
   ]
 }

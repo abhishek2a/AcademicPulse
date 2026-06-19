@@ -39,10 +39,10 @@
         <div class="nav-item" data-target="view-subjects"><span class="nav-icon">📚</span><span class="nav-text">Course</span></div>
         <div class="nav-item" data-target="view-attendance"><span class="nav-icon">📅</span><span class="nav-text">Attendance</span></div>
         <div class="nav-item" data-target="view-focus"><span class="nav-icon">🎯</span><span class="nav-text">Focus</span></div>
+        <div class="nav-item" data-target="view-schedule"><span class="nav-icon">🗓️</span><span class="nav-text">Schedule</span></div>
         <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Mocks</span></div>
         <div class="nav-item" data-target="view-analytics"><span class="nav-icon">📈</span><span class="nav-text">Analytics</span></div>
         <div class="nav-item" data-target="view-analyzer"><span class="nav-icon">🔍</span><span class="nav-text">Report Analyzer</span></div>
-        <div class="nav-item" data-target="view-notifications"><span class="nav-icon">🔔</span><span class="nav-text">Notifications</span></div>
         <div class="nav-item" data-target="view-search"><span class="nav-icon">🔎</span><span class="nav-text">Search</span></div>
         <div class="nav-item" id="nav-software-update" style="display: none; align-items: center; justify-content: space-between;" data-target="view-update">
             <div style="display: flex; align-items: center;">
@@ -54,7 +54,7 @@
         <div class="nav-item" data-target="view-profile"><span class="nav-icon">👤</span><span class="nav-text">Profile</span></div>
     </aside>
 
-    <main class="main-content">
+    <main class="main-content" id="mainContentArea" tabindex="-1">
         <div class="mobile-topbar">
             <h2>AcademicPulse</h2>
             <div>Hi, <span id="mobileTopUsername">User</span></div>
@@ -66,6 +66,8 @@
                 <h1 id="greetingTitle">Dashboard</h1>
                 <div class="date-display" id="currentDateDisplay"></div>
             </div>
+            
+            <div id="achievementsBannerOverview"></div>
 
             <!-- Exam Widgets -->
             <div id="examWidgetsContainer" class="exams-grid">
@@ -85,6 +87,19 @@
                 <div class="stat-card" style="text-align: center;">
                     <div class="stat-label">Today's Time</div>
                     <div class="stat-value text-blue" id="todayTimeVal">0m</div>
+                </div>
+            </div>
+
+            <!-- Dashboard Schedule Widget -->
+            <div class="card" style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                        <span style="color:var(--neon-blue);">🗓️</span> Today's Schedule
+                    </h3>
+                    <button class="btn btn-outline" onclick="document.querySelector('.nav-item[data-target=\'view-schedule\']').click()" style="padding: 4px 10px; font-size: 0.8rem;">View All</button>
+                </div>
+                <div id="overviewScheduleContainer">
+                    <div style="text-align:center; padding:15px; color:var(--text-muted); font-size:0.9rem;">No plans scheduled for today.</div>
                 </div>
             </div>
 
@@ -436,17 +451,17 @@
             </div>
 
             <!-- Performance Matrix -->
-            <div class="chart-card" style="margin-bottom: 30px; text-align: left; overflow-x: auto;">
+            <div class="chart-card" style="margin-bottom: 30px; text-align: left;">
                 <h3 style="margin-bottom: 20px;">Performance Matrix by Syllabus Area</h3>
-                <table style="width: 100%; min-width: 500px; border-collapse: collapse; text-align: left;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
                     <thead>
                         <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.85rem;">
-                            <th style="padding: 10px;">Area</th>
-                            <th style="padding: 10px;">Course</th>
-                            <th style="padding: 10px;">Accuracy</th>
-                            <th style="padding: 10px;">Mock Avg</th>
-                            <th style="padding: 10px;">Qs Done</th>
-                            <th style="padding: 10px;">Status</th>
+                            <th style="padding: 10px 5px;">Area</th>
+                            <th style="padding: 10px 5px;">Course</th>
+                            <th style="padding: 10px 5px;">Acc%</th>
+                            <th style="padding: 10px 5px;">Mock%</th>
+                            <th style="padding: 10px 5px;">Qs</th>
+                            <th style="padding: 10px 5px; text-align:right;">Status</th>
                         </tr>
                     </thead>
                     <tbody id="performanceMatrixBody">
@@ -536,20 +551,26 @@
             <div class="chart-card" style="margin-bottom: 30px; text-align: left;">
                 <h3 style="margin-bottom: 15px;">Log New Mock Test</h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group" style="grid-column: span 2;">
+                    <div class="form-group" style="grid-column: span 1;">
                         <label>Course</label>
                         <select id="mockCourseInput" class="form-input">
                             <option value="ACCA">ACCA</option>
                             <option value="CSEB">CSEB</option>
                         </select>
                     </div>
-                    <div class="form-group" style="grid-column: span 2;">
+                    <div class="form-group" style="grid-column: span 1;">
                         <label>Syllabus Area</label>
                         <select id="mockAreaInput" class="form-input">
                             <option value="">General</option>
                         </select>
                     </div>
-                    <div class="form-group" style="grid-column: span 2;">
+                    <div class="form-group" style="grid-column: span 1;">
+                        <label>Topic (Optional)</label>
+                        <select id="mockTopicInput" class="form-input">
+                            <option value="">All Topics</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 1;">
                         <label>Mock Exam Name</label>
                         <input type="text" id="mockNameInput" class="form-input" placeholder="e.g. Mock Test 1">
                     </div>
@@ -633,21 +654,6 @@
         </section>
 
         <!-- View: Notifications -->
-        <section id="view-notifications" class="view-section">
-            <div class="header" style="display: flex; justify-content: space-between; align-items: flex-end;">
-                <div>
-                    <h1>Notifications</h1>
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">Your recent activity and alerts.</p>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-outline" id="clearNotifsBtn" style="padding: 8px 15px; font-size: 0.85rem;">Clear All</button>
-                </div>
-            </div>
-            <div id="notificationsContainer" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
-                <!-- Notifications injected here -->
-            </div>
-        </section>
-
         <!-- View: Focus Mode -->
         <section id="view-focus" class="view-section">
             <div class="header" style="text-align: center; margin-bottom: 10px;">
@@ -655,6 +661,7 @@
                 <p style="color: var(--text-muted); font-size: 0.9rem; width: 100%;">Deep work sessions</p>
             </div>
             
+
             <div class="session-setup" style="margin: 0 auto; margin-bottom: 20px; max-width: 500px; text-align: center;">
                 <div class="timer-modes" style="justify-content: center; margin-bottom: 25px; flex-wrap: wrap;">
                     <button class="mode-btn active" id="modePomodoroBtn">Pomodoro</button>
@@ -684,11 +691,36 @@
             </div>
         </section>
 
+        <!-- View: Schedule -->
+        <section id="view-schedule" class="view-section">
+            <div class="header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <h1>Study Schedule</h1>
+                <button class="btn btn-primary" id="addScheduleBtn">
+                    <span>+ Add Plan</span>
+                </button>
+            </div>
+            
+            <div class="schedule-tabs" style="display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px;">
+                <button class="btn" id="tabScheduleToday" style="background: var(--glass-bg); border: 1px solid var(--glass-border);">Today</button>
+                <button class="btn" id="tabScheduleUpcoming" style="background: transparent; border: 1px solid transparent; color: var(--text-muted);">Upcoming</button>
+                <button class="btn" id="tabSchedulePast" style="background: transparent; border: 1px solid transparent; color: var(--text-muted);">Past</button>
+            </div>
+
+            <div id="scheduleListContainer" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Scheduled items populated here -->
+            </div>
+        </section>
+
         <!-- View: Search -->
         <section id="view-search" class="view-section">
-            <div class="header">
-                <h1>Global Search</h1>
-                <p style="color: var(--text-muted); font-size: 0.9rem;">Find sessions, mock tests, and subjects.</p>
+            <div class="header" style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <h1>Global Search</h1>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Find sessions, mock tests, and subjects.</p>
+                </div>
+                <button class="btn btn-outline" id="openNotificationsModalBtn" style="padding: 8px 12px; font-size: 1.1rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;" title="Notifications">
+                    🔔
+                </button>
             </div>
             
             <div class="form-group" style="margin-top: 20px; margin-bottom: 10px;">
@@ -720,6 +752,11 @@
                     <div style="width: 80px; height: 80px; background: var(--neon-blue); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--text-main); margin-bottom: 15px;" id="profileAvatar">U</div>
                     <h2 style="margin: 0;" id="profileDisplayName">User</h2>
                     <p style="color: var(--text-muted); margin-top: 5px;" id="profileEmail">user@example.com</p>
+                </div>
+                
+                <!-- Achievements Section -->
+                <div style="margin-bottom: 30px;">
+                    <button id="btnOpenAchievements" class="btn btn-outline" style="width: 100%; justify-content: center; font-size: 1.05rem;">🏆 View Your Achievements</button>
                 </div>
 
                 <!-- Theme Settings -->
@@ -876,6 +913,97 @@
     </div>
 
     <!-- Modals -->
+    <div class="modal-overlay" id="notificationsModal">
+        <div class="modal-card" style="max-height: 80vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0;">Notifications</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-outline" id="clearNotifsBtn" style="padding: 6px 12px; font-size: 0.85rem;">Clear All</button>
+                    <button class="btn btn-outline" id="closeNotificationsModalBtn" style="padding: 6px 12px; font-size: 0.85rem;">Close</button>
+                </div>
+            </div>
+            <div id="notificationsContainer" style="display: flex; flex-direction: column; gap: 15px; overflow-y: auto; padding-right: 5px;">
+                <!-- Notifications injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievements Modal -->
+    <div class="modal-overlay" id="achievementsModal">
+        <div class="modal-card" style="max-height: 85vh; display: flex; flex-direction: column; padding-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--glass-border);">
+                <h2 style="margin: 0;">Your Achievements</h2>
+                <button class="btn btn-outline" id="closeAchievementsModalBtn" style="padding: 6px 12px; font-size: 0.85rem;">Close</button>
+            </div>
+            <div id="achievementsBannerProfile" style="display: flex; flex-direction: column; gap: 15px; overflow-y: auto; padding-bottom: 20px; padding-right: 5px; scrollbar-width: none;">
+                <!-- Achievements injected here -->
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="scheduleModal">
+        <div class="modal-card">
+            <h2 style="margin-top: 0;" id="scheduleModalTitle">Add Schedule Plan</h2>
+            <input type="hidden" id="scheduleIdInput">
+            
+            <div class="form-group">
+                <label>Type</label>
+                <select id="scheduleTypeInput">
+                    <option value="study">Self Study</option>
+                    <option value="class">Class</option>
+                    <option value="pending_topic">Pending Topic</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Course</label>
+                    <select id="scheduleCourseInput" required>
+                        <option value="CSEB">CSEB</option>
+                        <option value="ACCA">ACCA</option>
+                    </select>
+                    <div id="scheduleExamAlert" style="margin-top: 6px; font-size: 0.75rem; color: var(--neon-gold); display: none;"></div>
+                </div>
+                <div class="form-group" style="flex: 2;">
+                    <label>Subject</label>
+                    <select id="scheduleSubjectInput" required>
+                        <!-- Injected options -->
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Syllabus Topic (Optional)</label>
+                <select id="scheduleTopicDropdown">
+                    <option value="">-- Select a Topic --</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Title / Notes (Optional)</label>
+                <input type="text" id="scheduleTitleInput" placeholder="e.g. Chapter 4 Review">
+            </div>
+            
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="scheduleDateInput">
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Start Time</label>
+                    <input type="time" id="scheduleStartTimeInput" style="width:100%;">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>End Time</label>
+                    <input type="time" id="scheduleEndTimeInput" style="width:100%;">
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="closeScheduleModalBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveScheduleBtn">Save</button>
+            </div>
+        </div>
+    </div>
     <div class="modal-overlay" id="subjectModal">
         <div class="modal-card">
             <h2 style="margin-top: 0;" id="subjectModalTitle">Add Subject</h2>

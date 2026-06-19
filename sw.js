@@ -1,21 +1,19 @@
-const CACHE_NAME = 'academicpulse-v1.1.30';
+const CACHE_NAME = 'academicpulse-v1.0.41';
 
 const STATIC_ASSETS = [
     'index.html',
-    'style.css?v=16',
-    'app.js?v=40',
-    'auth.js?v=10',
-    'export.js?v=9',
+    'style.css?v=18',
+    'app.js?v=42',
+    'auth.js?v=12',
+    'export.js?v=11',
     'manifest.json',
     'icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
-    // skipWaiting inside waitUntil so it's tracked as part of the install lifecycle
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(STATIC_ASSETS).catch(err => console.warn('Static assets cache warning:', err)))
-            .then(() => self.skipWaiting())
     );
 });
 

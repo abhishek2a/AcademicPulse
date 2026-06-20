@@ -1272,7 +1272,7 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, notes: s.notes, isFocusMode: s.isFocusMode });
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, isFocusMode: s.isFocusMode });
     });
 
     // Build HTML with placeholders, then fill in user-supplied text safely via textContent
@@ -1289,6 +1289,7 @@ function renderDayReport(dateKey) {
                     <button onclick="deleteSession('${d.id}')" style="background:transparent; border:none; color:var(--neon-red); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Delete Session">×</button>
                 </div>
             </div>
+            <div class="rsi-topic-${i}" style="font-size:0.85rem; font-weight:600; color:var(--text-main); margin-bottom:2px;"></div>
             <div class="rsi-notes-${i} report-session-notes"></div>
         </div>
     `).join('');
@@ -1314,8 +1315,26 @@ function renderDayReport(dateKey) {
     sessionDataForRender.forEach((d, i) => {
         const subjEl = content.querySelector(`.rsi-subj-${i}`);
         if (subjEl) subjEl.textContent = d.subjName;
+        
+        const topicEl = content.querySelector(`.rsi-topic-${i}`);
+        if (topicEl) {
+            if (d.topic) {
+                topicEl.textContent = `Topic: ${d.topic}`;
+                topicEl.style.display = 'block';
+            } else {
+                topicEl.style.display = 'none';
+            }
+        }
+        
         const notesEl = content.querySelector(`.rsi-notes-${i}`);
-        if (notesEl) notesEl.textContent = d.notes || 'No notes';
+        if (notesEl) {
+            if (d.notes) {
+                notesEl.textContent = d.notes;
+                notesEl.style.display = 'block';
+            } else {
+                notesEl.style.display = 'none';
+            }
+        }
     });
 }
 
@@ -4466,15 +4485,15 @@ function renderScheduleList() {
         
         card.innerHTML = `
             ${dateDisp}
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div style="width:30px; height:30px; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
-                    <div>
-                        <div style="font-weight:600; font-size:1.05rem; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${escapeHtml(displayTitle)}</div>
-                        <div style="font-size:0.85rem; color:var(--text-muted);">${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}</div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px;">
+                <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
+                    <div style="width:30px; height:30px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight:600; font-size:1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
+                        <div style="font-size:0.85rem; color:var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}</div>
                     </div>
                 </div>
-                <div style="display:flex; gap:5px;">
+                <div style="display:flex; gap:5px; flex-shrink: 0;">
                     ${item.status !== 'completed' ? `
                         <button onclick="completeScheduleItem('${item.id}')" style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer;" title="Complete & Log">✓</button>
                     ` : `<span style="color:var(--neon-green); font-size:0.8rem; border:1px solid var(--neon-green); border-radius:4px; padding:2px 6px;">Completed</span>`}
@@ -4525,15 +4544,15 @@ function renderOverviewScheduleWidget() {
         const courseStr = subj ? (subj.course || 'CSEB') : '';
         
         html += `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--glass-bg); padding:10px 12px; border-radius:10px; border-left: 3px solid ${item.status === 'completed' ? 'var(--glass-border)' : color}; ${item.status === 'completed' ? 'opacity:0.6;' : ''}">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div style="width:24px; height:24px; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:0.8rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
-                    <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; background:var(--glass-bg); padding:10px 12px; border-radius:10px; border-left: 3px solid ${item.status === 'completed' ? 'var(--glass-border)' : color}; ${item.status === 'completed' ? 'opacity:0.6;' : ''}">
+                <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
+                    <div style="width:24px; height:24px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:0.8rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
+                    <div style="flex: 1; min-width: 0;">
                         ${courseStr ? `<div style="font-size:0.65rem; color:${color}; font-weight:700; text-transform:uppercase; margin-bottom:2px; letter-spacing:0.5px;">${courseStr}</div>` : ''}
-                        <div style="font-size:0.9rem; font-weight:600; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${escapeHtml(item.title)}</div>
+                        <div style="font-size:0.9rem; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
                     </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:10px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-shrink: 0;">
                     <div style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">
                         ${formatTimeStr(item.startTime)}
                     </div>

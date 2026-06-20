@@ -4579,6 +4579,58 @@ function renderOverviewScheduleWidget() {
 }
 
 // ==========================================
+// DRAG-TO-SCROLL UTILITY FOR TOUCHPADS
+// ==========================================
+function makeDraggableScrollable(el) {
+    if (!el) return;
+    let isDown = false;
+    let startX, startY, scrollLeft, scrollTop;
+
+    el.style.cursor = 'grab';
+
+    el.addEventListener('mousedown', (e) => {
+        isDown = true;
+        el.style.cursor = 'grabbing';
+        startX = e.pageX - el.offsetLeft;
+        startY = e.pageY - el.offsetTop;
+        scrollLeft = el.scrollLeft;
+        scrollTop = el.scrollTop;
+    });
+
+    el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = 'grab'; });
+    el.addEventListener('mouseup', () => { isDown = false; el.style.cursor = 'grab'; });
+
+    el.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - el.offsetLeft;
+        const y = e.pageY - el.offsetTop;
+        const walkX = (x - startX) * 1.5;
+        const walkY = (y - startY) * 1.5;
+        el.scrollLeft = scrollLeft - walkX;
+        el.scrollTop = scrollTop - walkY;
+    });
+
+    // Translate vertical wheel to horizontal if it's a primarily horizontal container
+    if (el.id === 'searchFilters' || el.style.overflowX === 'auto') {
+        el.addEventListener('wheel', (e) => {
+            if (e.deltaY !== 0 && e.deltaX === 0) {
+                e.preventDefault();
+                el.scrollLeft += e.deltaY;
+            }
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Apply draggable scrolling to modals and hidden-scrollbar areas
+    makeDraggableScrollable(document.getElementById('notificationsContainer'));
+    makeDraggableScrollable(document.getElementById('achievementsBannerProfile'));
+    makeDraggableScrollable(document.getElementById('searchFilters'));
+    makeDraggableScrollable(document.querySelector('.study-heatmap-container'));
+});
+
+// ==========================================
 // NOTIFICATIONS MODAL
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {

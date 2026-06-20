@@ -4600,15 +4600,24 @@ function makeDraggableScrollable(el) {
     el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = 'grab'; });
     el.addEventListener('mouseup', () => { isDown = false; el.style.cursor = 'grab'; });
 
+    let ticking = false;
+
     el.addEventListener('mousemove', (e) => {
         if (!isDown) return;
         e.preventDefault();
-        const x = e.pageX - el.offsetLeft;
-        const y = e.pageY - el.offsetTop;
-        const walkX = (x - startX) * 1.5;
-        const walkY = (y - startY) * 1.5;
-        el.scrollLeft = scrollLeft - walkX;
-        el.scrollTop = scrollTop - walkY;
+        
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                const x = e.pageX - el.offsetLeft;
+                const y = e.pageY - el.offsetTop;
+                const walkX = (x - startX) * 1.5;
+                const walkY = (y - startY) * 1.5;
+                el.scrollLeft = scrollLeft - walkX;
+                el.scrollTop = scrollTop - walkY;
+                ticking = false;
+            });
+            ticking = true;
+        }
     });
 
     // Translate vertical wheel to horizontal if it's a primarily horizontal container

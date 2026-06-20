@@ -79,10 +79,17 @@ const AppState = {
     notifications: [],
     schedule: [],
     achievements: [],
-    currentVersion: 'v1.0.40',
+    currentVersion: 'v1.0.45',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
+};
+
+// Global Memory Cache for expensive parsed data
+const appCache = {
+    analytics: null,
+    sessionsHash: null,
+    analyticsVersion: 1
 };
 
 // ==========================================
@@ -188,7 +195,7 @@ function loadData() {
     AppState.schedule = Storage.get(STORAGE_KEYS.SCHEDULE, []);
     AppState.achievements = Storage.get(STORAGE_KEYS.ACHIEVEMENTS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.40', availableUpdate: null, dataVersion: 2 });
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.45', availableUpdate: null, dataVersion: 2 });
     AppState.currentVersion = sysState.currentVersion;
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
@@ -362,15 +369,19 @@ window.showWhatsNewPopup = async function() {
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
         features = [
-            "<b>Welcome to AcademicPulse v1.0.40!</b> This is a major update bringing an entirely new interconnected experience and a background gamification engine.",
-            "<b>🏆 Gamification Engine</b>",
-            "<b>The 100-Hour Club:</b> Secret achievement unlocked when you surpass 100 hours of study time.",
-            "<b>Flawless Week:</b> Hit your daily goal 7 days in a row to earn this streak badge.",
-            "<b>Mock Master:</b> Score above 85% on 3 consecutive mocks in a single subject.",
-            "<b>Premium Banners:</b> New achievements trigger a beautiful glowing banner that cleanly disappears after 24 hours.",
+            "<b>Welcome to AcademicPulse v1.0.45!</b> This major update brings an entirely new interconnected experience, a background gamification engine, and our intelligent phased rollout system to ensure stability.",
+            "<b>🏆 Gamification Engine & Achievements</b>",
+            "<b>The 100-Hour Club:</b> A secret achievement is now unlocked when you successfully surpass 100 hours of total study time.",
+            "<b>Flawless Week:</b> You can now earn a dedicated streak badge by hitting your daily goal 7 days in a row.",
+            "<b>Mock Master:</b> Score above 85% on 3 consecutive mock exams within a single subject to earn this new title.",
+            "<b>Premium Banners:</b> New achievements will trigger a beautiful glowing banner on your dashboard that cleanly disappears after 24 hours.",
+            "<b>Trophy Room Modal:</b> We completely redesigned the Profile achievements section into a sleek, scrollable Trophy Room that tracks all of your lifetime awards.",
             "<b>🔗 Interconnected UI & Smart Routing</b>",
-            "<b>Contextual Workflows:</b> All pages are now heavily integrated. You can instantly jump from Subjects to Analytics, from Analytics Weak Areas straight into Focus Mode, or from low Attendance straight into Schedule planning.",
-            "<b>Smart Auto-fill:</b> Jumping into Focus Mode from any 'Practice Now' or 'Focus' button smartly passes the subject context so you don't have to manually select your subject when logging the session."
+            "<b>Contextual Workflows:</b> All pages are now heavily integrated, allowing you to instantly jump from Subjects to Analytics, from Analytics Weak Areas straight into Focus Mode, or from low Attendance straight into Schedule planning.",
+            "<b>Smart Auto-fill:</b> Jumping into Focus Mode from any 'Practice Now' or 'Focus' button smartly passes the subject context so you don't have to manually select your subject when logging the session.",
+            "<b>🚀 Phased Rollout Engine</b>",
+            "<b>Power Users First:</b> Our most active users with high streaks or high session counts will now receive the newest cutting-edge updates immediately upon release.",
+            "<b>Stability for Casual Users:</b> To guarantee maximum stability, users who study less frequently will receive updates 3 days after the initial release."
         ];
     }
     const list = document.getElementById('whatsNewModalList');
@@ -683,7 +694,8 @@ function renderSubjects() {
     grid.innerHTML = '';
     
     // Use analyticsCache to avoid re-iterating all sessions
-    const subjectTotals = AppState.analyticsCache ? AppState.analyticsCache.subjTotals : {};
+    if (!appCache.analytics) rebuildAnalyticsCache();
+    const subjectTotals = appCache.analytics.data.subjTotals || {};
 
     const filteredSubjects = AppState.subjects.filter(s => s.course === currentViewCourse || (!s.course && currentViewCourse === 'CSEB'));
 
@@ -1009,7 +1021,7 @@ function renderOverview() {
         tbody.innerHTML = '';
         const recent = [...AppState.sessions].sort((a,b) => new Date(b.startTime) - new Date(a.startTime)).slice(0, 5);
         
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = TimeUtils.getDateKey(new Date());
         const now = new Date();
         const nowTimeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
         
@@ -1207,7 +1219,7 @@ function renderDayReport(dateKey) {
     
     // Add Pending Scheduled Items for this day
     const now = new Date();
-    const todayKey = now.toISOString().split('T')[0];
+    const todayKey = TimeUtils.getDateKey(now);
     const nowTimeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
     
     const pendingSchedule = AppState.schedule.filter(s => s.date === dateKey && s.status === 'pending');
@@ -1243,7 +1255,7 @@ function renderDayReport(dateKey) {
                     <div style="font-size:0.85rem; color:var(--text-muted);">${noteOrTopic}</div>
                     <div style="display:flex; gap: 5px;">
                         <button style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="completeScheduleItem('${item.id}')">✓ Log</button>
-                        <button style="background:rgba(255,69,58,0.15); color:var(--neon-red); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="missScheduleItem('${item.id}')">✕</button>
+                        <button style="background:rgba(255,69,58,0.15); color:var(--neon-red); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="deleteScheduleItem('${item.id}')">✕</button>
                     </div>
                 </div>
             </div>
@@ -1394,12 +1406,13 @@ let monthlyAttendanceBarChartInst = null;
 function renderAnalytics() {
     const now = new Date();
 
-    // Always rebuild the cache fresh so it reflects current AppState.sessions
+    // Lazy load analytics - only build when the user opens the tab
     rebuildAnalyticsCache();
-    const cache = AppState.analyticsCache;
+    const cache = appCache.analytics.data;
     
-    // Smart insights runs independently — don't let it crash the main render
+    // Smart insights runs independently - don't let it crash the main render
     try { generateSmartInsights(); } catch(e) { console.warn('generateSmartInsights error:', e); }
+    try { generateAICoachAnalysis('general'); } catch(e) { console.warn('generateAICoachAnalysis error:', e); }
     
     // Core aggregates
     const { totalSecs, todaySecs, weekSecs, monthSecs, subjTotals, dailyData, monthlyData } = cache;
@@ -1436,6 +1449,17 @@ function renderAnalytics() {
     if(e('distWeek')) e('distWeek').textContent = TimeUtils.formatHours(weekSecs);
     if(e('distMonth')) e('distMonth').textContent = TimeUtils.formatHours(monthSecs);
     if(e('distAll')) e('distAll').textContent = TimeUtils.formatHours(totalSecs);
+    
+    if (document.getElementById('analyticsMonthTotal')) {
+        document.getElementById('analyticsMonthTotal').textContent = TimeUtils.formatDuration(cache.monthSecs);
+    }
+
+    // Display Last Updated timestamp
+    const updatedEl = document.getElementById('analyticsLastUpdated');
+    if (updatedEl && appCache.analytics) {
+        const diffMins = Math.floor((Date.now() - appCache.analytics.generatedAt) / 60000);
+        updatedEl.innerHTML = `Analytics Updated: <b>${diffMins === 0 ? 'Just now' : diffMins + ' min ago'}</b>`;
+    }
 
     // Subject Analytics
     let mostSubj = null, leastSubj = null;
@@ -1727,8 +1751,8 @@ function renderAnalytics() {
 let liveClassTrendChartInst = null;
 
 function renderLiveClassAnalytics() {
-    if (!AppState.analyticsCache) return;
-    const lc = AppState.analyticsCache.liveClass;
+    if (!appCache.analytics) rebuildAnalyticsCache();
+    const lc = appCache.analytics.data.liveClass;
     if (!lc) return;
 
     const e = id => document.getElementById(id);
@@ -1854,6 +1878,43 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
         });
     }
 
+    // AI Suggestion Logic
+    const aiSubjectEl = document.getElementById('aiSuggestedSubject');
+    const aiInsightEl = document.getElementById('aiSuggestedInsight');
+    
+    if (aiSubjectEl && aiInsightEl) {
+        if (AppState.subjects.length === 0) {
+            aiSubjectEl.textContent = 'No Subjects';
+            aiInsightEl.textContent = 'Add subjects to get AI recommendations.';
+        } else {
+            // Suggest the subject with the LEAST amount of study time today/week to keep them balanced
+            const subjectsScores = AppState.subjects.map(subj => {
+                let recentTime = 0;
+                AppState.sessions.forEach(s => {
+                    if (s.subjectId === subj.id) {
+                        const d = new Date(s.startTime);
+                        const diffDays = (new Date() - d) / (1000 * 60 * 60 * 24);
+                        if (diffDays <= 7) {
+                            recentTime += (s.duration || (s.durationMinutes ? s.durationMinutes * 60 : 0));
+                        }
+                    }
+                });
+                return { subj, recentTime };
+            });
+            
+            subjectsScores.sort((a, b) => a.recentTime - b.recentTime);
+            const recommended = subjectsScores[0].subj;
+            
+            aiSubjectEl.textContent = recommended.name;
+            
+            if (subjectsScores[0].recentTime === 0) {
+                aiInsightEl.innerHTML = `You haven't touched this subject in the last 7 days! <br/><b>Time for a quick revision session!</b>`;
+            } else {
+                aiInsightEl.innerHTML = `This is your least studied subject this week. <br/><b>Spend 30 mins to keep it fresh in your mind.</b>`;
+            }
+        }
+    }
+
     const attBarCtx = document.getElementById('monthlyAttendanceBarChart');
     if (attBarCtx) {
         if (monthlyAttendanceBarChartInst) monthlyAttendanceBarChartInst.destroy();
@@ -1880,6 +1941,11 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
     const pieCtx = document.getElementById('subjectPieChart');
     if (pieCtx) {
         if (subjectPieChartInst) subjectPieChartInst.destroy();
+        
+        if (!appCache.analytics || !appCache.analytics.data) rebuildAnalyticsCache();
+        const cache = appCache.analytics.data;
+        if (!appCache.analytics) rebuildAnalyticsCache();
+        
         const labels = subjArr.map(s => { const b=AppState.subjects.find(x=>x.id===s.id); return b?b.name:'-'; });
         const data = subjArr.map(s => s.dur/3600);
         const colors = subjArr.map(s => { const b=AppState.subjects.find(x=>x.id===s.id); return b?b.color:'#555'; });
@@ -1896,13 +1962,13 @@ function renderConsistencyHeatmap() {
     if (!grid) return;
 
     // Ensure cache is built before reading it
-    if (!AppState.analyticsCache) rebuildAnalyticsCache();
+    if (!appCache.analytics) rebuildAnalyticsCache();
     
     const now = new Date();
     const startDate = new Date();
     startDate.setDate(now.getDate() - 120);
     
-    const studyMap = (AppState.analyticsCache && AppState.analyticsCache.dailyData) || {};
+    const studyMap = appCache.analytics.data.dailyData || {};
 
     
     let bestDur = 0, bestDay = null;
@@ -1932,6 +1998,152 @@ function renderConsistencyHeatmap() {
     }
 }
 
+function generateAICoachAnalysis(type) {
+    const el = document.getElementById('aiCoachContent');
+    if (!el) return;
+
+    if (!AppState.sessions || AppState.sessions.length === 0) {
+        el.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Start logging sessions to get AI coaching.</div>';
+        return;
+    }
+
+    el.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Analyzing your data...</div>';
+
+    // Removed artificial delay for instant responsiveness
+    requestAnimationFrame(() => {
+        let insight = "";
+        
+        // 1. Analyze Subjects & Topics
+        const subjTotals = {};
+        const topicSet = new Set();
+        AppState.sessions.forEach(s => {
+            const d = (s.duration || (s.durationMinutes ? s.durationMinutes * 60 : 0));
+            if(!subjTotals[s.subjectId]) subjTotals[s.subjectId] = 0;
+            subjTotals[s.subjectId] += d;
+            if (s.topic) topicSet.add(s.topic.toLowerCase());
+        });
+        
+        let bestSubj = null; let bestTime = 0;
+        let worstSubj = null; let worstTime = Infinity;
+        Object.keys(subjTotals).forEach(id => {
+            if(subjTotals[id] > bestTime) { bestTime = subjTotals[id]; bestSubj = id; }
+            if(subjTotals[id] < worstTime) { worstTime = subjTotals[id]; worstSubj = id; }
+        });
+        const bName = bestSubj ? (AppState.subjects.find(s=>s.id===bestSubj)?.name || 'Unknown') : '';
+        const wName = worstSubj ? (AppState.subjects.find(s=>s.id===worstSubj)?.name || 'Unknown') : '';
+
+        // 2. Analyze Attendance (Last 30 Days)
+        const now = new Date();
+        let presentDays = 0; let totalRecordedDays = 0;
+        for (let i = 0; i < 30; i++) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const k = TimeUtils.getDateKey(d);
+            if (AppState.attendance[k]) {
+                totalRecordedDays++;
+                if (AppState.attendance[k] === 'present') presentDays++;
+            }
+        }
+        const attendanceRate = totalRecordedDays > 0 ? (presentDays / totalRecordedDays) * 100 : 0;
+
+        // 3. Analyze Mock Tests
+        let avgMockScore = 0;
+        if (AppState.mockTests && AppState.mockTests.length > 0) {
+            const recentMocks = AppState.mockTests.slice(-3);
+            const totalScore = recentMocks.reduce((acc, m) => acc + (m.score / m.maxScore), 0);
+            avgMockScore = (totalScore / recentMocks.length) * 100;
+        }
+
+        // 4. Analyze Schedule (Last 7 Days)
+        let scheduleCompletes = 0; let scheduleTotal = 0;
+        if (AppState.schedule) {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            AppState.schedule.forEach(s => {
+                const sDate = new Date(s.date);
+                if (sDate >= sevenDaysAgo && sDate <= now) {
+                    scheduleTotal++;
+                    if (s.completed) scheduleCompletes++;
+                }
+            });
+        }
+        const scheduleRate = scheduleTotal > 0 ? (scheduleCompletes / scheduleTotal) * 100 : 0;
+
+        // Streaks
+        const streaks = calculateStreaks();
+
+        if (type === 'general') {
+            insight = `<b style="color:var(--neon-blue); font-size:1.1rem;">Holistic Performance Review</b><br/><br/>`;
+            
+            if (streaks.current > 0) {
+                insight += `<span style="font-size:1.1rem;">🔥</span> You're riding a <b>${streaks.current}-day streak</b>! Consistency is the ultimate key to passing exams. `;
+            } else {
+                insight += `<span style="font-size:1.1rem;">⚠️</span> You broke your streak recently. Today is the perfect day to start a new one! `;
+            }
+            
+            if (totalRecordedDays > 5) {
+                insight += `Your 30-day attendance rate is <b>${attendanceRate.toFixed(0)}%</b>. `;
+                if (attendanceRate > 80) insight += `You are showing phenomenal discipline! `;
+                else insight += `Try to aim for above 80% to ensure steady progress. `;
+            }
+
+            if (topicSet.size > 0) {
+                insight += `<br/><br/><span style="font-size:1.1rem;">📚</span> You've explored <b>${topicSet.size} unique topics</b> across your subjects, ensuring broad syllabus coverage. `;
+            }
+            
+            if (avgMockScore > 0) {
+                insight += `Your recent mock exams average a solid <b>${avgMockScore.toFixed(0)}%</b>.`;
+            }
+        } else if (type === 'strengths') {
+            insight = `<b style="color:var(--neon-green); font-size:1.1rem;">Your Superpowers</b><br/><br/>`;
+            
+            if (bName) {
+                insight += `<span style="font-size:1.1rem;">⭐</span> <b>Deep Focus:</b> You have incredible dedication when studying <b>${bName}</b> (${(bestTime/3600).toFixed(1)} hours). It is clearly your strongest domain. `;
+            }
+            
+            if (scheduleTotal > 0 && scheduleRate >= 75) {
+                insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Exceptional Planner:</b> You completed <b>${scheduleRate.toFixed(0)}%</b> of your scheduled tasks this week. Your time management is top-tier! `;
+            }
+            
+            if (avgMockScore >= 75) {
+                insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Exam Readiness:</b> With a recent mock average of ${avgMockScore.toFixed(0)}%, you are proving that you can perform under pressure.`;
+            } else if (streaks.longest > 3) {
+                insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Grit & Discipline:</b> You've proven you can maintain focus with a personal best streak of <b>${streaks.longest} days</b>.`;
+            }
+        } else if (type === 'weaknesses') {
+            insight = `<b style="color:var(--neon-red); font-size:1.1rem;">Areas for Growth</b><br/><br/>`;
+            
+            if (wName && wName !== bName) {
+                insight += `<span style="font-size:1.1rem;">🎯</span> <b>Procrastination Alert:</b> You are heavily avoiding <b>${wName}</b> (only ${(worstTime/3600).toFixed(1)} hours). Procrastination often hides behind the subjects we find most difficult. Tackle this subject first thing tomorrow morning! `;
+            }
+            
+            if (scheduleTotal > 0 && scheduleRate < 50) {
+                insight += `<br/><br/><span style="font-size:1.1rem;">🎯</span> <b>Planning Fallacy:</b> You only completed <b>${scheduleRate.toFixed(0)}%</b> of your scheduled tasks this week. You might be scheduling too much at once. Try scheduling fewer, highly-focused blocks instead. `;
+            }
+            
+            if (topicSet.size > 0 && topicSet.size <= 3 && Object.keys(subjTotals).length > 1) {
+                insight += `<br/><br/><span style="font-size:1.1rem;">🎯</span> <b>Tunnel Vision:</b> You've spent a lot of time recently but only covered <b>${topicSet.size} topics</b>. Make sure you aren't ignoring the rest of your syllabus!`;
+            }
+            
+            if (totalRecordedDays > 5 && attendanceRate < 60) {
+                insight += `<br/><br/><span style="font-size:1.1rem;">🎯</span> <b>Inconsistent Routine:</b> Your attendance rate is dropping (${attendanceRate.toFixed(0)}%). Remember, studying 2 hours every day is far better than studying 10 hours on one day!`;
+            }
+        }
+
+        el.innerHTML = insight;
+        
+        // Highlight active button using CSS classes
+        const buttons = el.parentElement.parentElement.querySelectorAll('.ai-coach-btn');
+        buttons.forEach(b => {
+            if (b.getAttribute('data-type') === type) {
+                b.classList.add('active-prompt');
+            } else {
+                b.classList.remove('active-prompt');
+            }
+        });
+    }, 600); // Fake AI loading delay
+}
+
 function generateSmartInsights() {
     const container = document.getElementById('smartInsightsContainer');
     if (!container) return;
@@ -1957,8 +2169,13 @@ function generateSmartInsights() {
         if (!raw) return;
         const d = new Date(raw);
         if (isNaN(d.getTime())) return;
-        const dur = s.duration || ((new Date(s.endTime) - d) / 1000);
-        if (!dur || dur <= 0) return;
+        
+        let dur = parseFloat(s.duration);
+        if (isNaN(dur) || dur <= 0) {
+            const endDate = new Date(s.endTime);
+            if (!isNaN(endDate.getTime())) dur = (endDate - d) / 1000;
+        }
+        if (isNaN(dur) || dur <= 0 || !isFinite(dur)) return;
         
         if (TimeUtils.getDateKey(d) === todayStr) {
             todaySecs += dur;
@@ -2191,6 +2408,7 @@ function initRetrospectiveLogging() {
         addNotification('Session Logged', `Logged ${(durationSecs / 3600).toFixed(1)} hours for ${subjName}.`, 'success');
         
         document.getElementById('logSessionModal').classList.remove('active');
+        rebuildAnalyticsCache(true); // Force cache invalidation on new session
         renderOverview();
         renderAttendance();
         renderDayReport(dateKey);
@@ -2321,8 +2539,15 @@ function initTheme() {
 // ==========================================
 // INITIALIZATION
 // ==========================================
-function rebuildAnalyticsCache() {
-    const cache = {
+function rebuildAnalyticsCache(force = false) {
+    const currentHash = AppState.sessions.length + "-" + (AppState.sessions.length > 0 ? AppState.sessions[AppState.sessions.length - 1].id : "empty");
+    
+    // Memory Cache hit check
+    if (!force && appCache.analytics && appCache.analytics.version === appCache.analyticsVersion && appCache.sessionsHash === currentHash) {
+        return; // Bypass expensive O(n) loop!
+    }
+
+    const cacheData = {
         totalSecs: 0,
         todaySecs: 0,
         weekSecs: 0,
@@ -2330,13 +2555,12 @@ function rebuildAnalyticsCache() {
         subjTotals: {},
         dailyData: {},
         monthlyData: {},
-        // Live class tracking
         liveClass: {
             totalCount: 0,
             totalSecs: 0,
             monthCount: 0,
-            bySubject: {},   // subjectId -> { count, totalSecs }
-            byWeek: {}       // weekKey -> count
+            bySubject: {},
+            byWeek: {}
         }
     };
     
@@ -2346,39 +2570,37 @@ function rebuildAnalyticsCache() {
     const thisMonthKey = TimeUtils.getMonthKey(now);
     
     AppState.sessions.forEach(s => {
-        // Resolve date — some older sessions may use `date` instead of `startTime`
         const rawStart = s.startTime || s.date;
-        if (!rawStart) return; // skip sessions with no date at all
+        if (!rawStart) return; 
 
         const startDate = new Date(rawStart);
-        if (isNaN(startDate.getTime())) return; // skip sessions with invalid date
+        if (isNaN(startDate.getTime())) return; 
 
         const dKey = TimeUtils.getDateKey(startDate);
         const wKey = TimeUtils.getWeekKey(startDate);
         const mKey = TimeUtils.getMonthKey(startDate);
 
-        // Resolve duration — prefer explicit duration, fallback to end-start diff
-        let dur = s.duration;
-        if (!dur || dur <= 0) {
+        // Fortified duration parsing to strictly prevent NaN/Infinity
+        let dur = parseFloat(s.duration);
+        if (isNaN(dur) || dur <= 0) {
             const endDate = new Date(s.endTime);
             if (!isNaN(endDate.getTime())) {
                 dur = (endDate - startDate) / 1000;
             }
         }
-        if (!dur || dur <= 0) return; // skip sessions with no usable duration
+        if (isNaN(dur) || dur <= 0 || !isFinite(dur)) return; 
         
-        cache.totalSecs += dur;
-        if (dKey === todayKey) cache.todaySecs += dur;
-        if (wKey === thisWeekKey) cache.weekSecs += dur;
-        if (mKey === thisMonthKey) cache.monthSecs += dur;
+        cacheData.totalSecs += dur;
+        if (dKey === todayKey) cacheData.todaySecs += dur;
+        if (wKey === thisWeekKey) cacheData.weekSecs += dur;
+        if (mKey === thisMonthKey) cacheData.monthSecs += dur;
         
-        if (s.subjectId) cache.subjTotals[s.subjectId] = (cache.subjTotals[s.subjectId] || 0) + dur;
-        cache.dailyData[dKey] = (cache.dailyData[dKey] || 0) + dur;
-        cache.monthlyData[mKey] = (cache.monthlyData[mKey] || 0) + dur;
+        if (s.subjectId) cacheData.subjTotals[s.subjectId] = (cacheData.subjTotals[s.subjectId] || 0) + dur;
+        cacheData.dailyData[dKey] = (cacheData.dailyData[dKey] || 0) + dur;
+        cacheData.monthlyData[mKey] = (cacheData.monthlyData[mKey] || 0) + dur;
 
-        // Live class detection
         if (/\(live class\)/i.test(s.notes || '')) {
-            const lc = cache.liveClass;
+            const lc = cacheData.liveClass;
             lc.totalCount++;
             lc.totalSecs += dur;
             if (mKey === thisMonthKey) lc.monthCount++;
@@ -2391,8 +2613,12 @@ function rebuildAnalyticsCache() {
         }
     });
 
-    
-    AppState.analyticsCache = cache;
+    appCache.sessionsHash = currentHash;
+    appCache.analytics = {
+        version: appCache.analyticsVersion,
+        generatedAt: Date.now(),
+        data: cacheData
+    };
 }
 
 function migrateData() {
@@ -2443,7 +2669,7 @@ window.initApp = function() {
     try {
         loadData();
         migrateData();
-        rebuildAnalyticsCache();
+        rebuildAnalyticsCache(); // Must rebuild on startup for Dashboard metrics
         initTheme();
         initNavigation();
         initSubjects();
@@ -4091,7 +4317,7 @@ function initFocusMode() {
         logMsg.textContent = `🎯 Focus Session Complete! (${mins} mins)`;
         
         logBtn.onclick = () => {
-            document.getElementById('logDateInput').value = new Date().toISOString().split('T')[0];
+            document.getElementById('logDateInput').value = TimeUtils.getDateKey(new Date());
             document.getElementById('logHoursInput').value = Math.floor(mins / 60);
             document.getElementById('logMinutesInput').value = mins % 60;
             document.getElementById('logNotesInput').value = focusMode === 'pomodoro' ? 'Pomodoro Session 🍅' : 'Focus Session 🎯';
@@ -4325,7 +4551,7 @@ window.openScheduleModal = function(id = null) {
         document.getElementById('scheduleCourseInput').value = 'CSEB';
         populateScheduleSubjects('CSEB');
         document.getElementById('scheduleTitleInput').value = '';
-        const today = new Date().toISOString().split('T')[0];
+        const today = TimeUtils.getDateKey(new Date());
         document.getElementById('scheduleDateInput').value = today;
         document.getElementById('scheduleStartTimeInput').value = '10:00';
         document.getElementById('scheduleEndTimeInput').value = '11:00';
@@ -4384,10 +4610,12 @@ function saveSchedulePlan() {
 
 window.deleteScheduleItem = function(id) {
     if (!confirm('Are you sure you want to delete this scheduled plan?')) return;
+    const item = AppState.schedule.find(s => s.id === id);
     AppState.schedule = AppState.schedule.filter(s => s.id !== id);
     saveData('schedule');
     renderScheduleList();
     renderOverview();
+    if (item) renderDayReport(item.date);
 };
 
 window.missScheduleItem = function(id) {
@@ -4397,6 +4625,7 @@ window.missScheduleItem = function(id) {
     saveData('schedule');
     renderScheduleList();
     renderOverview();
+    renderDayReport(item.date);
 };
 
 window.completeScheduleItem = function(id) {
@@ -4439,7 +4668,7 @@ function renderScheduleList() {
     
     container.innerHTML = '';
     
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = TimeUtils.getDateKey(new Date());
     
     let filtered = AppState.schedule.filter(s => {
         if (currentScheduleTab === 'today') return s.date === todayStr;
@@ -4518,8 +4747,8 @@ function renderOverviewScheduleWidget() {
     const container = document.getElementById('overviewScheduleContainer');
     if (!container) return;
     
-    const todayStr = new Date().toISOString().split('T')[0];
-    let todayItems = AppState.schedule.filter(s => s.date === todayStr);
+    const todayStr = TimeUtils.getDateKey(new Date());
+    let todayItems = AppState.schedule.filter(s => s.date === todayStr && s.status !== 'missed');
     
     if (todayItems.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding:15px; color:var(--text-muted); font-size:0.9rem;">No plans scheduled for today.</div>`;
@@ -4549,7 +4778,9 @@ function renderOverviewScheduleWidget() {
         else if (isPending) { color = 'var(--neon-gold)'; icon = '⏳'; }
         
         const subj = AppState.subjects.find(sub => sub.id === item.subjectId);
+        const subjName = subj ? subj.name : 'Unknown Subject';
         const courseStr = subj ? (subj.course || 'CSEB') : '';
+        const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');
         
         html += `
             <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; background:var(--glass-bg); padding:10px 12px; border-radius:10px; border-left: 3px solid ${item.status === 'completed' ? 'var(--glass-border)' : color}; ${item.status === 'completed' ? 'opacity:0.6;' : ''}">
@@ -4557,7 +4788,7 @@ function renderOverviewScheduleWidget() {
                     <div style="width:24px; height:24px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:0.8rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
                     <div style="flex: 1; min-width: 0;">
                         ${courseStr ? `<div style="font-size:0.65rem; color:${color}; font-weight:700; text-transform:uppercase; margin-bottom:2px; letter-spacing:0.5px;">${courseStr}</div>` : ''}
-                        <div style="font-size:0.9rem; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+                        <div style="font-size:0.9rem; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:10px; flex-shrink: 0;">

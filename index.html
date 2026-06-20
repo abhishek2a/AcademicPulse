@@ -35,19 +35,18 @@
     <aside class="sidebar">
         <h2 class="app-logo" style="margin-bottom: 30px;">AcademicPulse</h2>
         <div class="nav-item active" data-target="view-overview"><span class="nav-icon">📊</span><span class="nav-text">Dashboard</span></div>
-
-        <div class="nav-item" data-target="view-subjects"><span class="nav-icon">📚</span><span class="nav-text">Course</span></div>
+        <div class="nav-item" data-target="view-subjects"><span class="nav-icon">📚</span><span class="nav-text">Course Hub</span></div>
         <div class="nav-item" data-target="view-attendance"><span class="nav-icon">📅</span><span class="nav-text">Attendance</span></div>
-        <div class="nav-item" data-target="view-focus"><span class="nav-icon">🎯</span><span class="nav-text">Focus</span></div>
-        <div class="nav-item" data-target="view-schedule"><span class="nav-icon">🗓️</span><span class="nav-text">Schedule</span></div>
-        <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Mocks</span></div>
+        <div class="nav-item" data-target="view-focus"><span class="nav-icon">🧠</span><span class="nav-text">Focus Mode</span></div>
+        <div class="nav-item" data-target="view-schedule"><span class="nav-icon">🗓️</span><span class="nav-text">Planner</span></div>
+        <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Mock Exams</span></div>
         <div class="nav-item" data-target="view-analytics"><span class="nav-icon">📈</span><span class="nav-text">Analytics</span></div>
         <div class="nav-item" data-target="view-analyzer"><span class="nav-icon">🔍</span><span class="nav-text">Report Analyzer</span></div>
-        <div class="nav-item" data-target="view-search"><span class="nav-icon">🔎</span><span class="nav-text">Search</span></div>
+        <div class="nav-item" data-target="view-search"><span class="nav-icon">🔎</span><span class="nav-text">Search Data</span></div>
         <div class="nav-item" id="nav-software-update" style="display: none; align-items: center; justify-content: space-between;" data-target="view-update">
             <div style="display: flex; align-items: center;">
-                <span class="nav-icon" style="color: var(--neon-blue);">✨</span>
-                <span class="nav-text">Software Update</span>
+                <span class="nav-icon" style="color: var(--neon-blue);">⚡</span>
+                <span class="nav-text">Update Ready</span>
             </div>
             <span class="update-badge" id="updateSidebarBadge" style="display: none; background: var(--neon-red); color: #fff; font-size: 0.7rem; font-weight: bold; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; box-shadow: 0 0 10px var(--neon-red); margin-left: 10px;">1</span>
         </div>
@@ -221,6 +220,7 @@
         <section id="view-analytics" class="view-section">
             <div class="header">
                 <h1>Analytics Dashboard</h1>
+                <div id="analyticsLastUpdated" style="color: var(--neon-blue); font-size: 0.85rem; margin-top: 5px;"></div>
             </div>
 
             <!-- Top Overview Cards -->
@@ -233,8 +233,141 @@
             </div>
 
             <!-- 1. Smart Insights Panel -->
-            <div id="smartInsightsContainer" style="margin-bottom: 30px;">
+            <div id="smartInsightsContainer" style="margin-bottom: 20px;">
                 <!-- Smart insights injected here -->
+            </div>
+
+            <!-- AI Performance Coach Styles -->
+            <style>
+                .ai-coach-container {
+                    background: var(--surface);
+                    border: 1px solid var(--glass-border);
+                    border-radius: 16px;
+                    padding: 24px;
+                    margin-bottom: 24px;
+                    position: relative;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                }
+                .ai-coach-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-bottom: 1px solid var(--glass-border);
+                    padding-bottom: 16px;
+                    flex-wrap: wrap;
+                    gap: 12px;
+                }
+                .ai-coach-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    font-size: 1.2rem;
+                    font-weight: 600;
+                    color: var(--text-main);
+                    margin: 0;
+                }
+                .ai-coach-icon {
+                    background: linear-gradient(135deg, rgba(10,132,255,0.2), rgba(191,90,242,0.2));
+                    border: 1px solid rgba(191,90,242,0.4);
+                    border-radius: 12px;
+                    width: 40px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.2rem;
+                    color: #fff;
+                    box-shadow: 0 0 15px rgba(191,90,242,0.2);
+                    flex-shrink: 0;
+                }
+                .ai-coach-status {
+                    font-size: 0.75rem;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    font-weight: 700;
+                    color: var(--neon-purple);
+                    background: rgba(191,90,242,0.1);
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                    border: 1px solid rgba(191,90,242,0.3);
+                    white-space: nowrap;
+                }
+                .ai-coach-body {
+                    background: rgba(0,0,0,0.2);
+                    border-radius: 12px;
+                    padding: 20px;
+                    min-height: 100px;
+                    font-size: 0.95rem;
+                    line-height: 1.6;
+                    color: var(--text-main);
+                    border: 1px solid rgba(255,255,255,0.03);
+                    word-break: break-word;
+                }
+                .ai-coach-controls {
+                    display: flex;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                }
+                .ai-coach-btn {
+                    flex: 1 1 calc(33.333% - 12px);
+                    min-width: 140px;
+                    background: var(--surface);
+                    border: 1px solid var(--glass-border);
+                    color: var(--text-muted);
+                    padding: 12px 16px;
+                    border-radius: 10px;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: all 0.2s ease;
+                }
+                .ai-coach-btn:hover {
+                    background: rgba(255,255,255,0.05);
+                    border-color: var(--btn-color);
+                    color: #fff;
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                }
+                .ai-coach-btn.active-prompt {
+                    background: rgba(255,255,255,0.08);
+                    border-color: var(--btn-color);
+                    color: #fff;
+                    box-shadow: inset 0 0 0 1px var(--btn-color), 0 0 15px rgba(0,0,0,0.3);
+                }
+            </style>
+
+            <!-- AI Performance Coach -->
+            <div class="ai-coach-container">
+                <div class="ai-coach-header">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="ai-coach-icon">⚡</div>
+                        <h3 class="app-logo" style="font-size: 1.4rem; margin: 0;">Pulse AI</h3>
+                    </div>
+                    <div class="ai-coach-status">Online</div>
+                </div>
+                
+                <div id="aiCoachContent" class="ai-coach-body">
+                    <div style="text-align: center; color: rgba(255,255,255,0.3); padding: 20px 0; font-style: italic;">Select an analysis module to begin...</div>
+                </div>
+
+                <div class="ai-coach-controls">
+                    <button class="ai-coach-btn" style="--btn-color: var(--neon-blue);" data-type="general" onclick="generateAICoachAnalysis('general')">
+                        <span>📊</span> Overview
+                    </button>
+                    <button class="ai-coach-btn" style="--btn-color: var(--neon-green);" data-type="strengths" onclick="generateAICoachAnalysis('strengths')">
+                        <span>⭐</span> Strengths
+                    </button>
+                    <button class="ai-coach-btn" style="--btn-color: var(--neon-red);" data-type="weaknesses" onclick="generateAICoachAnalysis('weaknesses')">
+                        <span>🎯</span> Weaknesses
+                    </button>
+                </div>
             </div>
 
             <!-- 2. Study Trends -->
@@ -247,6 +380,15 @@
                 <div class="chart-card">
                     <h3>Monthly Study Trend</h3>
                     <div style="height: 250px;"><canvas id="monthlyStudyBarChart"></canvas></div>
+                </div>
+                <div class="chart-card" style="display: flex; flex-direction: column; position: relative; overflow: hidden;">
+                    <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: var(--neon-purple); filter: blur(80px); opacity: 0.3; border-radius: 50%; pointer-events: none;"></div>
+                    <h3 style="display: flex; align-items: center; gap: 8px; margin-bottom: auto;"><span style="color: var(--neon-purple);">✨</span> AI Next Study Suggestion</h3>
+                    <div id="aiSuggestionContainer" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px;">
+                        <div style="font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 15px;" id="aiSuggestedSubject">-</div>
+                        <div style="font-size: 0.95rem; color: var(--text-muted); line-height: 1.6;" id="aiSuggestedInsight">Analyzing your study patterns...</div>
+                    </div>
+                    <button class="btn" style="margin-top: auto; padding: 10px; background: rgba(191, 90, 242, 0.1); color: var(--neon-purple); border: 1px solid var(--neon-purple);" onclick="const subj = document.getElementById('aiSuggestedSubject').textContent; if(subj !== '-') { const target = AppState.subjects.find(s => s.name === subj); if(target) { document.querySelector('.nav-item[data-target=\'view-focus\']').click(); setTimeout(() => { document.getElementById('focusSubjectSelect').value = target.id; }, 100); } }">Study Now</button>
                 </div>
             </div>
 
@@ -1291,8 +1433,9 @@
         </div>
     </div>
 
-    <script src="auth.js?v=10"></script>
+    <script src="auth.js?v=12"></script>
     <script src="export.js?v=9"></script>
-    <script src="app.js?v=44"></script>
+    <script src="ai.js?v=4"></script>
+    <script src="app.js?v=69"></script>
 </body>
 </html>

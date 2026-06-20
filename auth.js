@@ -99,16 +99,18 @@ async function syncDataFromCloud(uid) {
         
         if (docSnap.exists) {
             const data = docSnap.data();
-            if (data.subjects) localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(data.subjects));
-            if (data.sessions) localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(data.sessions));
-            if (data.attendance) localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data.attendance));
-            if (data.goals) localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(data.goals));
-            if (data.accaTopics) localStorage.setItem(STORAGE_KEYS.ACCA_TOPICS, JSON.stringify(data.accaTopics));
-            if (data.mocks) localStorage.setItem(STORAGE_KEYS.MOCKS, JSON.stringify(data.mocks));
-            if (data.practice) localStorage.setItem(STORAGE_KEYS.PRACTICE, JSON.stringify(data.practice));
-            if (data.csebSyllabus) localStorage.setItem(STORAGE_KEYS.CSEB_SYLLABUS, JSON.stringify(data.csebSyllabus));
-            if (data.notifications) localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(data.notifications));
-            if (data.systemState) localStorage.setItem(STORAGE_KEYS.SYSTEM_STATE, JSON.stringify(data.systemState));
+            if (data.subjects) localStorage.setItem('cseb_study_subjects', JSON.stringify(data.subjects));
+            if (data.sessions) localStorage.setItem('cseb_session_history', JSON.stringify(data.sessions));
+            if (data.attendance) localStorage.setItem('cseb_study_attendance', JSON.stringify(data.attendance));
+            if (data.goals) localStorage.setItem('cseb_study_goals', JSON.stringify(data.goals));
+            if (data.accaTopics) localStorage.setItem('cseb_acca_topics', JSON.stringify(data.accaTopics));
+            if (data.mocks) localStorage.setItem('cseb_mock_tests', JSON.stringify(data.mocks));
+            if (data.practice) localStorage.setItem('cseb_question_practice', JSON.stringify(data.practice));
+            if (data.csebSyllabus) localStorage.setItem('cseb_syllabus_tracker', JSON.stringify(data.csebSyllabus));
+            if (data.notifications) localStorage.setItem('cseb_notifications', JSON.stringify(data.notifications));
+            if (data.schedule) localStorage.setItem('cseb_study_schedule', JSON.stringify(data.schedule));
+            if (data.achievements) localStorage.setItem('cseb_achievements', JSON.stringify(data.achievements));
+            if (data.systemState) localStorage.setItem('cseb_system_state', JSON.stringify(data.systemState));
         } else {
             // First login, push local data to cloud
             await syncDataToCloud(uid);
@@ -122,16 +124,18 @@ async function syncDataToCloud(uid) {
     if(!uid) return;
     try {
         await db.collection("userData").doc(uid).set({
-            subjects: JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBJECTS) || '[]'),
-            sessions: JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]'),
-            attendance: JSON.parse(localStorage.getItem(STORAGE_KEYS.ATTENDANCE) || '{}'),
-            goals: JSON.parse(localStorage.getItem(STORAGE_KEYS.GOALS) || '{"daily":8,"weekly":40,"monthly":160}'),
-            accaTopics: JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCA_TOPICS) || '[]'),
-            mocks: JSON.parse(localStorage.getItem(STORAGE_KEYS.MOCKS) || '[]'),
-            practice: JSON.parse(localStorage.getItem(STORAGE_KEYS.PRACTICE) || '{"attempted":0,"correct":0}'),
-            csebSyllabus: JSON.parse(localStorage.getItem(STORAGE_KEYS.CSEB_SYLLABUS) || '{}'),
-            notifications: JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS) || '[]'),
-            systemState: JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_STATE) || '{"currentVersion":"v1.1.20"}')
+            subjects: JSON.parse(localStorage.getItem('cseb_study_subjects') || '[]'),
+            sessions: JSON.parse(localStorage.getItem('cseb_session_history') || '[]'),
+            attendance: JSON.parse(localStorage.getItem('cseb_study_attendance') || '{}'),
+            goals: JSON.parse(localStorage.getItem('cseb_study_goals') || '{"daily":8,"weekly":40,"monthly":160}'),
+            accaTopics: JSON.parse(localStorage.getItem('cseb_acca_topics') || '[]'),
+            mocks: JSON.parse(localStorage.getItem('cseb_mock_tests') || '[]'),
+            practice: JSON.parse(localStorage.getItem('cseb_question_practice') || '{"attempted":0,"correct":0}'),
+            csebSyllabus: JSON.parse(localStorage.getItem('cseb_syllabus_tracker') || '{}'),
+            notifications: JSON.parse(localStorage.getItem('cseb_notifications') || '[]'),
+            schedule: JSON.parse(localStorage.getItem('cseb_study_schedule') || '[]'),
+            achievements: JSON.parse(localStorage.getItem('cseb_achievements') || '[]'),
+            systemState: JSON.parse(localStorage.getItem('cseb_system_state') || '{"currentVersion":"v1.1.20"}')
         });
     } catch (error) {
         console.error("Error saving to cloud:", error);

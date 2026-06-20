@@ -1,11 +1,19 @@
 {
-  "version": "1.0.42",
-  "build": "2026.06.19-phased",
+  "version": "1.0.45",
+  "build": "2026.06.20-stable",
   "features": [
-    "<b>Welcome to AcademicPulse v1.0.41!</b> This update introduces our intelligent phased rollout engine.",
-    "<b>🚀 Phased Rollouts</b>",
-    "<b>Power Users First:</b> Our most active users with high streaks or session counts will now receive the newest cutting-edge updates immediately upon release.",
-    "<b>Stability for Casual Users:</b> Users who study less frequently will receive updates 3 days after the initial release to guarantee maximum stability.",
-    "<b>🏆 Achievements Modal:</b> We completely redesigned the Profile achievements section into a sleek scrollable Trophy Room that tracks all of your lifetime awards."
+    "<b>Welcome to AcademicPulse v1.0.45!</b> This major update brings an entirely new interconnected experience, a background gamification engine, and our intelligent phased rollout system to ensure stability.",
+    "<b>🏆 Gamification Engine & Achievements</b>",
+    "<b>The 100-Hour Club:</b> A secret achievement is now unlocked when you successfully surpass 100 hours of total study time.",
+    "<b>Flawless Week:</b> You can now earn a dedicated streak badge by hitting your daily study goal 7 days in a row.",
+    "<b>Mock Master:</b> Score above 85% on 3 consecutive mock exams within a single subject to earn this new title.",
+    "<b>Premium Banners:</b> New achievements will trigger a beautiful glowing banner on your dashboard that cleanly disappears after 24 hours.",
+    "<b>Trophy Room Modal:</b> We completely redesigned the Profile achievements section into a sleek, scrollable Trophy Room that tracks all of your lifetime awards.",
+    "<b>🔗 Interconnected UI & Smart Routing</b>",
+    "<b>Contextual Workflows:</b> All pages are now heavily integrated, allowing you to instantly jump from Subjects to Analytics, from Analytics Weak Areas straight into Focus Mode, or from low Attendance straight into Schedule planning.",
+    "<b>Smart Auto-fill:</b> Jumping into Focus Mode from any \"Practice Now\" or \"Focus\" button smartly passes the subject context so you don't have to manually select your subject when logging the session.",
+    "<b>🚀 Phased Rollout Engine</b>",
+    "<b>Power Users First:</b> Our most active users with high streaks or high session counts will now receive the newest cutting-edge updates immediately upon release.",
+    "<b>Stability for Casual Users:</b> To guarantee maximum stability, users who study less frequently will receive updates 3 days after the initial release."
   ]
 }

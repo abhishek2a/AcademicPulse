@@ -1213,6 +1213,14 @@ function renderDayReport(dateKey) {
     const pendingSchedule = AppState.schedule.filter(s => s.date === dateKey && s.status === 'pending');
     let pendingHtml = '';
     
+    const formatTimeStr = (t) => {
+        if (!t) return '';
+        let [h, m] = t.split(':').map(Number);
+        let ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `${h}:${m.toString().padStart(2,'0')} ${ampm}`;
+    };
+    
     pendingSchedule.forEach(item => {
         // Only skip if the scheduled item is completely in the future (tomorrow onwards)
         // If the user clicks today's date, show ALL of today's schedule.

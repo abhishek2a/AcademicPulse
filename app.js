@@ -2111,6 +2111,45 @@ function initRetrospectiveLogging() {
             if (schedItem) {
                 schedItem.status = 'completed';
                 saveData('schedule');
+                
+                // Automatically tick off the topic from the syllabus if one was selected
+                if (topic && subjectId) {
+                    const subj = AppState.subjects.find(s => s.id === subjectId);
+                    if (subj) {
+                        const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
+                        let syllabusType = null;
+                        let syllabusTopics = null;
+                        
+                        const courseCode = document.getElementById('logCourseInput').value;
+                        if (courseCode === 'CSEB' && AppState.csebSyllabus) {
+                            const key = Object.keys(AppState.csebSyllabus).find(k => {
+                                const cleanK = k.toLowerCase();
+                                return cleanName === cleanK || cleanName.includes(cleanK) || cleanK.includes(cleanName);
+                            });
+                            if (key) {
+                                syllabusTopics = AppState.csebSyllabus[key];
+                                syllabusType = 'csebSyllabus';
+                            }
+                        } else if (courseCode === 'ACCA' && AppState.accaTopics) {
+                            // Find which area holds this topic
+                            Object.keys(AppState.accaTopics).forEach(area => {
+                                const t = AppState.accaTopics[area].find(x => (x.name || x.topic || x) === topic);
+                                if (t) {
+                                    syllabusTopics = AppState.accaTopics[area];
+                                    syllabusType = 'accaTopics';
+                                }
+                            });
+                        }
+                        
+                        if (syllabusTopics && syllabusType) {
+                            const targetTopic = syllabusTopics.find(t => (t.name || t.topic || t) === topic);
+                            if (targetTopic && !targetTopic.completed) {
+                                targetTopic.completed = true;
+                                saveData(syllabusType);
+                            }
+                        }
+                    }
+                }
             }
             window._completingScheduleId = null;
         }

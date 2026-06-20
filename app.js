@@ -2074,20 +2074,19 @@ function initRetrospectiveLogging() {
         const endTimeVal = document.getElementById('logEndTimeInput').value;
         let sessionStart, sessionEnd;
 
+        const [yy, mm, dd] = dateKey.split('-').map(Number);
+
         if (startTimeVal) {
             const [sh, sm] = startTimeVal.split(':').map(Number);
-            sessionStart = new Date(dateKey + 'T00:00:00');
-            sessionStart.setHours(sh, sm, 0, 0);
+            sessionStart = new Date(yy, mm - 1, dd, sh, sm, 0, 0);
         } else {
             const now = new Date();
-            sessionStart = new Date(dateKey + 'T00:00:00');
-            sessionStart.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+            sessionStart = new Date(yy, mm - 1, dd, now.getHours(), now.getMinutes(), now.getSeconds());
         }
 
         if (endTimeVal) {
             const [eh, em] = endTimeVal.split(':').map(Number);
-            sessionEnd = new Date(dateKey + 'T00:00:00');
-            sessionEnd.setHours(eh, em, 0, 0);
+            sessionEnd = new Date(yy, mm - 1, dd, eh, em, 0, 0);
             if (sessionEnd <= sessionStart) sessionEnd.setDate(sessionEnd.getDate() + 1); // overnight
         } else {
             sessionEnd = new Date(sessionStart.getTime() + (durationSecs * 1000));

@@ -1402,6 +1402,115 @@ let dailyStudyLineChartInst = null;
 let monthlyStudyBarChartInst = null;
 let subjectPieChartInst = null;
 let monthlyAttendanceBarChartInst = null;
+let mockExamsLineChartInst = null;
+
+let currentMockAnalyticsTab = 'ACCA';
+
+window.setMockAnalyticsTab = function(course, el) {
+    currentMockAnalyticsTab = course;
+    if (el) {
+        const tabs = el.parentElement.querySelectorAll('.tab');
+        tabs.forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+    }
+    
+    const chartTitle = document.getElementById('mockChartTitle');
+    if (chartTitle) chartTitle.textContent = `Recent Mock Scores (%) - ${course}`;
+    
+    renderMockTotals();
+    renderMockExamsChart();
+    renderMockAnalyticsTable();
+};
+
+window.openMockDetailedReview = function() {
+    const title = document.getElementById('mockDetailedReviewModalTitle');
+    if (title) title.textContent = `Detailed Review - ${currentMockAnalyticsTab}`;
+    renderMockAnalyticsTable();
+    document.getElementById('mockDetailedReviewModal').classList.add('active');
+};
+
+function renderMockAnalyticsTable() {
+    const tbody = document.getElementById('analyticsMockTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    const filteredMocks = (AppState.mockTests || []).filter(m => m.course === currentMockAnalyticsTab);
+    const sorted = [...filteredMocks].sort((a,b) => new Date(b.date) - new Date(a.date));
+    
+    if (sorted.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px;">No mock exams logged for ${currentMockAnalyticsTab}</td></tr>`;
+        return;
+    }
+    
+    sorted.forEach(m => {
+        const pct = Math.round((m.score / (m.maxScore || 1)) * 100);
+        let color = 'var(--neon-green)';
+        if (pct < 50) color = 'var(--neon-red)';
+        else if (pct < 75) color = 'var(--neon-gold)';
+        
+        const d = new Date(m.date);
+        const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <div style="font-weight:bold;">${dateStr}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">${timeStr}</div>
+            </td>
+            <td>
+                <div style="font-weight:bold; color:var(--text-main);">${m.syllabusArea || 'N/A'}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">${m.topic || 'General Practice'}</div>
+            </td>
+            <td>
+                <div style="font-weight:bold; color:${color}; font-size:1.1rem;">${pct}%</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">${m.score} / ${m.maxScore}</div>
+            </td>
+            <td style="color:var(--text-muted); font-size: 0.9rem;">${m.notes || '-'}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function renderMockExamsChart() {
+    const mockCtx = document.getElementById('mockExamsLineChart');
+    if (mockCtx) {
+        if (mockExamsLineChartInst) mockExamsLineChartInst.destroy();
+        
+        const filteredMocks = (AppState.mockTests || []).filter(m => m.course === currentMockAnalyticsTab);
+        const sortedMocks = [...filteredMocks].sort((a,b) => new Date(a.date) - new Date(b.date)).slice(-10);
+        
+        const labels = sortedMocks.map(m => new Date(m.date).toLocaleDateString(undefined, {month:'short', day:'numeric'}));
+        const data = sortedMocks.map(m => Math.max(0, Math.min(100, Math.round((m.score / (m.maxScore || 1)) * 100))));
+        
+        mockExamsLineChartInst = new Chart(mockCtx, {
+            type: 'line',
+            data: {
+                labels: labels.length > 0 ? labels : ['No Data'],
+                datasets: [{
+                    label: 'Mock Score (%)',
+                    data: data.length > 0 ? data : [0],
+                    borderColor: '#FFD60A',
+                    backgroundColor: 'rgba(255, 214, 10, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true,
+                    pointBackgroundColor: '#FFD60A',
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, max: 100, grid: { color: 'var(--glass-border)' }, ticks: { callback: v => v+'%' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+}
 
 function renderAnalytics() {
     const now = new Date();
@@ -1648,7 +1757,11 @@ function renderAnalytics() {
 
         const weakestContainer = e('weakestAreasContainer');
         const topicRecs = e('topicRecommendationsList');
-        const weakestAreas = matrixRows.filter(r => r.statusText === 'Needs Work' || r.statusText === 'Average').sort((a,b) => a.compositeScore - b.compositeScore).slice(0,3);
+        let weakestAreas = matrixRows.filter(r => r.statusText === 'Needs Work' || r.statusText === 'Average').sort((a,b) => a.compositeScore - b.compositeScore).slice(0,3);
+        
+        if (weakestAreas.length === 0) {
+            weakestAreas = matrixRows.filter(r => r.statusText === 'Need Data' && r.sylPct < 100).sort((a,b) => a.sylPct - b.sylPct).slice(0,3);
+        }
         
         if (weakestContainer) {
             weakestContainer.innerHTML = '';
@@ -1658,11 +1771,12 @@ function renderAnalytics() {
                 weakestAreas.forEach(w => {
                     const subjObj = AppState.subjects.find(s => s.name === w.area);
                     const subjId = subjObj ? subjObj.id : '';
+                    const scoreText = w.statusText === 'Need Data' ? 'Untested (Needs Data)' : `Avg Score: ${Math.round(w.compositeScore)}%`;
                     weakestContainer.innerHTML += `
                         <div style="background: var(--glass-hover); padding: 15px; border-radius: 8px; flex: 1; min-width: 150px; border-left: 4px solid ${w.color};">
                             <div style="font-weight: bold; margin-bottom: 5px;">${w.area}</div>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div style="font-size: 0.85rem; color: var(--text-muted);">Avg Score: ${Math.round(w.compositeScore)}%</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">${scoreText}</div>
                                 ${subjId ? `<button onclick="navigateTo('view-focus', {subjectId: '${subjId}'})" style="background:var(--neon-gold); color:#000; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer;">Practice Now</button>` : ''}
                             </div>
                         </div>
@@ -1955,6 +2069,9 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
             options: { responsive: true, cutout: '70%', plugins: { legend: { position: 'right', labels: { color: 'var(--text-main)' } } } }
         });
     }
+
+    renderMockExamsChart();
+    renderMockAnalyticsTable();
 }
 
 function renderConsistencyHeatmap() {
@@ -2050,7 +2167,7 @@ function generateAICoachAnalysis(type) {
         let avgMockScore = 0;
         if (AppState.mockTests && AppState.mockTests.length > 0) {
             const recentMocks = AppState.mockTests.slice(-3);
-            const totalScore = recentMocks.reduce((acc, m) => acc + (m.score / m.maxScore), 0);
+            const totalScore = recentMocks.reduce((acc, m) => acc + (m.score / (m.maxScore || 1)), 0);
             avgMockScore = (totalScore / recentMocks.length) * 100;
         }
 
@@ -2092,7 +2209,12 @@ function generateAICoachAnalysis(type) {
             }
             
             if (avgMockScore > 0) {
-                insight += `Your recent mock exams average a solid <b>${avgMockScore.toFixed(0)}%</b>.`;
+                insight += `<br/><br/><span style="font-size:1.1rem;">📝</span> `;
+                if (avgMockScore >= 80) insight += `Your recent mock exams average an excellent <b>${avgMockScore.toFixed(0)}%</b>. Keep up the high accuracy!`;
+                else if (avgMockScore >= 60) insight += `Your recent mock exams average <b>${avgMockScore.toFixed(0)}%</b>. Try to push past the 70% mark.`;
+                else insight += `Your recent mock exams average <b>${avgMockScore.toFixed(0)}%</b>. This indicates a need for deeper review of core concepts before the real exam.`;
+            } else {
+                insight += `<br/><br/><span style="font-size:1.1rem;">📝</span> You haven't taken any mock exams recently. Start testing your knowledge soon!`;
             }
         } else if (type === 'strengths') {
             insight = `<b style="color:var(--neon-green); font-size:1.1rem;">Your Superpowers</b><br/><br/>`;
@@ -2956,6 +3078,53 @@ function initMocksAndPractice() {
     }
 
     renderMocksHistory();
+    renderMockTotals();
+}
+
+function renderMockTotals() {
+    const container = document.getElementById('analyticsMockSummary');
+    if (!container) return;
+    
+    const mocks = AppState.mockTests || [];
+    const courseMocks = mocks.filter(m => m.course === currentMockAnalyticsTab);
+    
+    if (courseMocks.length === 0) {
+        container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--glass-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--glass-border);">
+                <div style="text-align: left;">
+                    <div class="stat-label">Total Mocks Taken (${currentMockAnalyticsTab})</div>
+                    <div class="stat-value">0</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="stat-label">Average Score</div>
+                    <div class="stat-value text-blue">0%</div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    let totalScorePct = 0;
+    
+    courseMocks.forEach(m => {
+        const pct = (m.score / (m.maxScore || 1));
+        totalScorePct += pct;
+    });
+    
+    const avg = Math.round((totalScorePct / courseMocks.length) * 100);
+    
+    container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--glass-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--glass-border);">
+            <div style="text-align: left;">
+                <div class="stat-label">Total Mocks Taken (${currentMockAnalyticsTab})</div>
+                <div class="stat-value">${courseMocks.length}</div>
+            </div>
+            <div style="text-align: right;">
+                <div class="stat-label">Average Score</div>
+                <div class="stat-value text-blue">${avg}%</div>
+            </div>
+        </div>
+    `;
 }
 
 function renderMocksHistory() {
@@ -3870,6 +4039,7 @@ window.deleteMock = function(mockId) {
     AppState.mockTests = AppState.mockTests.filter(m => m.id !== mockId);
     saveData('mocks');
     renderMocksHistory();
+    renderMockTotals();
     renderAnalytics();
 };
 
@@ -4150,6 +4320,7 @@ window.saveEditMock = function() {
     saveData('mocks');
     document.getElementById('editMockModal').classList.remove('active');
     renderMocksHistory();
+    renderMockTotals();
     renderAnalytics();
 };
 

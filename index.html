@@ -557,7 +557,33 @@
                     <div style="height: 150px;">
                         <canvas id="monthlyAttendanceBarChart"></canvas>
                     </div>
-                 <!-- Exam Readiness Engine -->
+                </div>
+            </div>
+
+            <!-- 5. Mock Exam Performance -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0;">Mock Exam Performance</h2>
+                <div style="display: flex; gap: 10px; background: var(--glass-bg); padding: 5px; border-radius: 8px; border: 1px solid var(--glass-border);">
+                    <div class="tab active" onclick="setMockAnalyticsTab('ACCA', this)" style="padding: 6px 16px; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">ACCA</div>
+                    <div class="tab" onclick="setMockAnalyticsTab('CSEB', this)" style="padding: 6px 16px; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">CSEB</div>
+                </div>
+            </div>
+            
+            <div class="chart-card" style="margin-bottom: 30px;">
+                <!-- Summary Section -->
+                <div id="analyticsMockSummary" style="margin-bottom: 20px;"></div>
+                
+                <!-- Chart Section -->
+                <h3 id="mockChartTitle" style="margin-bottom: 15px; display: none;">Recent Mock Scores (%)</h3>
+                <div style="height: 250px; margin-bottom: 30px;"><canvas id="mockExamsLineChart"></canvas></div>
+                
+                <!-- Detailed Review Button -->
+                <div style="text-align: center;">
+                    <button class="btn btn-outline" onclick="openMockDetailedReview()">View Detailed History</button>
+                </div>
+            </div>
+
+            <!-- Exam Readiness Engine -->
             <div class="chart-card" style="margin-bottom: 30px; text-align: left;">
                 <h3 style="margin-bottom: 20px;">Exam Readiness Engine 🎯</h3>
                 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
@@ -600,9 +626,9 @@
                         <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.85rem;">
                             <th style="padding: 10px 5px;">Area</th>
                             <th style="padding: 10px 5px;">Course</th>
-                            <th style="padding: 10px 5px;">Acc%</th>
-                            <th style="padding: 10px 5px;">Mock%</th>
-                            <th style="padding: 10px 5px;">Qs</th>
+                            <th style="padding: 10px 5px;">Accuracy %</th>
+                            <th style="padding: 10px 5px;">Mock Exam %</th>
+                            <th style="padding: 10px 5px;">Questions</th>
                             <th style="padding: 10px 5px; text-align:right;">Status</th>
                         </tr>
                     </thead>
@@ -1433,9 +1459,34 @@
         </div>
     </div>
 
+    <!-- Mock Detailed Review Modal -->
+    <div class="modal-overlay" id="mockDetailedReviewModal">
+        <div class="modal-card" style="max-width: 800px; width: 95%;">
+            <div class="modal-header">
+                <h3 id="mockDetailedReviewModalTitle" style="margin: 0;">Detailed Review</h3>
+                <button class="close-btn" onclick="document.getElementById('mockDetailedReviewModal').classList.remove('active')">x</button>
+            </div>
+            <div style="margin-top: 15px; max-height: 60vh; overflow-y: auto;">
+                <table class="table" style="width: 100%; min-width: 500px;">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Syllabus Area / Topic</th>
+                            <th>Score</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analyticsMockTableBody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
     <script src="auth.js?v=12"></script>
     <script src="export.js?v=9"></script>
     <script src="ai.js?v=4"></script>
-    <script src="app.js?v=69"></script>
+    <script src="app.js?v=76"></script>
 </body>
 </html>

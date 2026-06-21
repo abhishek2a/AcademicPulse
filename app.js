@@ -2180,7 +2180,7 @@ function generateAICoachAnalysis(type) {
                 const sDate = new Date(s.date);
                 if (sDate >= sevenDaysAgo && sDate <= now) {
                     scheduleTotal++;
-                    if (s.completed) scheduleCompletes++;
+                    if (s.status === 'completed') scheduleCompletes++;
                 }
             });
         }

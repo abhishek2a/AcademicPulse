@@ -79,7 +79,7 @@ const AppState = {
     notifications: [],
     schedule: [],
     achievements: [],
-    currentVersion: 'v1.0.55',
+    currentVersion: 'v1.0.56',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -195,8 +195,8 @@ function loadData() {
     AppState.schedule = Storage.get(STORAGE_KEYS.SCHEDULE, []);
     AppState.achievements = Storage.get(STORAGE_KEYS.ACHIEVEMENTS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.55', availableUpdate: null, dataVersion: 2 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.55';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.56', availableUpdate: null, dataVersion: 2 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.56';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -1227,28 +1227,37 @@ function renderDayReport(dateKey) {
     };
     
     pendingSchedule.forEach(item => {
-        // Only skip if the scheduled item is completely in the future (tomorrow onwards)
-        // If the user clicks today's date, show ALL of today's schedule.
+        // Only show today's pending items (not future ones for past day views)
         if (dateKey > todayKey) return;
-        
-        const subj = AppState.subjects.find(sub => sub.id === item.subjectId) || { name: 'Unknown Subject', color: 'var(--neon-blue)' };
-        const timeStr = `${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}`;
-        const noteOrTopic = escapeHtml([item.topic, item.title].filter(Boolean).join(' - ') || '-');
+
+        const isExamRegItem = item.type === 'exam_register';
+        const subj = isExamRegItem ? null : (AppState.subjects.find(sub => sub.id === item.subjectId) || null);
+        const subjName = isExamRegItem ? escapeHtml(item.title || 'Exam Registration') : (subj ? escapeHtml(subj.name) : 'Unknown Subject');
+        const typeLabel = isExamRegItem ? 'EXAM REG' : 'SCHEDULED';
+        const typeLabelColor = isExamRegItem ? 'var(--neon-green)' : 'var(--neon-blue)';
+        const borderColor = isExamRegItem ? 'var(--neon-green)' : 'var(--neon-blue)';
+        const bgColor = isExamRegItem ? 'rgba(48,209,88,0.05)' : 'rgba(10,132,255,0.05)';
+        const timeStr = isExamRegItem ? (item.course || '') : `${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}`;
+        const noteOrTopic = isExamRegItem
+            ? [item.notifNo ? `Notif: ${item.notifNo}` : '', item.regNo ? `Reg: ${item.regNo}` : ''].filter(Boolean).join(' | ') || escapeHtml(item.notes || '')
+            : escapeHtml([item.topic, item.title].filter(Boolean).join(' - ') || '-');
+        const isTodayItem = dateKey === todayKey;
         
         pendingHtml += `
-            <div class="report-session-item" style="border-left: 4px solid var(--neon-blue); background: rgba(10,132,255,0.05); margin-bottom: 15px;">
+            <div class="report-session-item" style="border-left: 4px solid ${borderColor}; background: ${bgColor}; margin-bottom: 15px;">
                 <div class="report-session-header" style="margin-bottom: 5px;">
                     <div>
-                        <span style="font-weight:600;">${escapeHtml(subj.name)}</span>
-                        <span style="background:var(--glass-bg); color:var(--neon-blue); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid var(--neon-blue);">SCHEDULED</span>
+                        <span style="font-weight:600;">${subjName}</span>
+                        <span style="background:var(--glass-bg); color:${typeLabelColor}; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid ${typeLabelColor};">${typeLabel}</span>
                     </div>
-                    <div style="color: var(--neon-blue); font-size: 0.9rem;">${timeStr}</div>
+                    <div style="color: ${typeLabelColor}; font-size: 0.9rem;">${timeStr}</div>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="font-size:0.85rem; color:var(--text-muted);">${noteOrTopic}</div>
                     <div style="display:flex; gap: 5px;">
-                        <button style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="completeScheduleItem('${item.id}')">✓ Log</button>
-                        <button style="background:rgba(255,69,58,0.15); color:var(--neon-red); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="deleteScheduleItem('${item.id}')">✕</button>
+                        ${!isExamRegItem ? `<button style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="completeScheduleItem('${item.id}')">&#10003; Log</button>` : ''}
+                        ${isTodayItem ? `<button style="background:rgba(255,159,10,0.15); color:var(--neon-gold); border:none; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="moveScheduleItemToTomorrow('${item.id}')">&#8594; Tomorrow</button>` : ''}
+                        <button style="background:rgba(255,69,58,0.15); color:var(--neon-red); border:none; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:0.8rem; font-weight:600;" onclick="deleteScheduleItem('${item.id}')">&times;</button>
                     </div>
                 </div>
             </div>
@@ -4884,6 +4893,19 @@ window.missScheduleItem = function(id) {
     renderDayReport(item.date);
 };
 
+window.moveScheduleItemToTomorrow = function(id) {
+    const item = AppState.schedule.find(s => s.id === id);
+    if (!item) return;
+    const d = new Date(item.date + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    item.date = TimeUtils.getDateKey(d);
+    item.status = 'pending';
+    saveData('schedule');
+    renderScheduleList();
+    renderOverview();
+    addNotification('Moved to Tomorrow', `"${item.title || 'Schedule item'}" has been rescheduled to tomorrow.`, 'info');
+};
+
 window.completeScheduleItem = function(id) {
     const item = AppState.schedule.find(s => s.id === id);
     if (!item) return;
@@ -4933,10 +4955,10 @@ function renderScheduleList() {
         return false;
     });
     
-    // Sort by date, then by time
+    // Sort by date, then by time (guard for null startTime on exam_register)
     filtered.sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
-        return a.startTime.localeCompare(b.startTime);
+        return (a.startTime || '00:00').localeCompare(b.startTime || '00:00');
     });
     
     if (filtered.length === 0) {
@@ -5022,6 +5044,7 @@ function renderScheduleList() {
                     <div style="display:flex; gap:5px; flex-shrink: 0;">
                         ${item.status !== 'completed' ? `
                             <button onclick="completeScheduleItem('${item.id}')" style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer;" title="Complete & Log">&#10003;</button>
+                            ${currentScheduleTab === 'today' ? `<button onclick="moveScheduleItemToTomorrow('${item.id}')" style="background:rgba(255,159,10,0.15); color:var(--neon-gold); border:none; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:0.75rem;" title="Move to Tomorrow">&#8594;Tmrw</button>` : ''}
                         ` : `<span style="color:var(--neon-green); font-size:0.8rem; border:1px solid var(--neon-green); border-radius:4px; padding:2px 6px;">Done</span>`}
                         <button onclick="openScheduleModal('${item.id}')" style="background:transparent; color:var(--neon-blue); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Edit">&#9998;</button>
                         <button onclick="deleteScheduleItem('${item.id}')" style="background:transparent; color:var(--neon-red); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Delete">&times;</button>
@@ -5047,8 +5070,8 @@ function renderOverviewScheduleWidget() {
         return;
     }
     
-    // Sort by time
-    todayItems.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    // Sort by time (guard for null startTime on exam_register items)
+    todayItems.sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
     
     // Take up to 3 items
     const displayItems = todayItems.slice(0, 3);

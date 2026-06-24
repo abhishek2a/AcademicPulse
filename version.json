@@ -1,14 +1,11 @@
 {
-  "version": "v1.0.55",
+  "version": "v1.0.56",
   "build": "2026.06.24-stable",
   "features": [
-    "<b>&#127881; Welcome to AcademicPulse v1.0.55!</b> This update brings major analytics upgrades, a smarter Pulse AI engine, a new Mock Test schedule type in the planner, and a full round of bug fixes and performance improvements.",
-    "<b>&#127919; Mock Test in Planner</b> — You can now add <b>Mock Test</b> as a dedicated schedule type in the Planner (alongside Self Study, Class, and Pending Topic). Mock test sessions get a distinct red accent and &#127919; icon so they stand out.",
-    "<b>&#128200; Mock Exam Analytics Overhaul</b> — The Analytics page now has a dedicated <b>Mock Exam Performance</b> section with ACCA / CSEB tabs, average scores, a trend chart, and a scrollable <b>Detailed History</b> popup showing every mock with date, time, topic, score, and notes.",
-    "<b>&#129504; Smarter Pulse AI</b> — Fixed a bug where Pulse AI always showed 0% schedule completion even when tasks were finished. The AI now correctly reads your completed schedule items and accurately reports your <b>Planning Score</b>.",
-    "<b>&#127947; Pulse AI Weakest Areas</b> — The AI no longer says 'No weaknesses detected' when you ace your mock exams. It now intelligently falls back to highlighting <b>untested syllabus areas</b> so you always have an actionable recommendation.",
-    "<b>&#128293; Schedule Icons Fixed</b> — Garbled emoji icons in schedule cards have been replaced with clean, consistent icons across all schedule types and views.",
-    "<b>&#9889; Exam Readiness Engine</b> — Fixed title rendering and updated column headers from abbreviations (Acc%, Mock%, Qs) to full readable names (Accuracy %, Mock Exam %, Questions).",
-    "<b>&#128269; Performance & Stability</b> — Removed redundant re-render calls, fixed chart title visibility in Mock Analytics, resolved schedule date window bug that caused incorrect weekly stats, and consolidated analytics sub-renders for faster page loads."
+    "<b>&#128197; Move to Tomorrow</b> — Today's pending schedule items now have a <b>&#8594; Tmrw</b> button. Tap it to instantly reschedule any activity to the next day without deleting or re-creating it. Available in the Planner (Today tab) and the Attendance Day Report.",
+    "<b>&#128196; Exam Registration Overhaul</b> — Exam Registration entries no longer show 'Unknown Subject'. The Planner card, Day Report, and Dashboard overview widget now all correctly display the exam title, course, Notification No., and Reg No.",
+    "<b>&#9889; Crash Fixes</b> — Fixed a crash in the schedule list and dashboard widget when sorting Exam Registration items (which have no start time). Sorting now gracefully handles null times.",
+    "<b>&#128218; Day Report Improvements</b> — Exam Registration items in the Day Report now show with a green accent (matching their card colour) and correctly display their metadata instead of a missing subject name.",
+    "<b>&#128200; Performance</b> — Removed redundant sort calls; null-safe guards added throughout schedule rendering for faster, crash-free page loads."
   ]
 }

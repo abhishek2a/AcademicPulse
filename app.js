@@ -4568,9 +4568,9 @@ function updateScheduleModalFields() {
     if (examRegFields) examRegFields.style.display = isExamReg ? 'block' : 'none';
     if (timeFields) timeFields.style.display = isExamReg ? 'none' : 'flex';
     
-    // For exam_register, the Date field label changes to "Registration Deadline"
+    // For exam_register, the Date field label changes to "Registration Planning Date"
     if (dateLabel && dateLabel.tagName === 'LABEL') {
-        dateLabel.textContent = isExamReg ? 'Registration Deadline' : 'Date';
+        dateLabel.textContent = isExamReg ? 'Registration Planning Date' : 'Date';
     }
     
     if (!isExamReg) {
@@ -4994,7 +4994,7 @@ function renderScheduleList() {
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:0.65rem; color:${color}; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">${escapeHtml(item.course)} &bull; Exam Registration</div>
                             <div style="font-weight:600; font-size:1.05rem;">${escapeHtml(item.title)}</div>
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">&#128197; Exam Date: <b style="color:var(--text-main);">${examDateStr}</b></div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">&#128197; Deadline: <b style="color:var(--text-main);">${examDateStr}</b></div>
                             ${metaBits ? `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:5px;">${metaBits}</div>` : ''}
                             ${item.notes ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">${escapeHtml(item.notes)}</div>` : ''}
                         </div>

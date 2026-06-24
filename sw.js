@@ -1,16 +1,18 @@
-const CACHE_NAME = 'academicpulse-v1.0.48';
+const CACHE_NAME = 'academicpulse-v1.0.55';
 
 const STATIC_ASSETS = [
     'index.html',
     'style.css?v=18',
-    'app.js?v=42',
+    'app.js?v=78',
     'auth.js?v=12',
-    'export.js?v=11',
+    'export.js?v=9',
     'manifest.json',
     'icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
+    // Force immediate activation so new cache takes effect right away
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(STATIC_ASSETS).catch(err => console.warn('Static assets cache warning:', err)))
@@ -37,8 +39,6 @@ self.addEventListener('fetch', (event) => {
     // Cache First for static assets — match by pathname + search (handles ?v= versioned URLs)
     const fullPath = url.pathname + url.search;
     const isStaticAsset = STATIC_ASSETS.some(asset => {
-        // Match by pathname only (strip query) or by full pathname+search
-        const assetPath = asset.includes('?') ? asset : asset;
         return fullPath.endsWith(asset) || url.pathname.endsWith(asset.split('?')[0]);
     });
 

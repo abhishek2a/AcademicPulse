@@ -79,7 +79,7 @@ const AppState = {
     notifications: [],
     schedule: [],
     achievements: [],
-    currentVersion: 'v1.0.45',
+    currentVersion: 'v1.0.55',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -195,8 +195,8 @@ function loadData() {
     AppState.schedule = Storage.get(STORAGE_KEYS.SCHEDULE, []);
     AppState.achievements = Storage.get(STORAGE_KEYS.ACHIEVEMENTS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.45', availableUpdate: null, dataVersion: 2 });
-    AppState.currentVersion = sysState.currentVersion;
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.55', availableUpdate: null, dataVersion: 2 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.55';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -369,19 +369,12 @@ window.showWhatsNewPopup = async function() {
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
         features = [
-            "<b>Welcome to AcademicPulse v1.0.45!</b> This major update brings an entirely new interconnected experience, a background gamification engine, and our intelligent phased rollout system to ensure stability.",
-            "<b>🏆 Gamification Engine & Achievements</b>",
-            "<b>The 100-Hour Club:</b> A secret achievement is now unlocked when you successfully surpass 100 hours of total study time.",
-            "<b>Flawless Week:</b> You can now earn a dedicated streak badge by hitting your daily goal 7 days in a row.",
-            "<b>Mock Master:</b> Score above 85% on 3 consecutive mock exams within a single subject to earn this new title.",
-            "<b>Premium Banners:</b> New achievements will trigger a beautiful glowing banner on your dashboard that cleanly disappears after 24 hours.",
-            "<b>Trophy Room Modal:</b> We completely redesigned the Profile achievements section into a sleek, scrollable Trophy Room that tracks all of your lifetime awards.",
-            "<b>🔗 Interconnected UI & Smart Routing</b>",
-            "<b>Contextual Workflows:</b> All pages are now heavily integrated, allowing you to instantly jump from Subjects to Analytics, from Analytics Weak Areas straight into Focus Mode, or from low Attendance straight into Schedule planning.",
-            "<b>Smart Auto-fill:</b> Jumping into Focus Mode from any 'Practice Now' or 'Focus' button smartly passes the subject context so you don't have to manually select your subject when logging the session.",
-            "<b>🚀 Phased Rollout Engine</b>",
-            "<b>Power Users First:</b> Our most active users with high streaks or high session counts will now receive the newest cutting-edge updates immediately upon release.",
-            "<b>Stability for Casual Users:</b> To guarantee maximum stability, users who study less frequently will receive updates 3 days after the initial release."
+            "<b>&#127881; Welcome to AcademicPulse v1.0.55!</b> This update brings major analytics upgrades, a smarter Pulse AI engine, a new Mock Test schedule type in the planner, and a full round of bug fixes.",
+            "<b>&#127919; Mock Test in Planner</b> — Add Mock Test as a dedicated schedule type with a distinct red accent and &#127919; icon.",
+            "<b>&#128200; Mock Exam Analytics Overhaul</b> — ACCA / CSEB tabs, trend charts, and a Detailed History popup modal.",
+            "<b>&#129504; Smarter Pulse AI</b> — Fixed schedule completion tracking and weakest area predictions.",
+            "<b>&#128293; Schedule Icons Fixed</b> — Clean emoji icons across all schedule types.",
+            "<b>&#128269; Performance & Stability</b> — Faster renders, fixed chart titles, and resolved date window bugs."
         ];
     }
     const list = document.getElementById('whatsNewModalList');
@@ -1415,7 +1408,10 @@ window.setMockAnalyticsTab = function(course, el) {
     }
     
     const chartTitle = document.getElementById('mockChartTitle');
-    if (chartTitle) chartTitle.textContent = `Recent Mock Scores (%) - ${course}`;
+    if (chartTitle) {
+        chartTitle.textContent = `Recent Mock Scores (%) - ${course}`;
+        chartTitle.style.display = 'block';
+    }
     
     renderMockTotals();
     renderMockExamsChart();
@@ -2071,6 +2067,7 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
     }
 
     renderMockExamsChart();
+    renderMockTotals();
     renderMockAnalyticsTable();
 }
 
@@ -2176,10 +2173,13 @@ function generateAICoachAnalysis(type) {
         if (AppState.schedule) {
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            sevenDaysAgo.setHours(0, 0, 0, 0);
+            const endOfToday = new Date();
+            endOfToday.setHours(23, 59, 59, 999);
             AppState.schedule.forEach(s => {
                 const sDate = new Date(s.date);
-                if (sDate >= sevenDaysAgo && sDate <= now) {
-                    scheduleTotal++;
+                if (sDate >= sevenDaysAgo && sDate <= endOfToday) {
+                    if (s.status !== 'missed') scheduleTotal++;
                     if (s.status === 'completed') scheduleCompletes++;
                 }
             });
@@ -3078,7 +3078,6 @@ function initMocksAndPractice() {
     }
 
     renderMocksHistory();
-    renderMockTotals();
 }
 
 function renderMockTotals() {
@@ -4862,10 +4861,12 @@ function renderScheduleList() {
     filtered.forEach(item => {
         const isClass = item.type === 'class';
         const isPending = item.type === 'pending_topic';
+        const isMock = item.type === 'mock_test';
         let color = 'var(--neon-blue)';
-        let icon = '📖';
-        if (isClass) { color = 'var(--neon-purple)'; icon = '🎥'; }
-        else if (isPending) { color = 'var(--neon-gold)'; icon = '⏳'; }
+        let icon = '&#128218;';
+        if (isClass) { color = 'var(--neon-purple)'; icon = '&#127979;'; }
+        else if (isPending) { color = 'var(--neon-gold)'; icon = '&#128203;'; }
+        else if (isMock) { color = 'var(--neon-red)'; icon = '&#127919;'; }
         
         const card = document.createElement('div');
         card.style.background = 'var(--glass-bg)';
@@ -4943,10 +4944,12 @@ function renderOverviewScheduleWidget() {
     displayItems.forEach(item => {
         const isClass = item.type === 'class';
         const isPending = item.type === 'pending_topic';
+        const isMock = item.type === 'mock_test';
         let color = 'var(--neon-blue)';
-        let icon = '📖';
-        if (isClass) { color = 'var(--neon-purple)'; icon = '🎥'; }
-        else if (isPending) { color = 'var(--neon-gold)'; icon = '⏳'; }
+        let icon = '&#128218;';
+        if (isClass) { color = 'var(--neon-purple)'; icon = '&#127979;'; }
+        else if (isPending) { color = 'var(--neon-gold)'; icon = '&#128203;'; }
+        else if (isMock) { color = 'var(--neon-red)'; icon = '&#127919;'; }
         
         const subj = AppState.subjects.find(sub => sub.id === item.subjectId);
         const subjName = subj ? subj.name : 'Unknown Subject';
@@ -4966,7 +4969,7 @@ function renderOverviewScheduleWidget() {
                     <div style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">
                         ${formatTimeStr(item.startTime)}
                     </div>
-                    ${(!isClass && item.status !== 'completed') ? `<button onclick="navigateTo('view-focus', {subjectId: '${item.subjectId}'})" style="background:var(--neon-blue); color:#000; border:none; padding:4px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; cursor:pointer;">FOCUS</button>` : ''}
+                    ${(!isClass && !isMock && item.status !== 'completed') ? `<button onclick="navigateTo('view-focus', {subjectId: '${item.subjectId}'})" style="background:var(--neon-blue); color:#000; border:none; padding:4px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; cursor:pointer;">FOCUS</button>` : ''}
                 </div>
             </div>
         `;

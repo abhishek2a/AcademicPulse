@@ -1,19 +1,14 @@
 {
-  "version": "1.0.45",
-  "build": "2026.06.20-stable",
+  "version": "v1.0.55",
+  "build": "2026.06.24-stable",
   "features": [
-    "<b>Welcome to AcademicPulse v1.0.45!</b> This major update brings an entirely new interconnected experience, a background gamification engine, and our intelligent phased rollout system to ensure stability.",
-    "<b>🏆 Gamification Engine & Achievements</b>",
-    "<b>The 100-Hour Club:</b> A secret achievement is now unlocked when you successfully surpass 100 hours of total study time.",
-    "<b>Flawless Week:</b> You can now earn a dedicated streak badge by hitting your daily study goal 7 days in a row.",
-    "<b>Mock Master:</b> Score above 85% on 3 consecutive mock exams within a single subject to earn this new title.",
-    "<b>Premium Banners:</b> New achievements will trigger a beautiful glowing banner on your dashboard that cleanly disappears after 24 hours.",
-    "<b>Trophy Room Modal:</b> We completely redesigned the Profile achievements section into a sleek, scrollable Trophy Room that tracks all of your lifetime awards.",
-    "<b>🔗 Interconnected UI & Smart Routing</b>",
-    "<b>Contextual Workflows:</b> All pages are now heavily integrated, allowing you to instantly jump from Subjects to Analytics, from Analytics Weak Areas straight into Focus Mode, or from low Attendance straight into Schedule planning.",
-    "<b>Smart Auto-fill:</b> Jumping into Focus Mode from any \"Practice Now\" or \"Focus\" button smartly passes the subject context so you don't have to manually select your subject when logging the session.",
-    "<b>🚀 Phased Rollout Engine</b>",
-    "<b>Power Users First:</b> Our most active users with high streaks or high session counts will now receive the newest cutting-edge updates immediately upon release.",
-    "<b>Stability for Casual Users:</b> To guarantee maximum stability, users who study less frequently will receive updates 3 days after the initial release."
+    "<b>&#127881; Welcome to AcademicPulse v1.0.55!</b> This update brings major analytics upgrades, a smarter Pulse AI engine, a new Mock Test schedule type in the planner, and a full round of bug fixes and performance improvements.",
+    "<b>&#127919; Mock Test in Planner</b> — You can now add <b>Mock Test</b> as a dedicated schedule type in the Planner (alongside Self Study, Class, and Pending Topic). Mock test sessions get a distinct red accent and &#127919; icon so they stand out.",
+    "<b>&#128200; Mock Exam Analytics Overhaul</b> — The Analytics page now has a dedicated <b>Mock Exam Performance</b> section with ACCA / CSEB tabs, average scores, a trend chart, and a scrollable <b>Detailed History</b> popup showing every mock with date, time, topic, score, and notes.",
+    "<b>&#129504; Smarter Pulse AI</b> — Fixed a bug where Pulse AI always showed 0% schedule completion even when tasks were finished. The AI now correctly reads your completed schedule items and accurately reports your <b>Planning Score</b>.",
+    "<b>&#127947; Pulse AI Weakest Areas</b> — The AI no longer says 'No weaknesses detected' when you ace your mock exams. It now intelligently falls back to highlighting <b>untested syllabus areas</b> so you always have an actionable recommendation.",
+    "<b>&#128293; Schedule Icons Fixed</b> — Garbled emoji icons in schedule cards have been replaced with clean, consistent icons across all schedule types and views.",
+    "<b>&#9889; Exam Readiness Engine</b> — Fixed title rendering and updated column headers from abbreviations (Acc%, Mock%, Qs) to full readable names (Accuracy %, Mock Exam %, Questions).",
+    "<b>&#128269; Performance & Stability</b> — Removed redundant re-render calls, fixed chart title visibility in Mock Analytics, resolved schedule date window bug that caused incorrect weekly stats, and consolidated analytics sub-renders for faster page loads."
   ]
 }

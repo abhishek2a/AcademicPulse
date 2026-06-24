@@ -1,38 +1,104 @@
-const CACHE = 'study-tracker-v1.1.60';
-const PRECACHE = ['/', './index.html', './manifest.json', './logo.svg'];
+const CACHE_NAME = 'academicpulse-v1.0.55';
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting())
-  );
+const STATIC_ASSETS = [
+    'index.html',
+    'style.css?v=18',
+    'app.js?v=78',
+    'auth.js?v=12',
+    'export.js?v=9',
+    'manifest.json',
+    'icon.svg'
+];
+
+self.addEventListener('install', (event) => {
+    // Force immediate activation so new cache takes effect right away
+    self.skipWaiting();
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(STATIC_ASSETS).catch(err => console.warn('Static assets cache warning:', err)))
+    );
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+self.addEventListener('activate', (event) => {
+    // Chain both operations into a single waitUntil so clients.claim() is guaranteed
+    event.waitUntil(
+        caches.keys()
+            .then(keys => Promise.all(
+                keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+            ))
+            .then(() => self.clients.claim())
+    );
 });
 
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  const url = new URL(e.request.url);
-  // Always go network-first for Firebase, CDN assets
-  if (url.hostname.includes('firebase') || url.hostname.includes('googleapis') || url.hostname.includes('gstatic')) {
-    return;
-  }
-  e.respondWith(
-    fetch(e.request).then(res => {
-      if (res && res.status === 200 && res.type === 'basic') {
-        const resClone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, resClone));
-      }
-      return res;
-    }).catch(() => caches.match(e.request))
-  );
+self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+
+    // Ignore non-GET and extension requests
+    if (event.request.method !== 'GET' || url.protocol === 'chrome-extension:') return;
+
+    // Cache First for static assets — match by pathname + search (handles ?v= versioned URLs)
+    const fullPath = url.pathname + url.search;
+    const isStaticAsset = STATIC_ASSETS.some(asset => {
+        return fullPath.endsWith(asset) || url.pathname.endsWith(asset.split('?')[0]);
+    });
+
+    if (isStaticAsset) {
+        event.respondWith(
+            caches.match(event.request).then(response => {
+                return response || fetch(event.request).then(fetchRes => {
+                    return caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, fetchRes.clone());
+                        return fetchRes;
+                    });
+                });
+            })
+        );
+        return;
+    }
+
+    // Stale While Revalidate for fonts
+    if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com')) {
+        event.respondWith(
+            caches.match(event.request).then(cachedResponse => {
+                const fetchPromise = fetch(event.request).then(networkResponse => {
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, networkResponse.clone());
+                    });
+                    return networkResponse;
+                });
+                return cachedResponse || fetchPromise;
+            })
+        );
+        return;
+    }
+
+    // Network First for HTML, JS, API endpoints (fallback to cache for offline)
+    event.respondWith(
+        fetch(event.request).then(response => {
+            const resClone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+            return response;
+        }).catch(() => {
+            return caches.match(event.request);
+        })
+    );
 });
 
-self.addEventListener('message', e => {
-  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'CHECK_FOR_UPDATES') {
+        fetch('./version.json?t=' + Date.now())
+            .then(res => res.json())
+            .then(updateInfo => {
+                updateInfo.date = new Date().toLocaleDateString();
+                event.source.postMessage({
+                    type: 'UPDATE_AVAILABLE',
+                    payload: updateInfo
+                });
+            })
+            .catch(err => console.error('Error checking updates:', err));
+    }
+
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });

@@ -5065,34 +5065,50 @@ function renderOverviewScheduleWidget() {
         const isClass = item.type === 'class';
         const isPending = item.type === 'pending_topic';
         const isMock = item.type === 'mock_test';
+        const isExamReg = item.type === 'exam_register';
         let color = 'var(--neon-blue)';
         let icon = '&#128218;';
         if (isClass) { color = 'var(--neon-purple)'; icon = '&#127979;'; }
         else if (isPending) { color = 'var(--neon-gold)'; icon = '&#128203;'; }
         else if (isMock) { color = 'var(--neon-red)'; icon = '&#127919;'; }
+        else if (isExamReg) { color = 'var(--neon-green)'; icon = '&#128196;'; }
         
-        const subj = AppState.subjects.find(sub => sub.id === item.subjectId);
-        const subjName = subj ? subj.name : 'Unknown Subject';
-        const courseStr = subj ? (subj.course || 'CSEB') : '';
-        const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');
-        
-        html += `
-            <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; background:var(--glass-bg); padding:10px 12px; border-radius:10px; border-left: 3px solid ${item.status === 'completed' ? 'var(--glass-border)' : color}; ${item.status === 'completed' ? 'opacity:0.6;' : ''}">
-                <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
-                    <div style="width:24px; height:24px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:0.8rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
-                    <div style="flex: 1; min-width: 0;">
-                        ${courseStr ? `<div style="font-size:0.65rem; color:${color}; font-weight:700; text-transform:uppercase; margin-bottom:2px; letter-spacing:0.5px;">${courseStr}</div>` : ''}
-                        <div style="font-size:0.9rem; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
+        if (isExamReg) {
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; background:var(--glass-bg); padding:10px 12px; border-radius:10px; border-left: 3px solid ${item.status === 'completed' ? 'var(--glass-border)' : color}; ${item.status === 'completed' ? 'opacity:0.6;' : ''}">
+                    <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
+                        <div style="width:24px; height:24px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:0.8rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-size:0.65rem; color:${color}; font-weight:700; text-transform:uppercase; margin-bottom:2px; letter-spacing:0.5px;">${escapeHtml(item.course)} &bull; EXAM REG</div>
+                            <div style="font-size:0.9rem; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+                        </div>
                     </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:10px; flex-shrink: 0;">
-                    <div style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">
-                        ${formatTimeStr(item.startTime)}
+            `;
+        } else {
+            const subj = AppState.subjects.find(sub => sub.id === item.subjectId);
+            const subjName = subj ? subj.name : 'Unknown Subject';
+            const courseStr = subj ? (subj.course || 'CSEB') : '';
+            const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');
+            
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; background:var(--glass-bg); padding:10px 12px; border-radius:10px; border-left: 3px solid ${item.status === 'completed' ? 'var(--glass-border)' : color}; ${item.status === 'completed' ? 'opacity:0.6;' : ''}">
+                    <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
+                        <div style="width:24px; height:24px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:0.8rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
+                        <div style="flex: 1; min-width: 0;">
+                            ${courseStr ? `<div style="font-size:0.65rem; color:${color}; font-weight:700; text-transform:uppercase; margin-bottom:2px; letter-spacing:0.5px;">${courseStr}</div>` : ''}
+                            <div style="font-size:0.9rem; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
+                        </div>
                     </div>
-                    ${(!isClass && !isMock && item.status !== 'completed') ? `<button onclick="navigateTo('view-focus', {subjectId: '${item.subjectId}'})" style="background:var(--neon-blue); color:#000; border:none; padding:4px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; cursor:pointer;">FOCUS</button>` : ''}
+                    <div style="display:flex; align-items:center; gap:10px; flex-shrink: 0;">
+                        <div style="font-size:0.8rem; color:var(--text-muted); white-space:nowrap;">
+                            ${formatTimeStr(item.startTime)}
+                        </div>
+                        ${(!isClass && !isMock && item.status !== 'completed') ? `<button onclick="navigateTo('view-focus', {subjectId: '${item.subjectId}'})" style="background:var(--neon-blue); color:#000; border:none; padding:4px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; cursor:pointer;">FOCUS</button>` : ''}
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     });
     
     if (todayItems.length > 3) {

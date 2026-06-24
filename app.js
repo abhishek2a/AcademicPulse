@@ -61,10 +61,10 @@ const DEFAULT_SUBJECTS = [
 ];
 
 const EXAMS = [
-    { category: 'CAT 11/2026 · TARGET', date: '2026-07-11T00:00:00', title: 'Junior Clerk / Cashier', subtext: 'Special Grade · Class-I Banks' },
-    { category: 'CAT 10/2026 · UPCOMING', date: '2026-08-08T00:00:00', title: 'Junior Clerk / Cashier', subtext: 'Super Grade Banks' },
-    { category: 'CAT 09/2026 · UPCOMING', date: '2026-08-16T00:00:00', title: 'Assistant Secretary', subtext: '' },
-    { category: 'ACCA · UPCOMING', date: '2026-09-10T00:00:00', title: 'Financial Reporting (FR)', subtext: '' }
+    { category: 'ACCA · UPCOMING', date: '2026-09-10T00:00:00', title: 'Financial Reporting (FR)', subtext: 'Sep 2026 Session' },
+    { category: 'CAT 11/2026', date: null, title: 'Junior Clerk / Cashier', subtext: 'Special Grade · Class-I Banks', postponed: true },
+    { category: 'CAT 10/2026', date: null, title: 'Junior Clerk / Cashier', subtext: 'Super Grade Banks', postponed: true },
+    { category: 'CAT 09/2026', date: null, title: 'Assistant Secretary', subtext: '', postponed: true }
 ];
 
 const AppState = {
@@ -79,7 +79,7 @@ const AppState = {
     notifications: [],
     schedule: [],
     achievements: [],
-    currentVersion: 'v1.0.56',
+    currentVersion: 'v1.0.57',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -195,8 +195,8 @@ function loadData() {
     AppState.schedule = Storage.get(STORAGE_KEYS.SCHEDULE, []);
     AppState.achievements = Storage.get(STORAGE_KEYS.ACHIEVEMENTS, []);
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.56', availableUpdate: null, dataVersion: 2 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.56';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.57', availableUpdate: null, dataVersion: 2 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.57';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -1163,23 +1163,34 @@ function renderExams() {
     today.setHours(0,0,0,0);
 
     EXAMS.forEach(exam => {
-        const examDate = new Date(exam.date);
-        const diffTime = examDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        let daysText = diffDays > 0 ? `${diffDays} days left` : diffDays === 0 ? "Today!" : "Passed";
-        let daysColor = diffDays > 0 ? "#30D158" : diffDays === 0 ? "#FFD60A" : "#FF453A";
-        
-        const formattedDate = examDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
         const card = document.createElement('div');
         card.className = 'exam-card';
-        card.innerHTML = `
-            <div class="exam-meta">${exam.category}</div>
-            <div class="exam-date">${formattedDate}</div>
-            <div class="exam-title">${exam.title}${exam.subtext ? `<br><span style="font-size:0.8rem; color:#6E6E73;">${exam.subtext}</span>` : ''}</div>
-            <div class="exam-days" style="color: ${daysColor}">${daysText}</div>
-        `;
+
+        if (exam.postponed) {
+            card.innerHTML = `
+                <div class="exam-meta">${exam.category}</div>
+                <div class="exam-date" style="color:var(--text-muted); font-size:0.85rem;">Date TBA</div>
+                <div class="exam-title">${exam.title}${exam.subtext ? `<br><span style="font-size:0.8rem; color:#6E6E73;">${exam.subtext}</span>` : ''}</div>
+                <div class="exam-days" style="color:#FF9F0A; font-size:0.8rem; font-weight:600;">&#128337; Date Postponed</div>
+            `;
+        } else {
+            const examDate = new Date(exam.date);
+            const diffTime = examDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            let daysText = diffDays > 0 ? `${diffDays} days left` : diffDays === 0 ? 'Today!' : 'Passed';
+            let daysColor = diffDays > 14 ? '#30D158' : diffDays > 7 ? '#FFD60A' : diffDays >= 0 ? '#FF453A' : '#6E6E73';
+
+            const formattedDate = examDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+            card.innerHTML = `
+                <div class="exam-meta">${exam.category}</div>
+                <div class="exam-date">${formattedDate}</div>
+                <div class="exam-title">${exam.title}${exam.subtext ? `<br><span style="font-size:0.8rem; color:#6E6E73;">${exam.subtext}</span>` : ''}</div>
+                <div class="exam-days" style="color: ${daysColor}">${daysText}</div>
+            `;
+        }
+
         container.appendChild(card);
     });
 }
@@ -4607,6 +4618,7 @@ function updateScheduleExamAlert() {
     EXAMS.forEach(exam => {
         if (course === 'CSEB' && !exam.category.includes('CAT')) return;
         if (course === 'ACCA' && !exam.category.includes('ACCA')) return;
+        if (exam.postponed || !exam.date) return; // Skip postponed exams
         
         const examDate = new Date(exam.date);
         const diffTime = examDate.getTime() - today.getTime();
@@ -4620,7 +4632,7 @@ function updateScheduleExamAlert() {
     
     if (nextExam) {
         alertEl.style.display = 'block';
-        alertEl.innerHTML = `🚨 <strong>Next Exam:</strong> ${course === 'CSEB' ? 'CSEB' : 'ACCA FR'} is in <strong>${minDiff} days!</strong>`;
+        alertEl.innerHTML = `&#128680; <strong>Next Exam:</strong> ${nextExam.category.split('·')[0].trim()} is in <strong>${minDiff} day${minDiff !== 1 ? 's' : ''}!</strong>`;
     } else {
         alertEl.style.display = 'none';
     }
@@ -4851,6 +4863,8 @@ function saveSchedulePlan() {
             item.date = date;
             item.startTime = startTime;
             item.endTime = endTime;
+            // Reset status so rescheduled/edited missed items become pending again
+            if (item.status === 'missed') item.status = 'pending';
         }
     } else {
         AppState.schedule.push({
@@ -4910,19 +4924,29 @@ window.completeScheduleItem = function(id) {
     const item = AppState.schedule.find(s => s.id === id);
     if (!item) return;
 
+    // exam_register items can't be logged as sessions — just mark done
+    if (item.type === 'exam_register') {
+        item.status = 'completed';
+        saveData('schedule');
+        renderScheduleList();
+        renderOverview();
+        addNotification('Marked Complete', `"${item.title || 'Exam Registration'}" marked as done.`, 'success');
+        return;
+    }
+
     // Auto-fill logSessionModal instead of silently logging
     document.getElementById('logDateInput').value = item.date;
     
-    const start = new Date(`${item.date}T${item.startTime}:00`);
-    let end = new Date(`${item.date}T${item.endTime}:00`);
+    const start = new Date(`${item.date}T${item.startTime || '00:00'}:00`);
+    let end = new Date(`${item.date}T${item.endTime || '01:00'}:00`);
     if (end < start) end.setDate(end.getDate() + 1); // overnight
     const diffMins = Math.round((end - start) / 60000);
     
     document.getElementById('logHoursInput').value = Math.floor(diffMins / 60);
     document.getElementById('logMinutesInput').value = diffMins % 60;
     
-    document.getElementById('logStartTimeInput').value = item.startTime;
-    document.getElementById('logEndTimeInput').value = item.endTime;
+    document.getElementById('logStartTimeInput').value = item.startTime || '00:00';
+    document.getElementById('logEndTimeInput').value = item.endTime || '01:00';
     
     const courseInput = document.getElementById('logCourseInput');
     courseInput.value = item.course || 'CSEB';
@@ -5077,7 +5101,7 @@ function renderOverviewScheduleWidget() {
     const displayItems = todayItems.slice(0, 3);
     
     const formatTimeStr = (t) => {
-        let [h, m] = t.split(':').map(Number);
+        let [h, m] = (t || '00:00').split(':').map(Number);
         let ampm = h >= 12 ? 'PM' : 'AM';
         h = h % 12 || 12;
         return `${h}:${m.toString().padStart(2,'0')} ${ampm}`;

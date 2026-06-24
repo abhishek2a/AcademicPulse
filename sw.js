@@ -1,9 +1,9 @@
-const CACHE_NAME = 'academicpulse-v1.0.56';
+const CACHE_NAME = 'academicpulse-v1.0.57';
 
 const STATIC_ASSETS = [
     'index.html',
     'style.css?v=18',
-    'app.js?v=78',
+    'app.js?v=81',
     'auth.js?v=12',
     'export.js?v=9',
     'manifest.json',

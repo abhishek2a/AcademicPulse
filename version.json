@@ -1,11 +1,11 @@
 {
-  "version": "v1.0.56",
+  "version": "v1.0.57",
   "build": "2026.06.24-stable",
   "features": [
-    "<b>&#128197; Move to Tomorrow</b> — Today's pending schedule items now have a <b>&#8594; Tmrw</b> button. Tap it to instantly reschedule any activity to the next day without deleting or re-creating it. Available in the Planner (Today tab) and the Attendance Day Report.",
-    "<b>&#128196; Exam Registration Overhaul</b> — Exam Registration entries no longer show 'Unknown Subject'. The Planner card, Day Report, and Dashboard overview widget now all correctly display the exam title, course, Notification No., and Reg No.",
-    "<b>&#9889; Crash Fixes</b> — Fixed a crash in the schedule list and dashboard widget when sorting Exam Registration items (which have no start time). Sorting now gracefully handles null times.",
-    "<b>&#128218; Day Report Improvements</b> — Exam Registration items in the Day Report now show with a green accent (matching their card colour) and correctly display their metadata instead of a missing subject name.",
-    "<b>&#128200; Performance</b> — Removed redundant sort calls; null-safe guards added throughout schedule rendering for faster, crash-free page loads."
+    "<b>&#128197; Move to Tomorrow</b> — Today's pending schedule items now have a <b>&#8594; Tmrw</b> button. Tap it to instantly reschedule any activity to tomorrow without deleting and re-creating it.",
+    "<b>&#128196; Exam Registration — All Views Fixed</b> — Exam Registration cards now render correctly in the Planner, Dashboard Overview, and Day Report. No more 'Unknown Subject' display.",
+    "<b>&#127381; Crash Fix: Complete Button</b> — Tapping the complete (&#10003;) button on an Exam Registration item no longer crashes. It now correctly marks it as done instead of trying to open a study log.",
+    "<b>&#128337; CAT Exams Marked as Date Postponed</b> — CAT 9, 10 and 11 exam dates have been officially postponed. Their cards now show 'Date Postponed' status. ACCA FR (Sep 2026) remains active with a countdown.",
+    "<b>&#9889; Stability</b> — Fixed null-time crash when sorting schedule items, fixed service worker asset version mismatch, and added null-safety guards throughout schedule rendering."
   ]
 }

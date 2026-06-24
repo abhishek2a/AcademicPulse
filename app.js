@@ -4539,7 +4539,7 @@ function initSchedule() {
         document.getElementById('scheduleModal').classList.remove('active');
     });
 
-    document.getElementById('scheduleTypeInput').addEventListener('change', updateScheduleExamAlert);
+    document.getElementById('scheduleTypeInput').addEventListener('change', updateScheduleModalFields);
     
     document.getElementById('scheduleCourseInput').addEventListener('change', (e) => {
         populateScheduleSubjects(e.target.value);
@@ -4553,6 +4553,29 @@ function initSchedule() {
     document.getElementById('scheduleTopicDropdown').addEventListener('change', (e) => {
         // ... (removed custom topic logic)
     });
+}
+
+function updateScheduleModalFields() {
+    const type = document.getElementById('scheduleTypeInput').value;
+    const isExamReg = type === 'exam_register';
+    
+    const standardFields = document.getElementById('scheduleStandardFields');
+    const examRegFields = document.getElementById('scheduleExamRegFields');
+    const timeFields = document.getElementById('scheduleTimeFields');
+    const dateLabel = document.querySelector('#scheduleDateInput')?.previousElementSibling;
+
+    if (standardFields) standardFields.style.display = isExamReg ? 'none' : 'block';
+    if (examRegFields) examRegFields.style.display = isExamReg ? 'block' : 'none';
+    if (timeFields) timeFields.style.display = isExamReg ? 'none' : 'flex';
+    
+    // For exam_register, the Date field label changes to "Registration Deadline"
+    if (dateLabel && dateLabel.tagName === 'LABEL') {
+        dateLabel.textContent = isExamReg ? 'Registration Deadline' : 'Date';
+    }
+    
+    if (!isExamReg) {
+        updateScheduleExamAlert();
+    }
 }
 
 function updateScheduleExamAlert() {
@@ -4712,8 +4735,21 @@ window.openScheduleModal = function(id = null) {
         }
         document.getElementById('scheduleTitleInput').value = item.title || '';
         document.getElementById('scheduleDateInput').value = item.date;
-        document.getElementById('scheduleStartTimeInput').value = item.startTime;
-        document.getElementById('scheduleEndTimeInput').value = item.endTime;
+        document.getElementById('scheduleStartTimeInput').value = item.startTime || '10:00';
+        document.getElementById('scheduleEndTimeInput').value = item.endTime || '11:00';
+        // Populate exam_register fields
+        const erCourse = document.getElementById('scheduleExamRegCourse');
+        const erTitle = document.getElementById('scheduleExamRegTitle');
+        const erNotif = document.getElementById('scheduleExamNotifNo');
+        const erReg = document.getElementById('scheduleExamRegNo');
+        const erDate = document.getElementById('scheduleExamDate');
+        const erNotes = document.getElementById('scheduleExamNotes');
+        if (erCourse) erCourse.value = item.course || 'CSEB';
+        if (erTitle) erTitle.value = item.title || '';
+        if (erNotif) erNotif.value = item.notifNo || '';
+        if (erReg) erReg.value = item.regNo || '';
+        if (erDate) erDate.value = item.examDate || '';
+        if (erNotes) erNotes.value = item.notes || '';
     } else {
         document.getElementById('scheduleModalTitle').textContent = 'Add Schedule Plan';
         document.getElementById('scheduleIdInput').value = '';
@@ -4725,24 +4761,74 @@ window.openScheduleModal = function(id = null) {
         document.getElementById('scheduleDateInput').value = today;
         document.getElementById('scheduleStartTimeInput').value = '10:00';
         document.getElementById('scheduleEndTimeInput').value = '11:00';
+        // Reset exam reg fields
+        ['scheduleExamRegTitle','scheduleExamNotifNo','scheduleExamRegNo','scheduleExamNotes'].forEach(id => {
+            const el = document.getElementById(id); if (el) el.value = '';
+        });
+        const examDateEl = document.getElementById('scheduleExamDate');
+        if (examDateEl) examDateEl.value = '';
     }
-    updateScheduleExamAlert();
+    updateScheduleModalFields();
     modal.classList.add('active');
 };
 
 function saveSchedulePlan() {
     const id = document.getElementById('scheduleIdInput').value;
     const type = document.getElementById('scheduleTypeInput').value;
+    const date = document.getElementById('scheduleDateInput').value;
+    
+    if (!date) return alert('Please select a date.');
+    
+    if (type === 'exam_register') {
+        const course = document.getElementById('scheduleExamRegCourse').value;
+        const title = document.getElementById('scheduleExamRegTitle').value.trim();
+        const notifNo = document.getElementById('scheduleExamNotifNo').value.trim();
+        const regNo = document.getElementById('scheduleExamRegNo').value.trim();
+        const examDate = document.getElementById('scheduleExamDate').value;
+        const notes = document.getElementById('scheduleExamNotes').value.trim();
+        
+        if (!title) return alert('Please enter an Exam Name / Title.');
+        
+        const payload = {
+            id: id || generateId(),
+            type,
+            course,
+            subjectId: null,
+            topic: null,
+            title,
+            notifNo,
+            regNo,
+            examDate,
+            notes,
+            date,
+            startTime: '00:00',
+            endTime: '00:00',
+            status: 'pending'
+        };
+        
+        if (id) {
+            const idx = AppState.schedule.findIndex(s => s.id === id);
+            if (idx !== -1) AppState.schedule[idx] = { ...AppState.schedule[idx], ...payload };
+        } else {
+            AppState.schedule.push(payload);
+        }
+        saveData('schedule');
+        renderScheduleList();
+        document.getElementById('scheduleModal').classList.remove('active');
+        addNotification('Exam Registration Saved', `${title} (${course}) has been added to your planner.`, 'success');
+        return;
+    }
+    
+    // Standard types
     const course = document.getElementById('scheduleCourseInput').value;
     const subjectId = document.getElementById('scheduleSubjectInput').value;
     const topic = document.getElementById('scheduleTopicDropdown').value;
     const title = document.getElementById('scheduleTitleInput').value.trim();
-    const date = document.getElementById('scheduleDateInput').value;
     const startTime = document.getElementById('scheduleStartTimeInput').value;
     const endTime = document.getElementById('scheduleEndTimeInput').value;
     
     if (!subjectId || !date || !startTime || !endTime) {
-        return alert("Please fill in all required fields (Subject, Date, Times).");
+        return alert('Please fill in all required fields (Subject, Date, Times)');
     }
     
     if (id) {
@@ -4867,6 +4953,7 @@ function renderScheduleList() {
         if (isClass) { color = 'var(--neon-purple)'; icon = '&#127979;'; }
         else if (isPending) { color = 'var(--neon-gold)'; icon = '&#128203;'; }
         else if (isMock) { color = 'var(--neon-red)'; icon = '&#127919;'; }
+        else if (item.type === 'exam_register') { color = 'var(--neon-green)'; icon = '&#128196;'; }
         
         const card = document.createElement('div');
         card.style.background = 'var(--glass-bg)';
@@ -4879,38 +4966,71 @@ function renderScheduleList() {
         card.style.gap = '10px';
         if (item.status === 'completed') card.style.opacity = '0.6';
         
-        const subj = AppState.subjects.find(s => s.id === item.subjectId);
-        const subjName = subj ? subj.name : 'Unknown Subject';
-        const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');
-        
         const formatTimeStr = (t) => {
-            let [h, m] = t.split(':').map(Number);
+            let [h, m] = (t || '00:00').split(':').map(Number);
             let ampm = h >= 12 ? 'PM' : 'AM';
             h = h % 12 || 12;
             return `${h}:${m.toString().padStart(2,'0')} ${ampm}`;
         };
+        const dateDisp = currentScheduleTab !== 'today' ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:5px;">${new Date(item.date + 'T12:00:00').toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'})}</div>` : '';
         
-        const dateDisp = currentScheduleTab !== 'today' ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:5px;">${new Date(item.date).toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'})}</div>` : '';
+        const isExamReg = item.type === 'exam_register';
         
-        card.innerHTML = `
-            ${dateDisp}
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px;">
-                <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
-                    <div style="width:30px; height:30px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight:600; font-size:1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
-                        <div style="font-size:0.85rem; color:var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}</div>
+        // Build card content
+        let cardBody = '';
+
+        
+        if (isExamReg) {
+            const examDateStr = item.examDate ? new Date(item.examDate).toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'}) : 'TBD';
+            const metaBits = [
+                item.notifNo ? `<span style="background:rgba(48,209,88,0.1); color:var(--neon-green); border-radius:4px; padding:2px 6px; font-size:0.72rem;">Notif: ${escapeHtml(item.notifNo)}</span>` : '',
+                item.regNo ? `<span style="background:rgba(41,151,255,0.1); color:var(--neon-blue); border-radius:4px; padding:2px 6px; font-size:0.72rem;">Reg: ${escapeHtml(item.regNo)}</span>` : ''
+            ].filter(Boolean).join(' ');
+            cardBody = `
+                ${dateDisp}
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+                        <div style="width:30px; height:30px; flex-shrink:0; border-radius:50%; background:var(--glass-bg); display:flex; align-items:center; justify-content:center; font-size:1.1rem;">${icon}</div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:0.65rem; color:${color}; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">${escapeHtml(item.course)} &bull; Exam Registration</div>
+                            <div style="font-weight:600; font-size:1.05rem;">${escapeHtml(item.title)}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">&#128197; Exam Date: <b style="color:var(--text-main);">${examDateStr}</b></div>
+                            ${metaBits ? `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:5px;">${metaBits}</div>` : ''}
+                            ${item.notes ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">${escapeHtml(item.notes)}</div>` : ''}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px; flex-shrink:0;">
+                        <button onclick="openScheduleModal('${item.id}')" style="background:transparent; color:var(--neon-blue); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Edit">&#9998;</button>
+                        <button onclick="deleteScheduleItem('${item.id}')" style="background:transparent; color:var(--neon-red); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Delete">&times;</button>
                     </div>
                 </div>
-                <div style="display:flex; gap:5px; flex-shrink: 0;">
-                    ${item.status !== 'completed' ? `
-                        <button onclick="completeScheduleItem('${item.id}')" style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer;" title="Complete & Log">✓</button>
-                    ` : `<span style="color:var(--neon-green); font-size:0.8rem; border:1px solid var(--neon-green); border-radius:4px; padding:2px 6px;">Completed</span>`}
-                    <button onclick="openScheduleModal('${item.id}')" style="background:transparent; color:var(--neon-blue); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Edit">✎</button>
-                    <button onclick="deleteScheduleItem('${item.id}')" style="background:transparent; color:var(--neon-red); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Delete">×</button>
+            `;
+        } else {
+            const subj = AppState.subjects.find(s => s.id === item.subjectId);
+            const subjName = subj ? subj.name : 'Unknown Subject';
+            const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');
+            cardBody = `
+                ${dateDisp}
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
+                        <div style="width:30px; height:30px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight:600; font-size:1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
+                            <div style="font-size:0.85rem; color:var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px; flex-shrink: 0;">
+                        ${item.status !== 'completed' ? `
+                            <button onclick="completeScheduleItem('${item.id}')" style="background:rgba(48,209,88,0.15); color:var(--neon-green); border:none; border-radius:6px; padding:6px 10px; cursor:pointer;" title="Complete & Log">&#10003;</button>
+                        ` : `<span style="color:var(--neon-green); font-size:0.8rem; border:1px solid var(--neon-green); border-radius:4px; padding:2px 6px;">Done</span>`}
+                        <button onclick="openScheduleModal('${item.id}')" style="background:transparent; color:var(--neon-blue); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Edit">&#9998;</button>
+                        <button onclick="deleteScheduleItem('${item.id}')" style="background:transparent; color:var(--neon-red); border:none; border-radius:6px; padding:6px; cursor:pointer;" title="Delete">&times;</button>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
+        
+        card.innerHTML = cardBody;
         container.appendChild(card);
     });
 }

@@ -1120,35 +1120,73 @@
                     <option value="class">&#127979; Class</option>
                     <option value="pending_topic">&#128203; Pending Topic</option>
                     <option value="mock_test">&#127919; Mock Test</option>
+                    <option value="exam_register">&#128196; Exam Registration</option>
                 </select>
             </div>
-            <div style="display: flex; gap: 15px;">
-                <div class="form-group" style="flex: 1;">
+
+            <!-- Standard fields (hidden for exam_register) -->
+            <div id="scheduleStandardFields">
+                <div style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Course</label>
+                        <select id="scheduleCourseInput" required>
+                            <option value="CSEB">CSEB</option>
+                            <option value="ACCA">ACCA</option>
+                        </select>
+                        <div id="scheduleExamAlert" style="margin-top: 6px; font-size: 0.75rem; color: var(--neon-gold); display: none;"></div>
+                    </div>
+                    <div class="form-group" style="flex: 2;">
+                        <label>Subject</label>
+                        <select id="scheduleSubjectInput" required>
+                            <!-- Injected options -->
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Syllabus Topic (Optional)</label>
+                    <select id="scheduleTopicDropdown">
+                        <option value="">-- Select a Topic --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Title / Notes (Optional)</label>
+                    <input type="text" id="scheduleTitleInput" placeholder="e.g. Chapter 4 Review">
+                </div>
+            </div>
+
+            <!-- Exam Registration fields (shown only for exam_register) -->
+            <div id="scheduleExamRegFields" style="display: none;">
+                <div class="form-group">
                     <label>Course</label>
-                    <select id="scheduleCourseInput" required>
+                    <select id="scheduleExamRegCourse">
                         <option value="CSEB">CSEB</option>
                         <option value="ACCA">ACCA</option>
                     </select>
-                    <div id="scheduleExamAlert" style="margin-top: 6px; font-size: 0.75rem; color: var(--neon-gold); display: none;"></div>
                 </div>
-                <div class="form-group" style="flex: 2;">
-                    <label>Subject</label>
-                    <select id="scheduleSubjectInput" required>
-                        <!-- Injected options -->
-                    </select>
+                <div class="form-group">
+                    <label>Exam Name / Title</label>
+                    <input type="text" id="scheduleExamRegTitle" placeholder="e.g. Junior Clerk CAT 11/2026">
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Syllabus Topic (Optional)</label>
-                <select id="scheduleTopicDropdown">
-                    <option value="">-- Select a Topic --</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label>Title / Notes (Optional)</label>
-                <input type="text" id="scheduleTitleInput" placeholder="e.g. Chapter 4 Review">
+                <div style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Notification No.</label>
+                        <input type="text" id="scheduleExamNotifNo" placeholder="e.g. CAT-11-2026">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Registration No.</label>
+                        <input type="text" id="scheduleExamRegNo" placeholder="e.g. REG-2026-001">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Date of Exam</label>
+                    <input type="date" id="scheduleExamDate">
+                </div>
+                <div class="form-group">
+                    <label>Notes (Optional)</label>
+                    <input type="text" id="scheduleExamNotes" placeholder="e.g. Hall ticket, venue details...">
+                </div>
             </div>
             
             <div class="form-group">
@@ -1156,7 +1194,7 @@
                 <input type="date" id="scheduleDateInput">
             </div>
             
-            <div style="display: flex; gap: 10px;">
+            <div id="scheduleTimeFields" style="display: flex; gap: 10px;">
                 <div class="form-group" style="flex: 1;">
                     <label>Start Time</label>
                     <input type="time" id="scheduleStartTimeInput" style="width:100%;">
@@ -1488,6 +1526,6 @@
     <script src="auth.js?v=12"></script>
     <script src="export.js?v=9"></script>
     <script src="ai.js?v=4"></script>
-    <script src="app.js?v=78"></script>
+    <script src="app.js?v=79"></script>
 </body>
 </html>

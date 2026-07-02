@@ -82,7 +82,7 @@ const AppState = {
     achievements: [],
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
-    currentVersion: 'v1.0.59',
+    currentVersion: 'v1.0.62',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -199,8 +199,8 @@ function loadData() {
     AppState.workoutQuestions = Storage.get(STORAGE_KEYS.WORKOUT, []);
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.59', availableUpdate: null, dataVersion: 1 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.59';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.62', availableUpdate: null, dataVersion: 1 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.62';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -366,23 +366,32 @@ function buildDefaultAccaTopics() {
 
 window.showWhatsNewPopup = async function() {
     let features = [];
+    let description = '';
     try {
         const res = await fetch('version.json?t=' + new Date().getTime());
         const data = await res.json();
         features = data.features;
+        description = data.description || '';
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
+        description = "Welcome to AcademicPulse v1.0.62! This update focuses on critical stability, smarter data caching, and rich improvements to our clientside PDF report generation tools.";
         features = [
-            "<b>&#128170; New: Workout Mode</b> — Build your personal Q&amp;A question bank for ACCA &amp; CSEB. Add important questions with answers, difficulty level, and tags. Then launch a Flashcard Drill — tap to reveal the answer, mark <b>Got It ✅</b> or <b>Need Practice ❌</b>, and get a full score report at the end.",
-            "<b>&#128202; Report Analyzer in Analytics</b> — The PDF Report Analyzer is now built right into the Analytics page. Upload any study, monthly, or attendance report exported from the app and get instant personalized suggestions — no more switching to a separate page.",
-            "<b>&#128196; Richer PDF Reports</b> — All three PDF exports are massively upgraded: Study Report now includes session counts, streaks, mock exam stats, question practice accuracy, and workout stats. Monthly Report adds per-subject hours &amp; attendance. Attendance Report adds weekly breakdown and study hours on present days.",
-            "<b>&#9889; Cloud Sync for Workout</b> — Your workout question bank is automatically synced to Firebase, so your questions are available on all your devices instantly.",
-            "<b>&#128293; Bug Fixes &amp; Stability</b> — Missed schedule items now correctly reset to pending when rescheduled. Null-safety guards added across overview widget and score rendering."
+            "<div style='margin-bottom:8px'><b>&#128170; Workout Mode Refinements</b></div><b>Intelligent Field Constraints:</b> The source bank filter now automatically disables unsupported external options for the CSEB course tracking view, preventing configuration errors.<br/><br/><b>Smoother Dropdowns:</b> Enhanced the database routing hooks to ensure a cleaner, more responsive subtopic list population when picking subjects.",
+            "<div style='margin-bottom:8px'><b>&#128269; Integrated Report Analyzer Fixes</b></div><b>Strict PDF Parsing:</b> Upgraded the embedded Report Analyzer within the Analytics hub to prevent processing crashes caused by missing colon formatting identifiers in incoming text streams.",
+            "<div style='margin-bottom:8px'><b>&#128196; Massively Enhanced PDF Reports</b></div><b>Richer Metrics Array:</b> Lifetime Study Reports have been completely overhauled to bundle contextual summary counts, exact historical streaks, mock exam accuracies, and card workout metrics safely into a single document layout.<br/><br/><b>Weekly Subject Progress Correction:</b> The progression percentage tracking within the Study PDF export has been corrected to compute strictly against your active weekly hour allocations rather than duplicating lifetime totals.<br/><br/><b>Granular Monthly & Attendance Reports:</b> Monthly report prints now append discrete per-subject hours alongside raw calendar markings, while Attendance exports incorporate a dedicated weekly progress matrix.",
+            "<div style='margin-bottom:8px'><b>&#9889; Performance & Logic Tuning</b></div><b>Aggressive Memory Caching:</b> Implemented an internal aggregate memory cache wrapper to completely bypass expensive loops. The app now blocks redundant matrix paint routines unless true mutations occur in your local data tables.<br/><br/><b>Flawless Timezone Grouping:</b> Reconfigured the calendar baseline calculations to enforce strict local timezone tracking, aligning weekly metrics and charts to correctly group days from Sunday through Saturday without boundary bleeding."
         ];
     }
-    const list = document.getElementById('whatsNewModalList');
-    if(list) {
-        list.innerHTML = features.map(f => `<li style="margin-bottom: 10px;">${f}</li>`).join('');
+    const contentDiv = document.getElementById('whatsNewModalContent');
+    if(contentDiv) {
+        let html = '';
+        if (description) {
+            html += `<p style="margin-bottom: 20px;">${description}</p>`;
+        }
+        html += `<ul style="list-style-type: none; padding-left: 0; display: grid; gap: 15px;">`;
+        html += features.map(f => `<li style="margin-bottom: 10px;">${f}</li>`).join('');
+        html += `</ul>`;
+        contentDiv.innerHTML = html;
         const modal = document.getElementById('whatsNewModal');
         if (modal) modal.classList.add('active');
     }

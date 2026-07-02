@@ -1,11 +1,11 @@
 {
   "version": "v1.0.62",
-  "build": "2026.07.01-stable",
+  "build": "2026.07.02-stable",
+  "description": "Welcome to AcademicPulse v1.0.62! This update focuses on critical stability, smarter data caching, and rich improvements to our clientside PDF report generation tools.",
   "features": [
-    "<b>&#128170; Workout Mode Updates</b> — Auto-disable unsupported source filters for CSEB and smoother dropdown population.",
-    "<b>&#128202; Better PDF Parsing</b> — The Report Analyzer now strictly parses your PDFs with no errors due to missing colons.",
-    "<b>&#128196; Accurate PDF Weekly Target Progress</b> — Subject Progress in the Study PDF now accurately reflects this week's hours instead of lifetime hours.",
-    "<b>&#9889; Performance Overhaul</b> — Added deep debouncing for rendering and optimized caching for speed.",
-    "<b>&#128293; Correct Timezone Grouping</b> — Weekly charts and PDF Attendance reports now flawlessly group from Sunday to Saturday based strictly on your local timezone."
+    "<div style='margin-bottom:8px'><b>&#128170; Workout Mode Refinements</b></div><b>Intelligent Field Constraints:</b> The source bank filter now automatically disables unsupported external options for the CSEB course tracking view, preventing configuration errors.<br/><br/><b>Smoother Dropdowns:</b> Enhanced the database routing hooks to ensure a cleaner, more responsive subtopic list population when picking subjects.",
+    "<div style='margin-bottom:8px'><b>&#128269; Integrated Report Analyzer Fixes</b></div><b>Strict PDF Parsing:</b> Upgraded the embedded Report Analyzer within the Analytics hub to prevent processing crashes caused by missing colon formatting identifiers in incoming text streams.",
+    "<div style='margin-bottom:8px'><b>&#128196; Massively Enhanced PDF Reports</b></div><b>Richer Metrics Array:</b> Lifetime Study Reports have been completely overhauled to bundle contextual summary counts, exact historical streaks, mock exam accuracies, and card workout metrics safely into a single document layout.<br/><br/><b>Weekly Subject Progress Correction:</b> The progression percentage tracking within the Study PDF export has been corrected to compute strictly against your active weekly hour allocations rather than duplicating lifetime totals.<br/><br/><b>Granular Monthly & Attendance Reports:</b> Monthly report prints now append discrete per-subject hours alongside raw calendar markings, while Attendance exports incorporate a dedicated weekly progress matrix.",
+    "<div style='margin-bottom:8px'><b>&#9889; Performance & Logic Tuning</b></div><b>Aggressive Memory Caching:</b> Implemented an internal aggregate memory cache wrapper to completely bypass expensive loops. The app now blocks redundant matrix paint routines unless true mutations occur in your local data tables.<br/><br/><b>Flawless Timezone Grouping:</b> Reconfigured the calendar baseline calculations to enforce strict local timezone tracking, aligning weekly metrics and charts to correctly group days from Sunday through Saturday without boundary bleeding."
   ]
 }

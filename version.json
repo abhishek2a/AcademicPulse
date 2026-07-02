@@ -1,11 +1,11 @@
 {
-  "version": "v1.0.57",
-  "build": "2026.06.24-stable",
+  "version": "v1.0.62",
+  "build": "2026.07.01-stable",
   "features": [
-    "<b>&#128197; Move to Tomorrow</b> — Today's pending schedule items now have a <b>&#8594; Tmrw</b> button. Tap it to instantly reschedule any activity to tomorrow without deleting and re-creating it.",
-    "<b>&#128196; Exam Registration — All Views Fixed</b> — Exam Registration cards now render correctly in the Planner, Dashboard Overview, and Day Report. No more 'Unknown Subject' display.",
-    "<b>&#127381; Crash Fix: Complete Button</b> — Tapping the complete (&#10003;) button on an Exam Registration item no longer crashes. It now correctly marks it as done instead of trying to open a study log.",
-    "<b>&#128337; CAT Exams Marked as Date Postponed</b> — CAT 9, 10 and 11 exam dates have been officially postponed. Their cards now show 'Date Postponed' status. ACCA FR (Sep 2026) remains active with a countdown.",
-    "<b>&#9889; Stability</b> — Fixed null-time crash when sorting schedule items, fixed service worker asset version mismatch, and added null-safety guards throughout schedule rendering."
+    "<b>&#128170; Workout Mode Updates</b> — Auto-disable unsupported source filters for CSEB and smoother dropdown population.",
+    "<b>&#128202; Better PDF Parsing</b> — The Report Analyzer now strictly parses your PDFs with no errors due to missing colons.",
+    "<b>&#128196; Accurate PDF Weekly Target Progress</b> — Subject Progress in the Study PDF now accurately reflects this week's hours instead of lifetime hours.",
+    "<b>&#9889; Performance Overhaul</b> — Added deep debouncing for rendering and optimized caching for speed.",
+    "<b>&#128293; Correct Timezone Grouping</b> — Weekly charts and PDF Attendance reports now flawlessly group from Sunday to Saturday based strictly on your local timezone."
   ]
 }

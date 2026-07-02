@@ -18,6 +18,7 @@ const STORAGE_KEYS = {
     SCHEDULE: 'cseb_study_schedule',
     SYSTEM_STATE: 'cseb_system_state',
     ACHIEVEMENTS: 'cseb_achievements',
+    WORKOUT: 'cseb_workout_questions',
     // Device-local only — never cloud-synced.
     // Tracks the last version the user installed so sign-out/re-login
     // never re-triggers the update popup for an already-seen version.
@@ -57,7 +58,7 @@ const DEFAULT_SUBJECTS = [
     { id: generateId(), name: 'Accounting (CSEB)', course: 'CSEB', color: '#32ADE6', priority: 'High', targetHours: 5, totalHours: 0 },
     
     // ACCA Subjects
-    { id: generateId(), name: 'Financial Reporting (FR)', course: 'ACCA', color: '#0A84FF', priority: 'High', targetHours: 7, totalHours: 0 }
+    { id: generateId(), name: 'Financial Reporting (FR)', course: 'ACCA', color: '#0A84FF', priority: 'High', targetHours: 38, totalHours: 0 }
 ];
 
 const EXAMS = [
@@ -79,7 +80,9 @@ const AppState = {
     notifications: [],
     schedule: [],
     achievements: [],
-    currentVersion: 'v1.0.57',
+    workoutQuestions: [],
+    workoutStats: { totalDone: 0, totalCorrect: 0 },
+    currentVersion: 'v1.0.59',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -131,10 +134,9 @@ const TimeUtils = {
     getWeekKey(d = new Date()) {
         const d1 = new Date(d);
         d1.setHours(0, 0, 0, 0);
-        d1.setDate(d1.getDate() + 4 - (d1.getDay() || 7));
-        const yearStart = new Date(d1.getFullYear(), 0, 1);
-        const weekNo = Math.ceil((((d1 - yearStart) / 86400000) + 1) / 7);
-        return `${d1.getFullYear()}-W${weekNo}`;
+        // Shift date back to Sunday (0) to group from Sunday to Saturday
+        d1.setDate(d1.getDate() - d1.getDay());
+        return `${d1.getFullYear()}-W-${String(d1.getMonth() + 1).padStart(2, '0')}-${String(d1.getDate()).padStart(2, '0')}`;
     },
     getMonthKey(d = new Date()) {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -194,9 +196,11 @@ function loadData() {
     AppState.notifications = Storage.get(STORAGE_KEYS.NOTIFICATIONS, []);
     AppState.schedule = Storage.get(STORAGE_KEYS.SCHEDULE, []);
     AppState.achievements = Storage.get(STORAGE_KEYS.ACHIEVEMENTS, []);
+    AppState.workoutQuestions = Storage.get(STORAGE_KEYS.WORKOUT, []);
+    AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.57', availableUpdate: null, dataVersion: 2 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.57';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.59', availableUpdate: null, dataVersion: 1 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.59';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -369,18 +373,18 @@ window.showWhatsNewPopup = async function() {
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
         features = [
-            "<b>&#127881; Welcome to AcademicPulse v1.0.55!</b> This update brings major analytics upgrades, a smarter Pulse AI engine, a new Mock Test schedule type in the planner, and a full round of bug fixes.",
-            "<b>&#127919; Mock Test in Planner</b> — Add Mock Test as a dedicated schedule type with a distinct red accent and &#127919; icon.",
-            "<b>&#128200; Mock Exam Analytics Overhaul</b> — ACCA / CSEB tabs, trend charts, and a Detailed History popup modal.",
-            "<b>&#129504; Smarter Pulse AI</b> — Fixed schedule completion tracking and weakest area predictions.",
-            "<b>&#128293; Schedule Icons Fixed</b> — Clean emoji icons across all schedule types.",
-            "<b>&#128269; Performance & Stability</b> — Faster renders, fixed chart titles, and resolved date window bugs."
+            "<b>&#128170; New: Workout Mode</b> — Build your personal Q&amp;A question bank for ACCA &amp; CSEB. Add important questions with answers, difficulty level, and tags. Then launch a Flashcard Drill — tap to reveal the answer, mark <b>Got It ✅</b> or <b>Need Practice ❌</b>, and get a full score report at the end.",
+            "<b>&#128202; Report Analyzer in Analytics</b> — The PDF Report Analyzer is now built right into the Analytics page. Upload any study, monthly, or attendance report exported from the app and get instant personalized suggestions — no more switching to a separate page.",
+            "<b>&#128196; Richer PDF Reports</b> — All three PDF exports are massively upgraded: Study Report now includes session counts, streaks, mock exam stats, question practice accuracy, and workout stats. Monthly Report adds per-subject hours &amp; attendance. Attendance Report adds weekly breakdown and study hours on present days.",
+            "<b>&#9889; Cloud Sync for Workout</b> — Your workout question bank is automatically synced to Firebase, so your questions are available on all your devices instantly.",
+            "<b>&#128293; Bug Fixes &amp; Stability</b> — Missed schedule items now correctly reset to pending when rescheduled. Null-safety guards added across overview widget and score rendering."
         ];
     }
     const list = document.getElementById('whatsNewModalList');
     if(list) {
         list.innerHTML = features.map(f => `<li style="margin-bottom: 10px;">${f}</li>`).join('');
-        document.getElementById('whatsNewModal').classList.add('active');
+        const modal = document.getElementById('whatsNewModal');
+        if (modal) modal.classList.add('active');
     }
 };
 
@@ -399,6 +403,8 @@ function saveData(key) {
     if (key === 'notifications' || key === 'all') Storage.set(STORAGE_KEYS.NOTIFICATIONS, AppState.notifications);
     if (key === 'schedule' || key === 'all') Storage.set(STORAGE_KEYS.SCHEDULE, AppState.schedule);
     if (key === 'achievements' || key === 'all') Storage.set(STORAGE_KEYS.ACHIEVEMENTS, AppState.achievements);
+    if (key === 'workout' || key === 'all') Storage.set(STORAGE_KEYS.WORKOUT, AppState.workoutQuestions);
+    if (key === 'workoutStats' || key === 'all') Storage.set('cseb_workout_stats', AppState.workoutStats);
     if (key === 'system' || key === 'all') Storage.set(STORAGE_KEYS.SYSTEM_STATE, {
         currentVersion: AppState.currentVersion,
         availableUpdate: AppState.availableUpdate,
@@ -548,16 +554,20 @@ function initNavigation() {
             navItems.forEach(nav => nav.classList.remove('active'));
             item.classList.add('active');
 
+            // Redirect view-analyzer to view-analytics (analyzer is now embedded there)
+            const resolvedTarget = targetId === 'view-analyzer' ? 'view-analytics' : targetId;
+
             sections.forEach(sec => sec.classList.remove('active'));
-            document.getElementById(targetId).classList.add('active');
+            const targetEl = document.getElementById(resolvedTarget);
+            if (targetEl) targetEl.classList.add('active');
             
             // Give focus to scroll area for keyboard navigation
             const mainContent = document.getElementById('mainContentArea');
             if (mainContent) mainContent.focus();
 
             // Re-render views on switch
-            if (targetId === 'view-overview') renderOverview();
-            if (targetId === 'view-analytics') {
+            if (targetId === 'view-overview') debouncedRenderOverview();
+            if (targetId === 'view-analytics' || targetId === 'view-analyzer') {
                 const overlay = document.getElementById('loadingOverlay');
                 if (overlay) overlay.classList.add('active');
                 const hideOverlay = () => { if (overlay) overlay.classList.remove('active'); };
@@ -566,7 +576,7 @@ function initNavigation() {
                     .catch(err => console.warn('Chart.js failed to load — showing analytics without charts:', err))
                     .finally(() => {
                         try {
-                            renderAnalytics();
+                            debouncedRenderAnalytics();
                         } catch (e) {
                             console.error('renderAnalytics error:', e);
                         } finally {
@@ -574,7 +584,8 @@ function initNavigation() {
                         }
                     });
             }
-            if (targetId === 'view-attendance') renderAttendance();
+            if (targetId === 'view-attendance') debouncedRenderAttendance();
+            if (targetId === 'view-workout') renderWorkoutBank();
             if (targetId === 'view-schedule') {
                 const todayTab = document.getElementById('tabScheduleToday');
                 if(todayTab) todayTab.click();
@@ -593,7 +604,7 @@ function initNavigation() {
                                 display.id = 'focusContextDisplay';
                                 display.style.cssText = 'color: var(--neon-blue); font-weight: bold; margin-bottom: 15px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;';
                                 const container = document.querySelector('.session-setup');
-                                container.insertBefore(display, container.firstChild);
+                                if (container) container.insertBefore(display, container.firstChild);
                             }
                             const subj = AppState.subjects.find(s => s.id === ctx.subjectId);
                             display.textContent = subj ? `Focusing on: ${subj.name}` : '';
@@ -950,8 +961,9 @@ function renderOverview() {
     const now = new Date();
     const hrs = now.getHours();
     let greeting = 'Good Evening';
-    if (hrs < 12) greeting = 'Good Morning';
-    else if (hrs < 17) greeting = 'Good Afternoon';
+    if (hrs >= 22 || hrs < 5) greeting = 'Good Night';
+    else if (hrs >= 5 && hrs < 12) greeting = 'Good Morning';
+    else if (hrs >= 12 && hrs < 18) greeting = 'Good Afternoon';
     
     const fbUser = window.firebaseAuth && window.firebaseAuth.currentUser;
     const name = fbUser && fbUser.displayName ? fbUser.displayName.split(' ')[0] : 'User';
@@ -965,19 +977,12 @@ function renderOverview() {
     document.getElementById('studyStreakVal').textContent = streaks.current;
     document.getElementById('bestStudyStreakVal').textContent = `Best: ${streaks.best} days`;
 
-    // Calculate Times
-    let todaySecs = 0, monthSecs = 0;
-    const todayKey = TimeUtils.getDateKey();
-    const monthKey = TimeUtils.getMonthKey();
-
-    AppState.sessions.forEach(s => {
-        const dKey = TimeUtils.getDateKey(new Date(s.startTime));
-        const mKey = TimeUtils.getMonthKey(new Date(s.startTime));
-        const dur = s.duration || ((new Date(s.endTime) - new Date(s.startTime))/1000);
-        
-        if (dKey === todayKey) todaySecs += dur;
-        if (mKey === monthKey) monthSecs += dur;
-    });
+    if (!appCache.analytics || !appCache.analytics.data) rebuildAnalyticsCache();
+    const cache = appCache.analytics.data;
+    
+    let todaySecs = cache.todaySecs || 0;
+    let weekSecs = cache.weekSecs || 0;
+    let monthSecs = cache.monthSecs || 0;
 
     document.getElementById('todayTimeVal').textContent = TimeUtils.formatHours(todaySecs);
     document.getElementById('totalHoursVal').textContent = TimeUtils.formatHours(monthSecs);
@@ -990,13 +995,6 @@ function renderOverview() {
     document.getElementById('dailyGoalText').textContent = `${(todaySecs/3600).toFixed(1)} / ${AppState.goals.daily}h`;
 
     // Weekly
-    const weekKey = TimeUtils.getWeekKey();
-    let weekSecs = 0;
-    AppState.sessions.forEach(s => {
-        if (TimeUtils.getWeekKey(new Date(s.startTime)) === weekKey) {
-            weekSecs += s.duration || ((new Date(s.endTime) - new Date(s.startTime))/1000);
-        }
-    });
     const wGoalSecs = AppState.goals.weekly * 3600;
     const wPct = Math.min(100, (weekSecs / wGoalSecs) * 100) || 0;
     document.getElementById('weeklyGoalFill').style.width = `${wPct}%`;
@@ -1379,7 +1377,7 @@ window.setAttendanceStatus = function(dateKey, status) {
         AppState.attendance[dateKey] = status;
     }
     saveData('attendance');
-    renderAttendance();
+    debouncedRenderAttendance();
     renderDayReport(dateKey);
     debouncedRenderAnalytics();
 };
@@ -1399,8 +1397,8 @@ window.deleteSession = function(sessionId) {
             saveData('attendance');
         }
         
-        renderOverview();
-        renderAttendance();
+        debouncedRenderOverview();
+        debouncedRenderAttendance();
         debouncedRenderAnalytics();
         
         // Re-render the currently open day report
@@ -1576,7 +1574,7 @@ function renderAnalytics() {
     if(e('distAll')) e('distAll').textContent = TimeUtils.formatHours(totalSecs);
     
     if (document.getElementById('analyticsMonthTotal')) {
-        document.getElementById('analyticsMonthTotal').textContent = TimeUtils.formatDuration(cache.monthSecs);
+        document.getElementById('analyticsMonthTotal').textContent = TimeUtils.formatHours(cache.monthSecs);
     }
 
     // Display Last Updated timestamp
@@ -1944,8 +1942,10 @@ function renderLiveClassAnalytics() {
         const d = new Date(now);
         d.setDate(d.getDate() - i * 7);
         const wk = TimeUtils.getWeekKey(d);
-        // Label as "MMM D"
-        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        // Shift label date to the Sunday of that week for clarity
+        const labelDate = new Date(d);
+        labelDate.setDate(d.getDate() - d.getDay());
+        const label = labelDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         weekLabels.push(label);
         weekCounts.push(lc.byWeek[wk] || 0);
     }
@@ -2018,18 +2018,20 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
             aiInsightEl.textContent = 'Add subjects to get AI recommendations.';
         } else {
             // Suggest the subject with the LEAST amount of study time today/week to keep them balanced
+            const recentSubjTotals = {};
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            
+            AppState.sessions.forEach(s => {
+                const d = new Date(s.startTime);
+                if (d >= sevenDaysAgo) {
+                    if (!recentSubjTotals[s.subjectId]) recentSubjTotals[s.subjectId] = 0;
+                    recentSubjTotals[s.subjectId] += (s.duration || (s.durationMinutes ? s.durationMinutes * 60 : 0));
+                }
+            });
+
             const subjectsScores = AppState.subjects.map(subj => {
-                let recentTime = 0;
-                AppState.sessions.forEach(s => {
-                    if (s.subjectId === subj.id) {
-                        const d = new Date(s.startTime);
-                        const diffDays = (new Date() - d) / (1000 * 60 * 60 * 24);
-                        if (diffDays <= 7) {
-                            recentTime += (s.duration || (s.durationMinutes ? s.durationMinutes * 60 : 0));
-                        }
-                    }
-                });
-                return { subj, recentTime };
+                return { subj, recentTime: recentSubjTotals[subj.id] || 0 };
             });
             
             subjectsScores.sort((a, b) => a.recentTime - b.recentTime);
@@ -2074,7 +2076,6 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
         
         if (!appCache.analytics || !appCache.analytics.data) rebuildAnalyticsCache();
         const cache = appCache.analytics.data;
-        if (!appCache.analytics) rebuildAnalyticsCache();
         
         const labels = subjArr.map(s => { const b=AppState.subjects.find(x=>x.id===s.id); return b?b.name:'-'; });
         const data = subjArr.map(s => s.dur/3600);
@@ -2148,12 +2149,11 @@ function generateAICoachAnalysis(type) {
         let insight = "";
         
         // 1. Analyze Subjects & Topics
-        const subjTotals = {};
+        if (!appCache.analytics || !appCache.analytics.data) rebuildAnalyticsCache();
+        const subjTotals = appCache.analytics.data.subjTotals;
+        
         const topicSet = new Set();
         AppState.sessions.forEach(s => {
-            const d = (s.duration || (s.durationMinutes ? s.durationMinutes * 60 : 0));
-            if(!subjTotals[s.subjectId]) subjTotals[s.subjectId] = 0;
-            subjTotals[s.subjectId] += d;
             if (s.topic) topicSet.add(s.topic.toLowerCase());
         });
         
@@ -2249,8 +2249,8 @@ function generateAICoachAnalysis(type) {
             
             if (avgMockScore >= 75) {
                 insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Exam Readiness:</b> With a recent mock average of ${avgMockScore.toFixed(0)}%, you are proving that you can perform under pressure.`;
-            } else if (streaks.longest > 3) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Grit & Discipline:</b> You've proven you can maintain focus with a personal best streak of <b>${streaks.longest} days</b>.`;
+            } else if (streaks.best > 3) {
+                insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Grit & Discipline:</b> You've proven you can maintain focus with a personal best streak of <b>${streaks.best} days</b>.`;
             }
         } else if (type === 'weaknesses') {
             insight = `<b style="color:var(--neon-red); font-size:1.1rem;">Areas for Growth</b><br/><br/>`;
@@ -2275,7 +2275,7 @@ function generateAICoachAnalysis(type) {
         el.innerHTML = insight;
         
         // Highlight active button using CSS classes
-        const buttons = el.parentElement.parentElement.querySelectorAll('.ai-coach-btn');
+        const buttons = document.querySelectorAll('.ai-coach-btn');
         buttons.forEach(b => {
             if (b.getAttribute('data-type') === type) {
                 b.classList.add('active-prompt');
@@ -2283,7 +2283,7 @@ function generateAICoachAnalysis(type) {
                 b.classList.remove('active-prompt');
             }
         });
-    }, 600); // Fake AI loading delay
+    });
 }
 
 function generateSmartInsights() {
@@ -2551,8 +2551,8 @@ function initRetrospectiveLogging() {
         
         document.getElementById('logSessionModal').classList.remove('active');
         rebuildAnalyticsCache(true); // Force cache invalidation on new session
-        renderOverview();
-        renderAttendance();
+        debouncedRenderOverview();
+        debouncedRenderAttendance();
         renderDayReport(dateKey);
         debouncedRenderAnalytics();
     });
@@ -2654,8 +2654,8 @@ function initEditGoals() {
         AppState.goals.monthly = parseInt(document.getElementById('goalMonthlyInput').value) || 160;
         
         saveData('goals');
-        renderOverview();
-        document.getElementById('editGoalsModal').classList.add('active');
+        debouncedRenderOverview();
+        document.getElementById('editGoalsModal').classList.remove('active');
         addNotification('Goals Updated', 'Your study goals have been updated.', 'info');
     });
 }
@@ -2820,7 +2820,8 @@ window.initApp = function() {
         initMocksAndPractice();
         initFocusMode();
         initSchedule();
-        renderOverview();
+        initWorkout();
+        debouncedRenderOverview();
         
         // Start live clock — only update the date/time display, not full render
         if (window._overviewInterval) clearInterval(window._overviewInterval);
@@ -2860,6 +2861,440 @@ window.initApp = function() {
         document.getElementById('loadingOverlay').classList.remove('active');
     }
 };
+
+// ==========================================
+// WORKOUT — Question Bank & Drill
+// ==========================================
+
+let _drillQueue = [];      // shuffled questions for current drill
+let _drillIndex = 0;       // current position in queue
+let _drillCorrect = 0;     // got-it count
+let _drillWrong = [];      // wrong question objects
+let _drillAnswerShown = false; // whether card is flipped
+
+// ── Helpers ────────────────────────────────
+function getWorkoutSubjectsForCourse(course) {
+    if (course === 'ACCA') {
+        return Object.values(AppState.accaTopics).flat().map(t => t.name);
+    }
+    // CSEB — combine subject names + syllabus area names
+    const fromSubjects = AppState.subjects.filter(s => s.course === 'CSEB').map(s => s.name);
+    return [...new Set([...fromSubjects, ...Object.keys(AppState.csebSyllabus)])];
+}
+
+function populateWqSubjects() {
+    const course = document.getElementById('wqCourse')?.value || 'CSEB';
+    const sel = document.getElementById('wqSubject');
+    if (!sel) return;
+    const items = getWorkoutSubjectsForCourse(course);
+    sel.innerHTML = items.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+    
+    const sourceBank = document.getElementById('wqSourceBank');
+    if (sourceBank) {
+        if (course === 'CSEB') {
+            sourceBank.value = 'Custom';
+            sourceBank.disabled = true;
+            sourceBank.style.opacity = '0.5';
+        } else {
+            sourceBank.disabled = false;
+            sourceBank.style.opacity = '1';
+        }
+    }
+    
+    populateWqSubtopicList();
+}
+
+function populateDrillSubjects() {
+    const course = document.getElementById('drillCourseSelect')?.value || 'ALL';
+    const sel = document.getElementById('drillSubjectSelect');
+    if (!sel) return;
+    if (course === 'ALL') {
+        sel.innerHTML = '<option value="ALL">All Subjects</option>';
+        return;
+    }
+    const items = getWorkoutSubjectsForCourse(course);
+    sel.innerHTML = '<option value="ALL">All Subjects</option>' +
+        items.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+}
+
+function populateWbSubjectFilter() {
+    const course = document.getElementById('wbCourseFilter')?.value || 'ALL';
+    const sel = document.getElementById('wbSubjectFilter');
+    if (!sel) return;
+    if (course === 'ALL') {
+        sel.innerHTML = '<option value="ALL">All Subjects</option>';
+        populateWbSubtopicFilter();
+        return;
+    }
+    const items = getWorkoutSubjectsForCourse(course);
+    sel.innerHTML = '<option value="ALL">All Subjects</option>' +
+        items.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+    
+    const sourceFilter = document.getElementById('wbSourceFilter');
+    if (sourceFilter) {
+        if (course === 'CSEB') {
+            sourceFilter.value = 'ALL';
+            sourceFilter.disabled = true;
+            sourceFilter.style.opacity = '0.5';
+        } else {
+            sourceFilter.disabled = false;
+            sourceFilter.style.opacity = '1';
+        }
+    }
+    
+    populateWbSubtopicFilter();
+}
+
+function getPredefinedSubtopics(course, subject) {
+    let subtopics = [];
+    if (subject && subject !== 'ALL') {
+        if (course === 'CSEB' && AppState.csebSyllabus && AppState.csebSyllabus[subject]) {
+            subtopics = AppState.csebSyllabus[subject].map(t => t.name);
+        } else if (course === 'ACCA' && AppState.accaTopics && AppState.accaTopics[subject]) {
+            subtopics = AppState.accaTopics[subject].map(t => t.name);
+        }
+    }
+    return subtopics;
+}
+
+function populateWbSubtopicFilter() {
+    const course = document.getElementById('wbCourseFilter')?.value || 'ALL';
+    const subject = document.getElementById('wbSubjectFilter')?.value || 'ALL';
+    
+    const filterSel = document.getElementById('wbSubtopicFilter');
+    if (!filterSel) return;
+    
+    let pool = AppState.workoutQuestions;
+    if (course !== 'ALL') pool = pool.filter(q => q.course === course);
+    if (subject !== 'ALL') pool = pool.filter(q => q.subject === subject);
+    
+    let subtopics = pool.map(q => q.subtopic).filter(Boolean);
+    subtopics = subtopics.concat(getPredefinedSubtopics(course, subject));
+    
+    const uniqueSubtopics = [...new Set(subtopics)].sort();
+    
+    filterSel.innerHTML = '<option value="ALL">All Subtopics</option>' + 
+        uniqueSubtopics.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+}
+
+function populateWqSubtopicList() {
+    const course = document.getElementById('wqCourse')?.value || 'CSEB';
+    const subject = document.getElementById('wqSubject')?.value || '';
+    const subtopicSelect = document.getElementById('wqSubtopic');
+    if (!subtopicSelect) return;
+    
+    let pool = AppState.workoutQuestions;
+    pool = pool.filter(q => q.course === course);
+    if (subject) pool = pool.filter(q => q.subject === subject);
+    
+    let subtopics = pool.map(q => q.subtopic).filter(Boolean);
+    subtopics = subtopics.concat(getPredefinedSubtopics(course, subject));
+    
+    const uniqueSubtopics = [...new Set(subtopics)].sort();
+    subtopicSelect.innerHTML = '<option value="">Select Subtopic... (Optional)</option>' + 
+        uniqueSubtopics.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+}
+
+// Auto-refresh subject filter when course changes
+document.getElementById('wbCourseFilter')?.addEventListener('change', () => {
+    populateWbSubjectFilter();
+    renderWorkoutBank();
+});
+document.getElementById('wbSubjectFilter')?.addEventListener('change', () => {
+    populateWbSubtopicFilter();
+    renderWorkoutBank();
+});
+
+// ── Tab switching ───────────────────────────
+window.switchWorkoutTab = function(tab, btn) {
+    ['bank','drill'].forEach(t => {
+        document.getElementById(`workout${t.charAt(0).toUpperCase()+t.slice(1)}Tab`).style.display = t === tab ? '' : 'none';
+    });
+    document.querySelectorAll('#view-workout .workout-tab-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.border = '1px solid transparent';
+        b.style.color = 'var(--text-muted)';
+    });
+    if (btn) {
+        btn.classList.add('active');
+        btn.style.background = 'var(--glass-bg)';
+        btn.style.border = '1px solid var(--glass-border)';
+        btn.style.color = 'var(--text-main)';
+    }
+    if (tab === 'drill') {
+        populateDrillSubjects();
+        showDrillSetup();
+    }
+    if (tab === 'bank') renderWorkoutBank();
+};
+
+// ── Question Bank Render ─────────────────────
+window.renderWorkoutBank = function() {
+    const courseFilter = document.getElementById('wbCourseFilter')?.value || 'ALL';
+    const subjFilter = document.getElementById('wbSubjectFilter')?.value || 'ALL';
+    const subtopicFilter = document.getElementById('wbSubtopicFilter')?.value || 'ALL';
+    const sourceFilter = document.getElementById('wbSourceFilter')?.value || 'ALL';
+    const list = document.getElementById('workoutBankList');
+    if (!list) return;
+
+    const qs = AppState.workoutQuestions;
+
+    // Stats
+    document.getElementById('wbTotalCount').textContent = qs.length;
+    document.getElementById('wbCsebCount').textContent = qs.filter(q => q.course === 'CSEB').length;
+    document.getElementById('wbAccaCount').textContent = qs.filter(q => q.course === 'ACCA').length;
+    document.getElementById('wbWorkoutsDone').textContent = AppState.workoutStats.totalDone;
+
+    let filtered = qs;
+    if (courseFilter !== 'ALL') filtered = filtered.filter(q => q.course === courseFilter);
+    if (subjFilter !== 'ALL') filtered = filtered.filter(q => q.subject === subjFilter);
+    if (subtopicFilter !== 'ALL') filtered = filtered.filter(q => q.subtopic === subtopicFilter);
+    if (sourceFilter !== 'ALL') filtered = filtered.filter(q => q.sourceBank === sourceFilter);
+
+    if (filtered.length === 0) {
+        list.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:40px;">No questions yet. <button class="btn" onclick="openWorkoutQuestionModal()" style="margin-left:8px; padding:6px 14px;">+ Add one</button></div>`;
+        return;
+    }
+
+    const diffColor = { Easy: 'var(--neon-green)', Medium: 'var(--neon-gold)', Hard: 'var(--neon-red)' };
+    list.innerHTML = filtered.map((q, idx) => {
+        const globalIdx = qs.indexOf(q) + 1;
+        const tags = (q.tags || []).map(t => `<span style="background:rgba(41,151,255,0.12); color:var(--neon-blue); padding:2px 8px; border-radius:12px; font-size:0.72rem; margin-right:4px;">${escapeHtml(t)}</span>`).join('');
+        return `
+        <div class="chart-card" style="margin-bottom:12px; padding:16px 20px;" id="wq-card-${q.id}">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:200px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Q${globalIdx}</span>
+                        <span style="background:rgba(41,151,255,0.15); color:var(--neon-blue); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700;">${escapeHtml(q.course)}</span>
+                        <span style="background:rgba(100,100,100,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">${escapeHtml(q.subject)}</span>
+                        ${q.subtopic ? `<span style="background:rgba(200,200,200,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">↳ ${escapeHtml(q.subtopic)}</span>` : ''}
+                        <span style="color:${diffColor[q.difficulty] || 'var(--text-muted)'}; font-size:0.72rem; font-weight:700;">${q.difficulty}</span>
+                        ${q.sourceBank && q.sourceBank !== 'Custom' ? `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700;">${escapeHtml(q.sourceBank)}</span>` : ''}
+                        ${tags}
+                    </div>
+                    ${q.ref ? `<div style="font-size:0.85rem; color:var(--neon-green); font-weight:700; margin-bottom:6px;">Ref: ${escapeHtml(q.ref)}</div>` : ''}
+                    <div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px;">${escapeHtml(q.question)}</div>
+                    <details style="cursor:pointer;">
+                        <summary style="font-size:0.82rem; color:var(--neon-green); font-weight:600; user-select:none;">▶ Show Answer</summary>
+                        <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main);">${escapeHtml(q.answer)}</div>
+                    </details>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
+                    <button onclick="openWorkoutQuestionModal('${q.id}')" style="background:transparent; color:var(--neon-blue); border:1px solid var(--glass-border); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">✎ Edit</button>
+                    <button onclick="deleteWorkoutQuestion('${q.id}')" style="background:transparent; color:var(--neon-red); border:1px solid var(--glass-border); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">✕ Del</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+};
+
+// ── Open / Save Question Modal ───────────────
+window.openWorkoutQuestionModal = function(id) {
+    const modal = document.getElementById('workoutQuestionModal');
+    document.getElementById('workoutModalTitle').textContent = id ? 'Edit Question' : 'Add Question';
+    document.getElementById('wqEditId').value = id || '';
+    populateWqSubjects();
+
+    if (id) {
+        const q = AppState.workoutQuestions.find(x => x.id === id);
+        if (!q) return;
+        document.getElementById('wqCourse').value = q.course;
+        populateWqSubjects();
+        document.getElementById('wqSubject').value = q.subject;
+        populateWqSubtopicList();
+        document.getElementById('wqSubtopic').value = q.subtopic || '';
+        document.getElementById('wqSourceBank').value = q.sourceBank || 'Custom';
+        document.getElementById('wqRef').value = q.ref || '';
+        document.getElementById('wqQuestion').value = q.question;
+        document.getElementById('wqAnswer').value = q.answer;
+        document.getElementById('wqDifficulty').value = q.difficulty || 'Medium';
+        document.getElementById('wqTags').value = (q.tags || []).join(', ');
+    } else {
+        document.getElementById('wqCourse').value = 'CSEB';
+        populateWqSubjects();
+        document.getElementById('wqSubtopic').value = '';
+        document.getElementById('wqSourceBank').value = 'Custom';
+        document.getElementById('wqRef').value = '';
+        document.getElementById('wqQuestion').value = '';
+        document.getElementById('wqAnswer').value = '';
+        document.getElementById('wqDifficulty').value = 'Medium';
+        document.getElementById('wqTags').value = '';
+    }
+    modal.classList.add('active');
+};
+
+window.saveWorkoutQuestion = function() {
+    const id = document.getElementById('wqEditId').value;
+    const course = document.getElementById('wqCourse').value;
+    const subject = document.getElementById('wqSubject').value;
+    const subtopic = document.getElementById('wqSubtopic').value.trim();
+    const sourceBank = document.getElementById('wqSourceBank').value;
+    const ref = document.getElementById('wqRef').value.trim();
+    let question = document.getElementById('wqQuestion').value.trim();
+    let answer = document.getElementById('wqAnswer').value.trim();
+    const difficulty = document.getElementById('wqDifficulty').value;
+    const tags = document.getElementById('wqTags').value.split(',').map(t => t.trim()).filter(Boolean);
+
+    if (!question && ref) {
+        question = `[${sourceBank}] ${ref}`;
+    }
+    if (!answer && ref) {
+        answer = `(Refer to ${sourceBank} Question Bank for ${ref})`;
+    }
+
+    if (!question || !answer) {
+        alert('Please enter a question and answer, or provide a Q Reference.');
+        return;
+    }
+
+    if (id) {
+        const q = AppState.workoutQuestions.find(x => x.id === id);
+        if (q) { Object.assign(q, { course, subject, subtopic, sourceBank, ref, question, answer, difficulty, tags, updatedAt: new Date().toISOString() }); }
+    } else {
+        AppState.workoutQuestions.push({
+            id: generateId(), course, subject, subtopic, sourceBank, ref, question, answer, difficulty, tags,
+            createdAt: new Date().toISOString(), timesAttempted: 0, timesCorrect: 0
+        });
+    }
+
+    saveData('workout');
+    document.getElementById('workoutQuestionModal').classList.remove('active');
+    renderWorkoutBank();
+    addNotification('Question Saved', `${course} · ${subject}`, 'success');
+};
+
+window.deleteWorkoutQuestion = function(id) {
+    if (!confirm('Delete this question?')) return;
+    AppState.workoutQuestions = AppState.workoutQuestions.filter(q => q.id !== id);
+    saveData('workout');
+    renderWorkoutBank();
+};
+
+// ── Drill Logic ─────────────────────────────
+function showDrillSetup() {
+    document.getElementById('drillSetupScreen').style.display = '';
+    document.getElementById('drillActiveScreen').style.display = 'none';
+    document.getElementById('drillResultsScreen').style.display = 'none';
+}
+
+window.startWorkoutDrill = function() {
+    const course = document.getElementById('drillCourseSelect')?.value || 'ALL';
+    const subj = document.getElementById('drillSubjectSelect')?.value || 'ALL';
+    const countVal = document.getElementById('drillCountSelect')?.value || '10';
+
+    let pool = AppState.workoutQuestions;
+    if (course !== 'ALL') pool = pool.filter(q => q.course === course);
+    if (subj !== 'ALL') pool = pool.filter(q => q.subject === subj);
+
+    if (pool.length === 0) {
+        alert('No questions available for this filter. Add some in the Question Bank!');
+        switchWorkoutTab('bank', document.getElementById('tabWorkoutBank'));
+        return;
+    }
+
+    // Shuffle
+    _drillQueue = [...pool].sort(() => Math.random() - 0.5);
+    if (countVal !== 'ALL') _drillQueue = _drillQueue.slice(0, parseInt(countVal));
+
+    _drillIndex = 0;
+    _drillCorrect = 0;
+    _drillWrong = [];
+    _drillAnswerShown = false;
+
+    document.getElementById('drillSetupScreen').style.display = 'none';
+    document.getElementById('drillActiveScreen').style.display = '';
+    document.getElementById('drillResultsScreen').style.display = 'none';
+
+    renderDrillCard();
+};
+
+function renderDrillCard() {
+    const q = _drillQueue[_drillIndex];
+    const total = _drillQueue.length;
+    const pct = Math.round((_drillIndex / total) * 100);
+
+    document.getElementById('drillProgressText').textContent = `Question ${_drillIndex + 1} of ${total}`;
+    document.getElementById('drillScoreText').innerHTML = `✓ ${_drillCorrect} &nbsp;✗ ${_drillWrong.length}`;
+    document.getElementById('drillProgressBar').style.width = pct + '%';
+
+    document.getElementById('drillQuestionNo').textContent = `Q${AppState.workoutQuestions.indexOf(q) + 1} · ${q.course}`;
+    document.getElementById('drillSubjectBadge').textContent = q.subject;
+    document.getElementById('drillQuestionText').textContent = q.question;
+    document.getElementById('drillAnswerText').textContent = q.answer;
+    document.getElementById('drillAnswerBlock').style.display = 'none';
+    document.getElementById('drillTapHint').style.display = '';
+    document.getElementById('drillActionBtns').style.display = 'none';
+    _drillAnswerShown = false;
+}
+
+window.toggleDrillAnswer = function() {
+    if (_drillAnswerShown) return;
+    _drillAnswerShown = true;
+    document.getElementById('drillAnswerBlock').style.display = '';
+    document.getElementById('drillTapHint').style.display = 'none';
+    document.getElementById('drillActionBtns').style.display = 'flex';
+};
+
+window.markDrillQuestion = function(correct) {
+    if (!_drillAnswerShown) return;
+    const q = _drillQueue[_drillIndex];
+    if (correct) {
+        _drillCorrect++;
+        q.timesCorrect = (q.timesCorrect || 0) + 1;
+    } else {
+        _drillWrong.push(q);
+    }
+    q.timesAttempted = (q.timesAttempted || 0) + 1;
+    saveData('workout');
+
+    _drillIndex++;
+    if (_drillIndex >= _drillQueue.length) {
+        finishDrill();
+    } else {
+        renderDrillCard();
+    }
+};
+
+window.exitWorkoutDrill = function() { showDrillSetup(); };
+
+function finishDrill() {
+    const total = _drillQueue.length;
+    const pct = total > 0 ? Math.round((_drillCorrect / total) * 100) : 0;
+
+    AppState.workoutStats.totalDone++;
+    AppState.workoutStats.totalCorrect += _drillCorrect;
+    saveData('workoutStats');
+
+    document.getElementById('drillSetupScreen').style.display = 'none';
+    document.getElementById('drillActiveScreen').style.display = 'none';
+    document.getElementById('drillResultsScreen').style.display = '';
+
+    document.getElementById('drillFinalScore').textContent = `${pct}%`;
+
+    const badge = document.getElementById('drillAccuracyBadge');
+    if (pct >= 80) { badge.textContent = '🏆 Excellent!'; badge.style.background = 'rgba(48,209,88,0.2)'; badge.style.color = 'var(--neon-green)'; }
+    else if (pct >= 60) { badge.textContent = '👍 Good'; badge.style.background = 'rgba(255,214,10,0.2)'; badge.style.color = 'var(--neon-gold)'; }
+    else { badge.textContent = '📖 Keep Practicing'; badge.style.background = 'rgba(255,69,58,0.2)'; badge.style.color = 'var(--neon-red)'; }
+
+    const weakDiv = document.getElementById('drillWeakList');
+    if (_drillWrong.length > 0) {
+        weakDiv.innerHTML = `<h4 style="color:var(--neon-red); margin-bottom:8px;">📌 Questions to Review (${_drillWrong.length})</h4>` +
+            _drillWrong.map((q, i) => `<div style="background:rgba(255,69,58,0.06); border-left:3px solid var(--neon-red); padding:8px 12px; border-radius:6px; margin-bottom:6px; font-size:0.85rem;"><b>Q${i+1}:</b> ${escapeHtml(q.question)}</div>`).join('');
+    } else {
+        weakDiv.innerHTML = '<div style="color:var(--neon-green); text-align:center; padding:10px;">🎯 Perfect score! All correct!</div>';
+    }
+
+    document.getElementById('wbWorkoutsDone').textContent = AppState.workoutStats.totalDone;
+    addNotification('Workout Done!', `Score: ${_drillCorrect}/${total} (${pct}%)`, pct >= 60 ? 'success' : 'info');
+}
+
+// ── Init ─────────────────────────────────────
+function initWorkout() {
+    populateWbSubjectFilter();
+    renderWorkoutBank();
+}
 
 // ==========================================
 // MOCKS & PRACTICE
@@ -3009,7 +3444,7 @@ function initMocksAndPractice() {
         if(document.getElementById('practiceNotesInput')) document.getElementById('practiceNotesInput').value = '';
         renderPracticeTotals();
         renderPracticeHistory();
-        renderAnalytics();
+        debouncedRenderAnalytics();
     };
     }
 
@@ -3093,7 +3528,7 @@ function initMocksAndPractice() {
         document.getElementById('mockScoreInput').value = '';
         if(document.getElementById('mockNotesInput')) document.getElementById('mockNotesInput').value = '';
         renderMocksHistory();
-        renderAnalytics();
+        debouncedRenderAnalytics();
     };
     }
 
@@ -3158,7 +3593,7 @@ function renderMocksHistory() {
     }
     
     sorted.forEach(m => {
-        const pct = Math.round((m.score / m.maxScore) * 100);
+        const pct = Math.round((m.score / (m.maxScore || 1)) * 100);
         let color = 'var(--neon-green)';
         if(pct < 50) color = 'var(--neon-red)';
         else if(pct < 75) color = 'var(--neon-gold)';
@@ -3176,7 +3611,6 @@ function renderMocksHistory() {
             </td>
             <td style="padding:15px 10px;">${m.score} / ${m.maxScore} (${pct}%)</td>
             <td style="padding:15px 10px; text-align:right; min-width: 150px;">
-                <button onclick="alert('Detailed mistake analysis coming in next update! Stay tuned.')" style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid var(--glass-border); padding:4px 8px; border-radius:4px; font-size:0.7rem; cursor:pointer; margin-right: 8px;">Review Mistakes</button>
                 <a href="#" style="color:var(--neon-blue); margin-right:8px; font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); editMock('${m.id}')">Edit</a>
                 <a href="#" style="color:var(--neon-red); font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); deleteMock('${m.id}')">Delete</a>
             </td>
@@ -3190,9 +3624,9 @@ window.addEventListener('storage', (event) => {
     if (Object.values(STORAGE_KEYS).includes(event.key)) {
         loadData();
         rebuildAnalyticsCache(); // Ensure cache is fresh after external data change
-        renderOverview();
+        debouncedRenderOverview();
         if (document.getElementById('view-analytics') && document.getElementById('view-analytics').classList.contains('active')) {
-            renderAnalytics();
+            debouncedRenderAnalytics();
         }
     }
 });
@@ -3292,12 +3726,12 @@ function analyzeReportText(text) {
     let totalHours = 0;
     let attendance = 0;
     
-    const hoursMatch1 = text.match(/Total\s*Lifetime\s*Study\s*Hours:\s*([\d\.]+)\s*h/i);
-    const hoursMatch2 = text.match(/Total\s*Hours\s*this\s*Month:\s*([\d\.]+)\s*h/i);
+    const hoursMatch1 = text.match(/Total\s*Lifetime\s*Study\s*Hours:?\s*([\d\.]+)\s*h/i);
+    const hoursMatch2 = text.match(/Total\s*Hours\s*this\s*Month:?\s*([\d\.]+)\s*h/i);
     if(hoursMatch1) totalHours = parseFloat(hoursMatch1[1]);
     else if(hoursMatch2) totalHours = parseFloat(hoursMatch2[1]);
     
-    const attMatch = text.match(/Attendance Percentage:\s*(\d+)%/i);
+    const attMatch = text.match(/Attendance\s*Percentage:?\s*(\d+)%/i);
     if(attMatch) attendance = parseInt(attMatch[1]);
     
     document.getElementById('analyzerHours').textContent = totalHours > 0 ? `${totalHours}h` : 'N/A';
@@ -3846,7 +4280,7 @@ function renderSearchResults(query) {
                 card = createResultCard('mock', m.name, subtitle, res.date.toLocaleDateString(), m.notes || `Mock Test Log`, '#FF453A');
             } else if (res.type === 'practice') {
                 const p = res.data;
-                const pct = Math.round((p.correct / p.attempted) * 100) || 0;
+                const pct = p.attempted > 0 ? Math.round((p.correct / p.attempted) * 100) : 0;
                 const subtitle = `Score: ${p.correct} / ${p.attempted} (${pct}%) • ${p.confidence} Conf`;
                 card = createResultCard('practice', p.topic || p.syllabusArea || 'Practice', subtitle, res.date.toLocaleDateString(), p.notes || `Course: ${p.course}`, '#FF9F0A');
             }
@@ -4059,7 +4493,7 @@ window.deleteMock = function(mockId) {
     saveData('mocks');
     renderMocksHistory();
     renderMockTotals();
-    renderAnalytics();
+    debouncedRenderAnalytics();
 };
 
 window.deletePractice = function(id) {
@@ -4068,7 +4502,7 @@ window.deletePractice = function(id) {
     saveData('practice');
     renderPracticeTotals();
     renderPracticeHistory();
-    renderAnalytics();
+    debouncedRenderAnalytics();
 };
 
 function renderPracticeHistory() {
@@ -4131,11 +4565,11 @@ window.deleteAttendance = function(id) {
     if (!confirm("Are you sure you want to delete this session?")) return;
     const session = AppState.sessions.find(s => s.id === id);
     if (!session) return;
-    const dateKey = session.startTime ? session.startTime.split('T')[0] : null;
+    const dateKey = session.startTime ? TimeUtils.getDateKey(new Date(session.startTime)) : null;
     AppState.sessions = AppState.sessions.filter(s => s.id !== id);
     saveData('sessions');
-    renderOverview();
-    renderAttendance();
+    debouncedRenderOverview();
+    debouncedRenderAttendance();
     debouncedRenderAnalytics();
     if (dateKey) renderDayReport(dateKey);
 };
@@ -4145,7 +4579,9 @@ window.editAttendance = function(id) {
     if (!session) return;
     
     document.getElementById('editAttendanceId').value = id;
-    document.getElementById('editAttendanceDate').value = session.startTime.split('T')[0];
+    let dateStr = '';
+    if (session.startTime) dateStr = TimeUtils.getDateKey(new Date(session.startTime));
+    document.getElementById('editAttendanceDate').value = dateStr;
     
     const subjectSelect = document.getElementById('editAttendanceSubject');
     subjectSelect.innerHTML = '';
@@ -4261,8 +4697,8 @@ window.saveEditAttendance = function() {
     
     saveData('sessions');
     document.getElementById('editAttendanceModal').classList.remove('active');
-    renderOverview();
-    renderAttendance();
+    debouncedRenderOverview();
+    debouncedRenderAttendance();
     debouncedRenderAnalytics();
     renderDayReport(date);
 };
@@ -4302,7 +4738,7 @@ window.saveEditPractice = function() {
     document.getElementById('editPracticeModal').classList.remove('active');
     renderPracticeTotals();
     renderPracticeHistory();
-    renderAnalytics();
+    debouncedRenderAnalytics();
 };
 
 window.editMock = function(id) {
@@ -4340,7 +4776,7 @@ window.saveEditMock = function() {
     document.getElementById('editMockModal').classList.remove('active');
     renderMocksHistory();
     renderMockTotals();
-    renderAnalytics();
+    debouncedRenderAnalytics();
 };
 
 // ==========================================
@@ -4884,7 +5320,7 @@ function saveSchedulePlan() {
     saveData('schedule');
     document.getElementById('scheduleModal').classList.remove('active');
     renderScheduleList();
-    renderOverview();
+    debouncedRenderOverview();
 }
 
 window.deleteScheduleItem = function(id) {
@@ -4893,7 +5329,7 @@ window.deleteScheduleItem = function(id) {
     AppState.schedule = AppState.schedule.filter(s => s.id !== id);
     saveData('schedule');
     renderScheduleList();
-    renderOverview();
+    debouncedRenderOverview();
     if (item) renderDayReport(item.date);
 };
 
@@ -4903,7 +5339,7 @@ window.missScheduleItem = function(id) {
     item.status = 'missed';
     saveData('schedule');
     renderScheduleList();
-    renderOverview();
+    debouncedRenderOverview();
     renderDayReport(item.date);
 };
 
@@ -4916,7 +5352,7 @@ window.moveScheduleItemToTomorrow = function(id) {
     item.status = 'pending';
     saveData('schedule');
     renderScheduleList();
-    renderOverview();
+    debouncedRenderOverview();
     addNotification('Moved to Tomorrow', `"${item.title || 'Schedule item'}" has been rescheduled to tomorrow.`, 'info');
 };
 
@@ -4929,7 +5365,7 @@ window.completeScheduleItem = function(id) {
         item.status = 'completed';
         saveData('schedule');
         renderScheduleList();
-        renderOverview();
+        debouncedRenderOverview();
         addNotification('Marked Complete', `"${item.title || 'Exam Registration'}" marked as done.`, 'success');
         return;
     }
@@ -5288,8 +5724,9 @@ document.addEventListener('visibilitychange', () => {
                         focusState = 'stopped';
                         document.getElementById('focusStartBtn').style.display = 'inline-block';
                         document.getElementById('focusPauseBtn').style.display = 'none';
-                        const logContainer = document.getElementById('focusLogContainer');
-                        if (logContainer) logContainer.style.display = 'block';
+                        if (typeof showLogOptions === 'function') {
+                            showLogOptions();
+                        }
                     }
                 }
             }
@@ -5299,7 +5736,7 @@ document.addEventListener('visibilitychange', () => {
         const overview = document.getElementById('view-overview');
         if (overview && overview.classList.contains('active')) {
             if (typeof renderOverview === 'function') {
-                renderOverview();
+                debouncedRenderOverview();
             }
         }
     }

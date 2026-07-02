@@ -111,6 +111,8 @@ async function syncDataFromCloud(uid) {
             if (data.schedule) localStorage.setItem('cseb_study_schedule', JSON.stringify(data.schedule));
             if (data.achievements) localStorage.setItem('cseb_achievements', JSON.stringify(data.achievements));
             if (data.systemState) localStorage.setItem('cseb_system_state', JSON.stringify(data.systemState));
+            if (data.workoutQuestions) localStorage.setItem('cseb_workout_questions', JSON.stringify(data.workoutQuestions));
+            if (data.workoutStats) localStorage.setItem('cseb_workout_stats', JSON.stringify(data.workoutStats));
         } else {
             // First login, push local data to cloud
             await syncDataToCloud(uid);
@@ -135,7 +137,9 @@ async function syncDataToCloud(uid) {
             notifications: JSON.parse(localStorage.getItem('cseb_notifications') || '[]'),
             schedule: JSON.parse(localStorage.getItem('cseb_study_schedule') || '[]'),
             achievements: JSON.parse(localStorage.getItem('cseb_achievements') || '[]'),
-            systemState: JSON.parse(localStorage.getItem('cseb_system_state') || '{"currentVersion":"v1.1.20"}')
+            systemState: JSON.parse(localStorage.getItem('cseb_system_state') || '{"currentVersion":"v1.0.60"}'),
+            workoutQuestions: JSON.parse(localStorage.getItem('cseb_workout_questions') || '[]'),
+            workoutStats: JSON.parse(localStorage.getItem('cseb_workout_stats') || '{"totalDone":0,"totalCorrect":0}')
         });
     } catch (error) {
         console.error("Error saving to cloud:", error);

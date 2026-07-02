@@ -40,8 +40,8 @@
         <div class="nav-item" data-target="view-focus"><span class="nav-icon">🧠</span><span class="nav-text">Focus Mode</span></div>
         <div class="nav-item" data-target="view-schedule"><span class="nav-icon">🗓️</span><span class="nav-text">Planner</span></div>
         <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Mock Exams</span></div>
+        <div class="nav-item" data-target="view-workout"><span class="nav-icon">💪</span><span class="nav-text">Workout</span></div>
         <div class="nav-item" data-target="view-analytics"><span class="nav-icon">📈</span><span class="nav-text">Analytics</span></div>
-        <div class="nav-item" data-target="view-analyzer"><span class="nav-icon">🔍</span><span class="nav-text">Report Analyzer</span></div>
         <div class="nav-item" data-target="view-search"><span class="nav-icon">🔎</span><span class="nav-text">Search Data</span></div>
         <div class="nav-item" id="nav-software-update" style="display: none; align-items: center; justify-content: space-between;" data-target="view-update">
             <div style="display: flex; align-items: center;">
@@ -649,6 +649,36 @@
                     <button class="btn btn-export" id="btnExportAttendance">🗓️ Attendance Report (PDF)</button>
                 </div>
             </div>
+
+            <!-- Report Analyzer Tab (embedded in Analytics) -->
+            <div class="chart-card" style="margin-top: 10px;" id="analyticsAnalyzerPanel">
+                <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;">🔍 Report Analyzer <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">— Upload a PDF exported from this app to analyze it</span></h3>
+                <div style="border: 2px dashed var(--neon-blue); border-radius: 12px; padding: 30px 20px; cursor: pointer; transition: all 0.3s; text-align:center;" id="pdfDropZone">
+                    <div style="font-size: 2.5rem; margin-bottom: 10px;">📄</div>
+                    <div style="font-weight: 600;">Click or Drag PDF here</div>
+                    <div style="font-size:0.8rem; color:var(--text-muted); margin-top:5px;">Supports Study Report, Monthly Report &amp; Attendance Report PDFs</div>
+                    <input type="file" id="pdfFileInput" accept="application/pdf" style="display: none;">
+                </div>
+                <div id="analyzerLoading" style="display: none; margin-top: 20px; text-align:center;">
+                    <div class="spinner" style="margin: 0 auto;"></div>
+                    <p style="color: var(--text-muted); margin-top: 10px;">Analyzing your report...</p>
+                </div>
+                <div id="analyzerResults" style="display: none; margin-top: 20px;">
+                    <h4 style="margin-top: 0; color: var(--neon-blue);">Analysis Results</h4>
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap:wrap;">
+                        <div style="flex: 1; min-width:120px; background: var(--glass-hover); padding: 15px; border-radius: 12px; text-align: center;">
+                            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Total Hours</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--text-main);" id="analyzerHours">-</div>
+                        </div>
+                        <div style="flex: 1; min-width:120px; background: var(--glass-hover); padding: 15px; border-radius: 12px; text-align: center;">
+                            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Attendance</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--text-main);" id="analyzerAttendance">-</div>
+                        </div>
+                    </div>
+                    <h4 style="margin-bottom: 10px;">Suggestions for Improvement:</h4>
+                    <ul id="analyzerSuggestions" style="color: var(--text-muted); line-height: 1.6; padding-left: 20px;"></ul>
+                </div>
+            </div>
         </section>
 
         <!-- View: Mocks & Practice -->
@@ -780,44 +810,174 @@
         </section>
 
         <!-- View: Report Analyzer -->
-        <section id="view-analyzer" class="view-section">
+        <!-- view-analyzer kept as hidden redirect target for backward compat -->
+        <section id="view-analyzer" class="view-section" style="display:none !important;"></section>
+
+        <!-- View: Workout -->
+        <section id="view-workout" class="view-section">
             <div class="header">
-                <h1>Report Analyzer</h1>
+                <h1>💪 Workout</h1>
+                <p style="color:var(--text-muted); font-size:0.9rem; margin-top:4px;">Build your question bank and drill with flashcard workouts</p>
             </div>
-            
-            <div class="profile-card" style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 30px; border-radius: 20px; max-width: 600px; margin: 0 auto; text-align: center;">
-                <h3 style="margin-top: 0;">Upload your PDF Report</h3>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Upload a daily or monthly report exported from the app. We will analyze your hours and attendance to give you personalized suggestions.</p>
-                
-                <div style="border: 2px dashed var(--neon-blue); border-radius: 12px; padding: 40px 20px; cursor: pointer; transition: all 0.3s;" id="pdfDropZone">
-                    <div style="font-size: 3rem; margin-bottom: 15px;">📄</div>
-                    <div style="font-weight: 600;">Click or Drag PDF here</div>
-                    <input type="file" id="pdfFileInput" accept="application/pdf" style="display: none;">
-                </div>
-                
-                <div id="analyzerLoading" style="display: none; margin-top: 20px;">
-                    <div class="spinner" style="margin: 0 auto;"></div>
-                    <p style="color: var(--text-muted); margin-top: 10px;">Analyzing your report...</p>
-                </div>
+
+            <!-- Sub-tabs -->
+            <div class="tab-bar" style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
+                <button class="btn workout-tab-btn active" id="tabWorkoutBank" onclick="switchWorkoutTab('bank',this)" style="background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-main); font-weight:600; padding:10px 20px; border-radius:12px;">📚 Question Bank</button>
+                <button class="btn workout-tab-btn" id="tabWorkoutDrill" onclick="switchWorkoutTab('drill',this)" style="background: transparent; border: 1px solid transparent; color: var(--text-muted); font-weight:600; padding:10px 20px; border-radius:12px;">🎯 Start Workout</button>
             </div>
-            
-            <div id="analyzerResults" style="display: none; background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 30px; border-radius: 20px; max-width: 600px; margin: 30px auto 0;">
-                <h3 style="margin-top: 0; color: var(--neon-blue);">Analysis Results</h3>
-                
-                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                    <div style="flex: 1; background: var(--glass-hover); padding: 15px; border-radius: 12px; text-align: center;">
-                        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Total Hours</div>
-                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--text-main);" id="analyzerHours">-</div>
+
+            <!-- ── Question Bank Tab ── -->
+            <div id="workoutBankTab">
+                <!-- Filters + Add -->
+                <div style="background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:16px; padding:15px; margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                    <div style="flex:1; min-width:120px;" class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Course</label>
+                        <select id="wbCourseFilter" class="form-control" onchange="renderWorkoutBank()">
+                            <option value="ALL">All Courses</option>
+                            <option value="CSEB">CSEB</option>
+                            <option value="ACCA">ACCA</option>
+                        </select>
                     </div>
-                    <div style="flex: 1; background: var(--glass-hover); padding: 15px; border-radius: 12px; text-align: center;">
-                        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Present Days</div>
-                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--text-main);" id="analyzerAttendance">-</div>
+                    <div style="flex:1; min-width:140px;" class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Subject</label>
+                        <select id="wbSubjectFilter" class="form-control" onchange="renderWorkoutBank()">
+                            <option value="ALL">All Subjects</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; min-width:140px;" class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Subtopic</label>
+                        <select id="wbSubtopicFilter" class="form-control" onchange="renderWorkoutBank()">
+                            <option value="ALL">All Subtopics</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; min-width:120px;" class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Source</label>
+                        <select id="wbSourceFilter" class="form-control" onchange="renderWorkoutBank()">
+                            <option value="ALL">All Sources</option>
+                            <option value="Custom">Custom / Own</option>
+                            <option value="Kaplan">Kaplan</option>
+                            <option value="BPP">BPP</option>
+                            <option value="Study Hub">Study Hub</option>
+                        </select>
+                    </div>
+                    <button class="btn" style="background:var(--neon-green); color:#000; font-weight:700; height:48px; padding:0 20px; border-radius:12px;" onclick="openWorkoutQuestionModal()">+ Add</button>
+                </div>
+
+                <!-- Stats bar -->
+                <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+                    <div class="stat-card" style="padding:12px 18px; flex:1; min-width:120px;">
+                        <div class="stat-label">Total Questions</div>
+                        <div class="stat-value" id="wbTotalCount" style="font-size:1.6rem;">0</div>
+                    </div>
+                    <div class="stat-card" style="padding:12px 18px; flex:1; min-width:120px;">
+                        <div class="stat-label">CSEB</div>
+                        <div class="stat-value text-blue" id="wbCsebCount" style="font-size:1.6rem;">0</div>
+                    </div>
+                    <div class="stat-card" style="padding:12px 18px; flex:1; min-width:120px;">
+                        <div class="stat-label">ACCA</div>
+                        <div class="stat-value text-purple" id="wbAccaCount" style="font-size:1.6rem;">0</div>
+                    </div>
+                    <div class="stat-card" style="padding:12px 18px; flex:1; min-width:120px;">
+                        <div class="stat-label">Workouts Done</div>
+                        <div class="stat-value text-green" id="wbWorkoutsDone" style="font-size:1.6rem;">0</div>
                     </div>
                 </div>
-                
-                <h4 style="margin-bottom: 10px;">Suggestions for Improvement:</h4>
-                <ul id="analyzerSuggestions" style="color: var(--text-muted); line-height: 1.6; padding-left: 20px; text-align: left;">
-                </ul>
+
+                <!-- Question list -->
+                <div id="workoutBankList"></div>
+            </div>
+
+            <!-- ── Drill Tab ── -->
+            <div id="workoutDrillTab" style="display:none;">
+                <!-- Setup screen -->
+                <div id="drillSetupScreen">
+                    <div class="chart-card" style="max-width:500px; margin:0 auto;">
+                        <h3 style="margin-top:0;">🎯 Configure Workout</h3>
+                        <div class="form-group">
+                            <label>Course</label>
+                            <select id="drillCourseSelect" class="form-control" onchange="populateDrillSubjects()">
+                                <option value="ALL">All Courses</option>
+                                <option value="CSEB">CSEB</option>
+                                <option value="ACCA">ACCA</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Subject / Topic</label>
+                            <select id="drillSubjectSelect" class="form-control">
+                                <option value="ALL">All Subjects</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Number of Questions</label>
+                            <select id="drillCountSelect" class="form-control">
+                                <option value="5">5 Questions</option>
+                                <option value="10" selected>10 Questions</option>
+                                <option value="20">20 Questions</option>
+                                <option value="ALL">All Available</option>
+                            </select>
+                        </div>
+                        <button class="btn" style="width:100%; background:var(--neon-blue); color:#fff; font-weight:700; padding:14px;" onclick="startWorkoutDrill()">🚀 Start Workout</button>
+                    </div>
+                </div>
+
+                <!-- Active drill screen -->
+                <div id="drillActiveScreen" style="display:none;">
+                    <div style="max-width:600px; margin:0 auto;">
+                        <!-- Progress -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <span id="drillProgressText" style="font-size:0.9rem; color:var(--text-muted);">Question 1 of 10</span>
+                            <span id="drillScoreText" style="font-size:0.9rem; color:var(--neon-green); font-weight:600;">✓ 0 &nbsp;✗ 0</span>
+                        </div>
+                        <div style="background:var(--glass-border); height:6px; border-radius:3px; margin-bottom:20px; overflow:hidden;">
+                            <div id="drillProgressBar" style="height:100%; background:var(--neon-blue); border-radius:3px; width:0%; transition:width 0.4s;"></div>
+                        </div>
+
+                        <!-- Flashcard -->
+                        <div id="drillFlashcard" style="
+                            background: var(--glass-bg);
+                            border: 1px solid var(--glass-border);
+                            border-radius: 20px;
+                            padding: 30px;
+                            min-height: 220px;
+                            cursor: pointer;
+                            transition: all 0.3s;
+                            position: relative;
+                            text-align: center;
+                        " onclick="toggleDrillAnswer()">
+                            <div id="drillQuestionNo" style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;"></div>
+                            <div id="drillSubjectBadge" style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; margin-bottom:14px; background:rgba(41,151,255,0.15); color:var(--neon-blue);"></div>
+                            <div id="drillQuestionText" style="font-size:1.1rem; font-weight:600; line-height:1.5; margin-bottom:20px;"></div>
+                            <div id="drillAnswerBlock" style="display:none; border-top:1px solid var(--glass-border); padding-top:16px; margin-top:16px;">
+                                <div style="font-size:0.75rem; color:var(--neon-green); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Answer</div>
+                                <div id="drillAnswerText" style="font-size:1rem; color:var(--text-main); line-height:1.6;"></div>
+                            </div>
+                            <div id="drillTapHint" style="font-size:0.8rem; color:var(--text-muted); margin-top:16px;">👆 Tap card to reveal answer</div>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div id="drillActionBtns" style="display:none; gap:12px; margin-top:16px; display:flex; flex-wrap:wrap;">
+                            <button onclick="markDrillQuestion(true)" style="flex:1; padding:14px; background:rgba(48,209,88,0.15); color:var(--neon-green); border:1px solid var(--neon-green); border-radius:12px; cursor:pointer; font-weight:700; font-size:0.95rem;">✓ Got It!</button>
+                            <button onclick="markDrillQuestion(false)" style="flex:1; padding:14px; background:rgba(255,69,58,0.15); color:var(--neon-red); border:1px solid var(--neon-red); border-radius:12px; cursor:pointer; font-weight:700; font-size:0.95rem;">✗ Need Practice</button>
+                        </div>
+                        <button onclick="exitWorkoutDrill()" style="width:100%; margin-top:12px; padding:10px; background:transparent; color:var(--text-muted); border:1px solid var(--glass-border); border-radius:10px; cursor:pointer;">✕ Exit Workout</button>
+                    </div>
+                </div>
+
+                <!-- Results screen -->
+                <div id="drillResultsScreen" style="display:none; max-width:500px; margin:0 auto; text-align:center;">
+                    <div class="chart-card">
+                        <div style="font-size:3rem; margin-bottom:10px;">🎉</div>
+                        <h2 style="margin-top:0;">Workout Complete!</h2>
+                        <div style="font-size:3rem; font-weight:800; color:var(--neon-green);" id="drillFinalScore">0/0</div>
+                        <div style="color:var(--text-muted); margin:8px 0 20px;">Accuracy</div>
+                        <div id="drillAccuracyBadge" style="display:inline-block; padding:6px 18px; border-radius:20px; font-weight:700; margin-bottom:20px;"></div>
+                        <div id="drillWeakList" style="text-align:left; margin-bottom:20px;"></div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button onclick="startWorkoutDrill()" style="flex:1; padding:12px; background:var(--neon-blue); color:#fff; border:none; border-radius:10px; cursor:pointer; font-weight:700;">🔁 Retry</button>
+                            <button onclick="switchWorkoutTab('bank', document.getElementById('tabWorkoutBank'))" style="flex:1; padding:12px; background:var(--glass-hover); color:var(--text-main); border:1px solid var(--glass-border); border-radius:10px; cursor:pointer;">📚 Bank</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -1076,6 +1236,73 @@
             </form>
             <div style="text-align: center; margin-top: 25px; font-size: 0.95rem;">
                 <a href="#" id="linkToLoginFromReset" style="color: var(--neon-blue); text-decoration: none; font-weight: 600;">Back to Log In</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workout Question Modal -->
+    <div class="modal-overlay" id="workoutQuestionModal">
+        <div class="modal-card" style="max-width:560px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0;" id="workoutModalTitle">Add Question</h2>
+                <button onclick="document.getElementById('workoutQuestionModal').classList.remove('active')" style="background:transparent; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer;">&times;</button>
+            </div>
+            <input type="hidden" id="wqEditId">
+            <div class="form-group">
+                <label>Course</label>
+                <select id="wqCourse" class="form-control" onchange="populateWqSubjects()">
+                    <option value="CSEB">CSEB</option>
+                    <option value="ACCA">ACCA</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Subject / Topic</label>
+                <select id="wqSubject" class="form-control" onchange="populateWqSubtopicList()"></select>
+            </div>
+            <div class="form-group">
+                <label>Subtopic <span style="color:var(--text-muted); font-size:0.8rem;">(optional)</span></label>
+                <select id="wqSubtopic" class="form-control">
+                    <option value="">Select Subtopic...</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                    <label>Source Bank</label>
+                    <select id="wqSourceBank" class="form-control">
+                        <option value="Custom">Custom / Own</option>
+                        <option value="Kaplan">Kaplan</option>
+                        <option value="BPP">BPP</option>
+                        <option value="Study Hub">Study Hub</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                    <label>Q Reference <span style="color:var(--text-muted); font-size:0.8rem;">(e.g. Q5, Q7)</span></label>
+                    <input type="text" id="wqRef" class="form-control" placeholder="e.g. Q5, Q7">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Question <span style="color:var(--text-muted); font-size:0.8rem;">(Optional if Q Ref provided)</span></label>
+                <textarea id="wqQuestion" class="form-control" rows="3" placeholder="Enter the question..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Answer <span style="color:var(--text-muted); font-size:0.8rem;">(Optional if Q Ref provided)</span></label>
+                <textarea id="wqAnswer" class="form-control" rows="4" placeholder="Enter the answer / explanation..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Difficulty</label>
+                <select id="wqDifficulty" class="form-control">
+                    <option value="Easy">Easy</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="Hard">Hard</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Tags <span style="color:var(--text-muted); font-size:0.8rem;">(comma-separated, optional)</span></label>
+                <input type="text" id="wqTags" class="form-control" placeholder="e.g. NI Act, Cheques, KCS">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="btn" style="flex:1; background:var(--neon-blue); color:#fff; font-weight:700;" onclick="saveWorkoutQuestion()">Save Question</button>
+                <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('workoutQuestionModal').classList.remove('active')">Cancel</button>
             </div>
         </div>
     </div>
@@ -1523,9 +1750,9 @@
         </div>
     </div>
     
-    <script src="auth.js?v=12"></script>
-    <script src="export.js?v=9"></script>
+    <script src="auth.js?v=13"></script>
     <script src="ai.js?v=4"></script>
-    <script src="app.js?v=81"></script>
+    <script src="app.js?v=84"></script>
+    <script src="export.js?v=10"></script>
 </body>
 </html>

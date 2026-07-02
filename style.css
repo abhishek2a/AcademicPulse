@@ -820,3 +820,5 @@ body.light-theme .auth-logo, body.light-theme .app-logo { background: linear-gra
 
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Performance patch for backdrop filter */

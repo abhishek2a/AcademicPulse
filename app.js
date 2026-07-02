@@ -3055,11 +3055,29 @@ window.renderWorkoutBank = function() {
     document.getElementById('wbAccaCount').textContent = qs.filter(q => q.course === 'ACCA').length;
     document.getElementById('wbWorkoutsDone').textContent = AppState.workoutStats.totalDone;
 
-    let filtered = qs;
+    let filtered = [...qs];
     if (courseFilter !== 'ALL') filtered = filtered.filter(q => q.course === courseFilter);
     if (subjFilter !== 'ALL') filtered = filtered.filter(q => q.subject === subjFilter);
     if (subtopicFilter !== 'ALL') filtered = filtered.filter(q => q.subtopic === subtopicFilter);
     if (sourceFilter !== 'ALL') filtered = filtered.filter(q => q.sourceBank === sourceFilter);
+
+    const sortFilter = document.getElementById('wbSortFilter')?.value || 'DATE_DESC';
+    filtered.sort((a, b) => {
+        if (sortFilter === 'DATE_DESC') {
+            const dA = new Date(a.createdAt || 0).getTime();
+            const dB = new Date(b.createdAt || 0).getTime();
+            return dB - dA;
+        } else if (sortFilter === 'DATE_ASC') {
+            const dA = new Date(a.createdAt || 0).getTime();
+            const dB = new Date(b.createdAt || 0).getTime();
+            return dA - dB;
+        } else if (sortFilter === 'TOPIC') {
+            const topicA = (a.subject || '') + (a.subtopic || '');
+            const topicB = (b.subject || '') + (b.subtopic || '');
+            return topicA.localeCompare(topicB);
+        }
+        return 0;
+    });
 
     if (filtered.length === 0) {
         list.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:40px;">No questions yet. <button class="btn" onclick="openWorkoutQuestionModal()" style="margin-left:8px; padding:6px 14px;">+ Add one</button></div>`;
@@ -3078,6 +3096,7 @@ window.renderWorkoutBank = function() {
                         <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Q${globalIdx}</span>
                         <span style="background:rgba(41,151,255,0.15); color:var(--neon-blue); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700;">${escapeHtml(q.course)}</span>
                         <span style="background:rgba(100,100,100,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">${escapeHtml(q.subject)}</span>
+                        ${q.createdAt ? `<span style="font-size:0.7rem; color:var(--text-muted); margin-left:4px;">${q.createdAt.split('T')[0]}</span>` : ''}
                         ${q.subtopic ? `<span style="background:rgba(200,200,200,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">↳ ${escapeHtml(q.subtopic)}</span>` : ''}
                         <span style="color:${diffColor[q.difficulty] || 'var(--text-muted)'}; font-size:0.72rem; font-weight:700;">${q.difficulty}</span>
                         ${q.sourceBank && q.sourceBank !== 'Custom' ? `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700;">${escapeHtml(q.sourceBank)}</span>` : ''}
@@ -3120,6 +3139,7 @@ window.openWorkoutQuestionModal = function(id) {
         document.getElementById('wqAnswer').value = q.answer;
         document.getElementById('wqDifficulty').value = q.difficulty || 'Medium';
         document.getElementById('wqTags').value = (q.tags || []).join(', ');
+        document.getElementById('wqDate').value = q.createdAt ? q.createdAt.split('T')[0] : TimeUtils.getDateKey();
     } else {
         document.getElementById('wqCourse').value = 'CSEB';
         populateWqSubjects();
@@ -3130,6 +3150,7 @@ window.openWorkoutQuestionModal = function(id) {
         document.getElementById('wqAnswer').value = '';
         document.getElementById('wqDifficulty').value = 'Medium';
         document.getElementById('wqTags').value = '';
+        document.getElementById('wqDate').value = TimeUtils.getDateKey();
     }
     modal.classList.add('active');
 };
@@ -3145,6 +3166,8 @@ window.saveWorkoutQuestion = function() {
     let answer = document.getElementById('wqAnswer').value.trim();
     const difficulty = document.getElementById('wqDifficulty').value;
     const tags = document.getElementById('wqTags').value.split(',').map(t => t.trim()).filter(Boolean);
+    const dateInput = document.getElementById('wqDate').value;
+    const createdAt = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
 
     if (!question && ref) {
         question = `[${sourceBank}] ${ref}`;
@@ -3160,11 +3183,11 @@ window.saveWorkoutQuestion = function() {
 
     if (id) {
         const q = AppState.workoutQuestions.find(x => x.id === id);
-        if (q) { Object.assign(q, { course, subject, subtopic, sourceBank, ref, question, answer, difficulty, tags, updatedAt: new Date().toISOString() }); }
+        if (q) { Object.assign(q, { course, subject, subtopic, sourceBank, ref, question, answer, difficulty, tags, createdAt, updatedAt: new Date().toISOString() }); }
     } else {
         AppState.workoutQuestions.push({
             id: generateId(), course, subject, subtopic, sourceBank, ref, question, answer, difficulty, tags,
-            createdAt: new Date().toISOString(), timesAttempted: 0, timesCorrect: 0
+            createdAt, timesAttempted: 0, timesCorrect: 0
         });
     }
 

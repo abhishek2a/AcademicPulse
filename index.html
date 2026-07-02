@@ -860,6 +860,14 @@
                             <option value="Study Hub">Study Hub</option>
                         </select>
                     </div>
+                    <div style="flex:1; min-width:120px;" class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Sort By</label>
+                        <select id="wbSortFilter" class="form-control" onchange="renderWorkoutBank()">
+                            <option value="DATE_DESC">Newest First</option>
+                            <option value="DATE_ASC">Oldest First</option>
+                            <option value="TOPIC">By Topic</option>
+                        </select>
+                    </div>
                     <button class="btn" style="background:var(--neon-green); color:#000; font-weight:700; height:48px; padding:0 20px; border-radius:12px;" onclick="openWorkoutQuestionModal()">+ Add</button>
                 </div>
 
@@ -1264,6 +1272,10 @@
                 <select id="wqSubtopic" class="form-control">
                     <option value="">Select Subtopic...</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label>Date Added</label>
+                <input type="date" id="wqDate" class="form-control">
             </div>
             <div style="display:flex; gap:10px; margin-bottom:15px;">
                 <div class="form-group" style="flex:1; margin-bottom:0;">

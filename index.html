@@ -763,7 +763,7 @@
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: span 1;">
-                        <label>Topic (Optional)</label>
+                        <label>Primary Topic <span style="color:var(--text-muted); font-size:0.8rem;">(Optional)</span></label>
                         <select id="mockTopicInput" class="form-input">
                             <option value="">All Topics</option>
                         </select>
@@ -771,6 +771,16 @@
                     <div class="form-group" style="grid-column: span 1;">
                         <label>Mock Exam Name</label>
                         <input type="text" id="mockNameInput" class="form-input" placeholder="e.g. Mock Test 1">
+                    </div>
+                    <!-- Multi-topic coverage -->
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Topics Covered <span style="color:var(--text-muted); font-size:0.8rem;">(for mixed-topic mocks)</span></label>
+                        <div style="display:flex; gap:8px; margin-bottom:8px;">
+                            <select id="mockTopicAddSelect" class="form-input" style="flex:1;"></select>
+                            <button type="button" onclick="addMockTopicTag()" style="background:var(--neon-blue); color:#fff; border:none; border-radius:10px; padding:0 16px; cursor:pointer; font-weight:700; white-space:nowrap;">+ Add</button>
+                        </div>
+                        <div id="mockTopicTagsContainer" style="display:flex; flex-wrap:wrap; gap:6px; min-height:28px;"></div>
+                        <input type="hidden" id="mockTopicsJson" value="[]">
                     </div>
                     <div class="form-group">
                         <label>Score</label>
@@ -866,6 +876,16 @@
                             <option value="DATE_DESC">Newest First</option>
                             <option value="DATE_ASC">Oldest First</option>
                             <option value="TOPIC">By Topic</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; min-width:120px;" class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Section</label>
+                        <select id="wbSectionFilter" class="form-control" onchange="renderWorkoutBank()">
+                            <option value="ALL">All Sections</option>
+                            <option value="">General</option>
+                            <option value="A">Section A</option>
+                            <option value="B">Section B</option>
+                            <option value="C">Section C</option>
                         </select>
                     </div>
                     <button class="btn" style="background:var(--neon-green); color:#000; font-weight:700; height:48px; padding:0 20px; border-radius:12px;" onclick="openWorkoutQuestionModal()">+ Add</button>
@@ -1276,6 +1296,15 @@
             <div class="form-group">
                 <label>Date Added</label>
                 <input type="date" id="wqDate" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Section <span style="color:var(--text-muted); font-size:0.8rem;">(optional)</span></label>
+                <select id="wqSection" class="form-control">
+                    <option value="">General / None</option>
+                    <option value="A">Section A</option>
+                    <option value="B">Section B</option>
+                    <option value="C">Section C</option>
+                </select>
             </div>
             <div style="display:flex; gap:10px; margin-bottom:15px;">
                 <div class="form-group" style="flex:1; margin-bottom:0;">

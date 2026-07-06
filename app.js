@@ -3045,6 +3045,23 @@ window.renderWorkoutBank = function() {
     const subtopicFilter = document.getElementById('wbSubtopicFilter')?.value || 'ALL';
     const sourceFilter = document.getElementById('wbSourceFilter')?.value || 'ALL';
     const list = document.getElementById('workoutBankList');
+    
+    const wbSourceFilter = document.getElementById('wbSourceFilter');
+    if (wbSourceFilter) {
+        if (courseFilter === 'CSEB') {
+            Array.from(wbSourceFilter.options).forEach(opt => {
+                if (['Kaplan', 'BPP', 'Study Hub'].includes(opt.value)) {
+                    opt.disabled = true;
+                }
+            });
+            if (['Kaplan', 'BPP', 'Study Hub'].includes(sourceFilter)) {
+                wbSourceFilter.value = 'ALL';
+            }
+        } else {
+            Array.from(wbSourceFilter.options).forEach(opt => opt.disabled = false);
+        }
+    }
+
     if (!list) return;
 
     const qs = AppState.workoutQuestions;
@@ -3060,6 +3077,8 @@ window.renderWorkoutBank = function() {
     if (subjFilter !== 'ALL') filtered = filtered.filter(q => q.subject === subjFilter);
     if (subtopicFilter !== 'ALL') filtered = filtered.filter(q => q.subtopic === subtopicFilter);
     if (sourceFilter !== 'ALL') filtered = filtered.filter(q => q.sourceBank === sourceFilter);
+    const sectionFilter = document.getElementById('wbSectionFilter')?.value;
+    if (sectionFilter !== undefined && sectionFilter !== 'ALL') filtered = filtered.filter(q => (q.section || '') === sectionFilter);
 
     const sortFilter = document.getElementById('wbSortFilter')?.value || 'DATE_DESC';
     filtered.sort((a, b) => {
@@ -3096,6 +3115,7 @@ window.renderWorkoutBank = function() {
                         <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Q${globalIdx}</span>
                         <span style="background:rgba(41,151,255,0.15); color:var(--neon-blue); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700;">${escapeHtml(q.course)}</span>
                         <span style="background:rgba(100,100,100,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">${escapeHtml(q.subject)}</span>
+                        ${q.section ? `<span style="background:rgba(180,100,255,0.15); color:#c77dff; border:1px solid rgba(180,100,255,0.35); padding:2px 9px; border-radius:10px; font-size:0.72rem; font-weight:700;">§ ${escapeHtml(q.section)}</span>` : ''}
                         ${q.createdAt ? `<span style="font-size:0.7rem; color:var(--text-muted); margin-left:4px;">${q.createdAt.split('T')[0]}</span>` : ''}
                         ${q.subtopic ? `<span style="background:rgba(200,200,200,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">↳ ${escapeHtml(q.subtopic)}</span>` : ''}
                         <span style="color:${diffColor[q.difficulty] || 'var(--text-muted)'}; font-size:0.72rem; font-weight:700;">${q.difficulty}</span>
@@ -3140,6 +3160,7 @@ window.openWorkoutQuestionModal = function(id) {
         document.getElementById('wqDifficulty').value = q.difficulty || 'Medium';
         document.getElementById('wqTags').value = (q.tags || []).join(', ');
         document.getElementById('wqDate').value = q.createdAt ? q.createdAt.split('T')[0] : TimeUtils.getDateKey();
+        document.getElementById('wqSection').value = q.section || '';
     } else {
         document.getElementById('wqCourse').value = 'CSEB';
         populateWqSubjects();
@@ -3151,6 +3172,7 @@ window.openWorkoutQuestionModal = function(id) {
         document.getElementById('wqDifficulty').value = 'Medium';
         document.getElementById('wqTags').value = '';
         document.getElementById('wqDate').value = TimeUtils.getDateKey();
+        document.getElementById('wqSection').value = '';
     }
     modal.classList.add('active');
 };
@@ -3168,6 +3190,7 @@ window.saveWorkoutQuestion = function() {
     const tags = document.getElementById('wqTags').value.split(',').map(t => t.trim()).filter(Boolean);
     const dateInput = document.getElementById('wqDate').value;
     const createdAt = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
+    const section = document.getElementById('wqSection')?.value || '';
 
     if (!question && ref) {
         question = `[${sourceBank}] ${ref}`;
@@ -3183,10 +3206,10 @@ window.saveWorkoutQuestion = function() {
 
     if (id) {
         const q = AppState.workoutQuestions.find(x => x.id === id);
-        if (q) { Object.assign(q, { course, subject, subtopic, sourceBank, ref, question, answer, difficulty, tags, createdAt, updatedAt: new Date().toISOString() }); }
+        if (q) { Object.assign(q, { course, subject, subtopic, section, sourceBank, ref, question, answer, difficulty, tags, createdAt, updatedAt: new Date().toISOString() }); }
     } else {
         AppState.workoutQuestions.push({
-            id: generateId(), course, subject, subtopic, sourceBank, ref, question, answer, difficulty, tags,
+            id: generateId(), course, subject, subtopic, section, sourceBank, ref, question, answer, difficulty, tags,
             createdAt, timesAttempted: 0, timesCorrect: 0
         });
     }
@@ -3501,6 +3524,8 @@ function initMocksAndPractice() {
     const populateMockTopics = (course, area) => {
         if(!mockTopicSelect) return;
         mockTopicSelect.innerHTML = '<option value="">All Topics</option>';
+        const addSelect = document.getElementById('mockTopicAddSelect');
+        if(addSelect) addSelect.innerHTML = '';
         if(!area || area === 'General') return;
         
         const syllabusObj = course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
@@ -3512,6 +3537,12 @@ function initMocksAndPractice() {
                 opt.value = name;
                 opt.textContent = name;
                 mockTopicSelect.appendChild(opt);
+                if(addSelect) {
+                    const opt2 = document.createElement('option');
+                    opt2.value = name;
+                    opt2.textContent = name;
+                    addSelect.appendChild(opt2);
+                }
             });
         }
     };
@@ -3522,6 +3553,7 @@ function initMocksAndPractice() {
             populateMockTopics(e.target.value, '');
         };
         populateMockAreas(mockCourseSelect.value);
+        populateMockTopics(mockCourseSelect.value, mockAreaSelect?.value || 'General');
     }
     
     if(mockAreaSelect) {
@@ -3540,6 +3572,8 @@ function initMocksAndPractice() {
         const score = parseFloat(document.getElementById('mockScoreInput').value) || 0;
         const max = parseFloat(document.getElementById('mockMaxScoreInput').value) || 100;
         const notes = document.getElementById('mockNotesInput')?.value || '';
+        let topicsCovered = [];
+        try { topicsCovered = JSON.parse(document.getElementById('mockTopicsJson')?.value || '[]'); } catch(e) {}
         
         if(!name) return alert('Mock Name is required!');
         
@@ -3549,6 +3583,7 @@ function initMocksAndPractice() {
             course: course,
             syllabusArea: area,
             topic: topic,
+            topicsCovered: topicsCovered,
             name: name,
             score: score,
             maxScore: max,
@@ -3559,6 +3594,11 @@ function initMocksAndPractice() {
         document.getElementById('mockNameInput').value = '';
         document.getElementById('mockScoreInput').value = '';
         if(document.getElementById('mockNotesInput')) document.getElementById('mockNotesInput').value = '';
+        // reset topic tags
+        const tagsContainer = document.getElementById('mockTopicTagsContainer');
+        if(tagsContainer) tagsContainer.innerHTML = '';
+        const topicsJson = document.getElementById('mockTopicsJson');
+        if(topicsJson) topicsJson.value = '[]';
         renderMocksHistory();
         debouncedRenderAnalytics();
     };
@@ -3629,6 +3669,10 @@ function renderMocksHistory() {
         let color = 'var(--neon-green)';
         if(pct < 50) color = 'var(--neon-red)';
         else if(pct < 75) color = 'var(--neon-gold)';
+
+        const topicChips = (m.topicsCovered && m.topicsCovered.length > 0)
+            ? m.topicsCovered.map(t => `<span style="background:rgba(41,151,255,0.12); color:var(--neon-blue); border:1px solid rgba(41,151,255,0.3); padding:2px 8px; border-radius:12px; font-size:0.7rem; font-weight:600; margin-right:4px;">${escapeHtml(t)}</span>`).join('')
+            : '';
         
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--glass-border)';
@@ -3640,8 +3684,9 @@ function renderMocksHistory() {
                     ${m.course} - ${m.syllabusArea}
                     ${m.topic && m.topic !== 'All Topics' && m.topic !== '' ? ' &bull; ' + m.topic : ''}
                 </div>
+                ${topicChips ? `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">${topicChips}</div>` : ''}
             </td>
-            <td style="padding:15px 10px;">${m.score} / ${m.maxScore} (${pct}%)</td>
+            <td style="padding:15px 10px;">${m.score} / ${m.maxScore} (<span style="color:${color}; font-weight:700;">${pct}%</span>)</td>
             <td style="padding:15px 10px; text-align:right; min-width: 150px;">
                 <a href="#" style="color:var(--neon-blue); margin-right:8px; font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); editMock('${m.id}')">Edit</a>
                 <a href="#" style="color:var(--neon-red); font-size:0.85rem; text-decoration:none;" onclick="event.preventDefault(); deleteMock('${m.id}')">Delete</a>
@@ -4590,8 +4635,52 @@ function renderPracticeHistory() {
 }
 
 // ==========================================
-// EDIT / DELETE SESSIONS
+
 // ==========================================
+// MOCK TOPIC TAGS
+// ==========================================
+
+window.addMockTopicTag = function() {
+    const sel = document.getElementById('mockTopicAddSelect');
+    const container = document.getElementById('mockTopicTagsContainer');
+    const hiddenJson = document.getElementById('mockTopicsJson');
+    if (!sel || !container || !hiddenJson) return;
+
+    const val = sel.value;
+    if (!val) return;
+
+    // Parse existing
+    let topics = [];
+    try { topics = JSON.parse(hiddenJson.value); } catch(e) {}
+    if (topics.includes(val)) return; // no duplicates
+
+    topics.push(val);
+    hiddenJson.value = JSON.stringify(topics);
+
+    // Render chip
+    const chip = document.createElement('span');
+    chip.style.cssText = 'display:inline-flex; align-items:center; gap:5px; background:rgba(41,151,255,0.15); color:var(--neon-blue); border:1px solid rgba(41,151,255,0.35); padding:4px 10px; border-radius:20px; font-size:0.78rem; font-weight:600;';
+    chip.dataset.topic = val;
+    chip.innerHTML = `${escapeHtml(val)} <button type="button" onclick="removeMockTopicTag('${val.replace(/'/g,'\\\'')}')" style="background:none;border:none;color:var(--neon-red);cursor:pointer;font-size:1rem;line-height:1;padding:0;">×</button>`;
+    container.appendChild(chip);
+};
+
+window.removeMockTopicTag = function(val) {
+    const container = document.getElementById('mockTopicTagsContainer');
+    const hiddenJson = document.getElementById('mockTopicsJson');
+    if (!container || !hiddenJson) return;
+
+    // Remove chip
+    const chip = container.querySelector(`[data-topic="${CSS.escape(val)}"]`);
+    if (chip) chip.remove();
+
+    // Update JSON
+    let topics = [];
+    try { topics = JSON.parse(hiddenJson.value); } catch(e) {}
+    topics = topics.filter(t => t !== val);
+    hiddenJson.value = JSON.stringify(topics);
+};
+
 
 window.deleteAttendance = function(id) {
     if (!confirm("Are you sure you want to delete this session?")) return;

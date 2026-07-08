@@ -210,8 +210,8 @@ function loadData() {
 
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.63', availableUpdate: null, dataVersion: 1 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.63';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.64', availableUpdate: null, dataVersion: 1 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.64';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -3121,6 +3121,22 @@ window.renderWorkoutBank = function() {
     list.innerHTML = filtered.map((q, idx) => {
         const globalIdx = qs.indexOf(q) + 1;
         const tags = (q.tags || []).map(t => `<span style="background:rgba(41,151,255,0.12); color:var(--neon-blue); padding:2px 8px; border-radius:12px; font-size:0.72rem; margin-right:4px;">${escapeHtml(t)}</span>`).join('');
+        
+        let sourceBadges = '';
+        if (q.refsBySource) {
+            sourceBadges = Object.keys(q.refsBySource).map(k => `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; margin-left:4px;">${escapeHtml(k)}</span>`).join('');
+        } else if (q.sourceBank && q.sourceBank !== 'Custom' && q.sourceBank !== 'Mixed') {
+            sourceBadges = `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; margin-left:4px;">${escapeHtml(q.sourceBank)}</span>`;
+        }
+
+        let refHtml = '';
+        if (q.refsBySource) {
+            refHtml = Object.entries(q.refsBySource).map(([k, v]) => `<div style="font-size:0.85rem; color:var(--neon-green); font-weight:700; margin-bottom:2px;">[${escapeHtml(k)}] Ref: ${escapeHtml(v)}</div>`).join('');
+            if (refHtml) refHtml = `<div style="margin-bottom:6px;">${refHtml}</div>`;
+        } else if (q.ref) {
+            refHtml = `<div style="font-size:0.85rem; color:var(--neon-green); font-weight:700; margin-bottom:6px;">Ref: ${escapeHtml(q.ref)}</div>`;
+        }
+
         return `
         <div class="chart-card" style="margin-bottom:12px; padding:16px 20px;" id="wq-card-${q.id}">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
@@ -3133,14 +3149,14 @@ window.renderWorkoutBank = function() {
                         ${q.createdAt ? `<span style="font-size:0.7rem; color:var(--text-muted); margin-left:4px;">${q.createdAt.split('T')[0]}</span>` : ''}
                         ${q.subtopic ? `<span style="background:rgba(200,200,200,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">↳ ${escapeHtml(q.subtopic)}</span>` : ''}
                         <span style="color:${diffColor[q.difficulty] || 'var(--text-muted)'}; font-size:0.72rem; font-weight:700;">${q.difficulty}</span>
-                        ${q.sourceBank && q.sourceBank !== 'Custom' ? `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700;">${escapeHtml(q.sourceBank)}</span>` : ''}
+                        ${sourceBadges}
                         ${tags}
                     </div>
-                    ${q.ref ? `<div style="font-size:0.85rem; color:var(--neon-green); font-weight:700; margin-bottom:6px;">Ref: ${escapeHtml(q.ref)}</div>` : ''}
-                    <div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px;">${escapeHtml(q.question)}</div>
+                    ${refHtml}
+                    <div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px; white-space:pre-wrap;">${escapeHtml(q.question)}</div>
                     <details style="cursor:pointer;">
                         <summary style="font-size:0.82rem; color:var(--neon-green); font-weight:600; user-select:none;">▶ Show Answer</summary>
-                        <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main);">${escapeHtml(q.answer)}</div>
+                        <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main); white-space:pre-wrap;">${escapeHtml(q.answer)}</div>
                     </details>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
@@ -3241,34 +3257,62 @@ window.saveWorkoutQuestion = function() {
             q.course === course && 
             q.subject === subject && 
             q.subtopic === subtopic && 
-            q.section === section && 
-            q.sourceBank === sourceBank
+            q.section === section
         );
 
         if (existing && ref) {
-            const oldRef = existing.ref || '';
+            if (!existing.refsBySource) {
+                existing.refsBySource = {};
+                if (existing.sourceBank && existing.sourceBank !== 'Mixed' && existing.ref) {
+                    existing.refsBySource[existing.sourceBank] = existing.ref;
+                }
+            }
+
+            const oldRefsBySource = { ...existing.refsBySource };
+            const oldRef = existing.refsBySource[sourceBank] || '';
             const mergedRef = mergeAndSortRefs(oldRef, ref);
+            existing.refsBySource[sourceBank] = mergedRef;
             
-            const oldAutoQ = `[${existing.sourceBank}] ${oldRef}`;
+            const oldAutoLinesQ = [];
+            const oldAutoLinesA = [];
+            Object.entries(oldRefsBySource).forEach(([k, v]) => {
+                oldAutoLinesQ.push(`[${k}] ${v}`);
+                oldAutoLinesA.push(`(Refer to ${k} Question Bank for ${v})`);
+            });
+            const oldAutoQ = oldAutoLinesQ.join('\n\n');
+            const oldAutoA = oldAutoLinesA.join('\n\n');
+
+            const newAutoLinesQ = [];
+            const newAutoLinesA = [];
+            Object.entries(existing.refsBySource).forEach(([k, v]) => {
+                newAutoLinesQ.push(`[${k}] ${v}`);
+                newAutoLinesA.push(`(Refer to ${k} Question Bank for ${v})`);
+            });
+            const newAutoQ = newAutoLinesQ.join('\n\n');
+            const newAutoA = newAutoLinesA.join('\n\n');
+
             if (existing.question === oldAutoQ || !existing.question) {
-                existing.question = `[${existing.sourceBank}] ${mergedRef}`;
+                existing.question = newAutoQ;
             } else if (question !== `[${sourceBank}] ${ref}` && question) {
                 existing.question += '\n\n' + question;
             }
             
-            const oldAutoA = `(Refer to ${existing.sourceBank} Question Bank for ${oldRef})`;
             if (existing.answer === oldAutoA || !existing.answer) {
-                existing.answer = `(Refer to ${existing.sourceBank} Question Bank for ${mergedRef})`;
+                existing.answer = newAutoA;
             } else if (answer !== `(Refer to ${sourceBank} Question Bank for ${ref})` && answer) {
                 existing.answer += '\n\n' + answer;
             }
 
-            existing.ref = mergedRef;
+            existing.sourceBank = 'Mixed';
+            existing.ref = Object.entries(existing.refsBySource).map(([k, v]) => `${k}: ${v}`).join(' | ');
             existing.updatedAt = new Date().toISOString();
         } else {
+            const refsBySource = {};
+            if (ref) refsBySource[sourceBank] = ref;
+
             AppState.workoutQuestions.push({
                 id: generateId(), course, subject, subtopic, section, sourceBank, ref, question, answer, difficulty, tags,
-                createdAt, timesAttempted: 0, timesCorrect: 0
+                refsBySource, createdAt, timesAttempted: 0, timesCorrect: 0
             });
         }
     }

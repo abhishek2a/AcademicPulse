@@ -210,8 +210,8 @@ function loadData() {
 
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.62', availableUpdate: null, dataVersion: 1 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.62';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.63', availableUpdate: null, dataVersion: 1 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.63';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -3091,7 +3091,7 @@ window.renderWorkoutBank = function() {
     const sectionFilter = document.getElementById('wbSectionFilter')?.value;
     if (sectionFilter !== undefined && sectionFilter !== 'ALL') filtered = filtered.filter(q => (q.section || '') === sectionFilter);
 
-    const sortFilter = document.getElementById('wbSortFilter')?.value || 'DATE_DESC';
+    const sortFilter = document.getElementById('wbSortFilter')?.value || 'TOPIC';
     filtered.sort((a, b) => {
         if (sortFilter === 'DATE_DESC') {
             const dA = new Date(a.createdAt || 0).getTime();
@@ -3102,8 +3102,11 @@ window.renderWorkoutBank = function() {
             const dB = new Date(b.createdAt || 0).getTime();
             return dA - dB;
         } else if (sortFilter === 'TOPIC') {
-            const topicA = (a.subject || '') + (a.subtopic || '');
-            const topicB = (b.subject || '') + (b.subtopic || '');
+            const topicA = (a.course || '') + (a.subject || '') + (a.subtopic || '');
+            const topicB = (b.course || '') + (b.subject || '') + (b.subtopic || '');
+            if (topicA === topicB) {
+                return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+            }
             return topicA.localeCompare(topicB);
         }
         return 0;

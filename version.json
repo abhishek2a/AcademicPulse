@@ -1,7 +1,8 @@
 {
-  "version": "v1.0.62",
-  "build": "2026.07.02-stable",
-  "description": "Welcome to AcademicPulse v1.0.62! This update focuses on critical stability, smarter data caching, and rich improvements to our clientside PDF report generation tools.",
+  "version": "1.0.63",
+  "build": "2026.07.08-stable",
+  "title": "v1.0.63 Update",
+  "description": "Welcome to AcademicPulse v1.0.63! This update focuses on critical stability, smarter data caching, and rich improvements to our clientside PDF report generation tools.",
   "features": [
     "<div style='margin-bottom:8px'><b>&#128170; Workout Mode Refinements</b></div><b>Intelligent Field Constraints:</b> The source bank filter now automatically disables unsupported external options for the CSEB course tracking view, preventing configuration errors.<br/><br/><b>Smoother Dropdowns:</b> Enhanced the database routing hooks to ensure a cleaner, more responsive subtopic list population when picking subjects.",
     "<div style='margin-bottom:8px'><b>&#128269; Integrated Report Analyzer Fixes</b></div><b>Strict PDF Parsing:</b> Upgraded the embedded Report Analyzer within the Analytics hub to prevent processing crashes caused by missing colon formatting identifiers in incoming text streams.",

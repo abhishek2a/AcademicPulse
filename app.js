@@ -3191,6 +3191,21 @@ window.openWorkoutQuestionModal = function(id) {
     modal.classList.add('active');
 };
 
+window.mergeAndSortRefs = function(ref1, ref2) {
+    if (!ref1) return ref2 || '';
+    if (!ref2) return ref1 || '';
+    const parts = [...ref1.split(','), ...ref2.split(',')].map(p => p.trim()).filter(Boolean);
+    const uniqueParts = [...new Set(parts)];
+    
+    uniqueParts.sort((a, b) => {
+        const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
+        const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
+        return numA - numB;
+    });
+    
+    return uniqueParts.join(', ');
+};
+
 window.saveWorkoutQuestion = function() {
     const id = document.getElementById('wqEditId').value;
     const course = document.getElementById('wqCourse').value;
@@ -3222,10 +3237,40 @@ window.saveWorkoutQuestion = function() {
         const q = AppState.workoutQuestions.find(x => x.id === id);
         if (q) { Object.assign(q, { course, subject, subtopic, section, sourceBank, ref, question, answer, difficulty, tags, createdAt, updatedAt: new Date().toISOString() }); }
     } else {
-        AppState.workoutQuestions.push({
-            id: generateId(), course, subject, subtopic, section, sourceBank, ref, question, answer, difficulty, tags,
-            createdAt, timesAttempted: 0, timesCorrect: 0
-        });
+        const existing = AppState.workoutQuestions.find(q => 
+            q.course === course && 
+            q.subject === subject && 
+            q.subtopic === subtopic && 
+            q.section === section && 
+            q.sourceBank === sourceBank
+        );
+
+        if (existing && ref) {
+            const oldRef = existing.ref || '';
+            const mergedRef = mergeAndSortRefs(oldRef, ref);
+            
+            const oldAutoQ = `[${existing.sourceBank}] ${oldRef}`;
+            if (existing.question === oldAutoQ || !existing.question) {
+                existing.question = `[${existing.sourceBank}] ${mergedRef}`;
+            } else if (question !== `[${sourceBank}] ${ref}` && question) {
+                existing.question += '\n\n' + question;
+            }
+            
+            const oldAutoA = `(Refer to ${existing.sourceBank} Question Bank for ${oldRef})`;
+            if (existing.answer === oldAutoA || !existing.answer) {
+                existing.answer = `(Refer to ${existing.sourceBank} Question Bank for ${mergedRef})`;
+            } else if (answer !== `(Refer to ${sourceBank} Question Bank for ${ref})` && answer) {
+                existing.answer += '\n\n' + answer;
+            }
+
+            existing.ref = mergedRef;
+            existing.updatedAt = new Date().toISOString();
+        } else {
+            AppState.workoutQuestions.push({
+                id: generateId(), course, subject, subtopic, section, sourceBank, ref, question, answer, difficulty, tags,
+                createdAt, timesAttempted: 0, timesCorrect: 0
+            });
+        }
     }
 
     // Permanently group by Topic so Q-numbers are sequential for the same topic

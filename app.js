@@ -210,8 +210,8 @@ function loadData() {
 
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.64', availableUpdate: null, dataVersion: 1 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.64';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.65', availableUpdate: null, dataVersion: 1 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.65';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -3256,22 +3256,23 @@ window.saveWorkoutQuestion = function() {
         const existing = AppState.workoutQuestions.find(q => 
             q.course === course && 
             q.subject === subject && 
-            q.subtopic === subtopic && 
-            q.section === section
+            q.subtopic === subtopic
         );
 
         if (existing && ref) {
             if (!existing.refsBySource) {
                 existing.refsBySource = {};
                 if (existing.sourceBank && existing.sourceBank !== 'Mixed' && existing.ref) {
-                    existing.refsBySource[existing.sourceBank] = existing.ref;
+                    const oldKey = existing.section ? `${existing.sourceBank} (Sec ${existing.section})` : existing.sourceBank;
+                    existing.refsBySource[oldKey] = existing.ref;
                 }
             }
 
             const oldRefsBySource = { ...existing.refsBySource };
-            const oldRef = existing.refsBySource[sourceBank] || '';
+            const sourceKey = section ? `${sourceBank} (Sec ${section})` : sourceBank;
+            const oldRef = existing.refsBySource[sourceKey] || '';
             const mergedRef = mergeAndSortRefs(oldRef, ref);
-            existing.refsBySource[sourceBank] = mergedRef;
+            existing.refsBySource[sourceKey] = mergedRef;
             
             const oldAutoLinesQ = [];
             const oldAutoLinesA = [];
@@ -3304,11 +3305,15 @@ window.saveWorkoutQuestion = function() {
             }
 
             existing.sourceBank = 'Mixed';
+            if (existing.section && existing.section !== section) {
+                existing.section = ''; // Clear master section badge if they differ
+            }
             existing.ref = Object.entries(existing.refsBySource).map(([k, v]) => `${k}: ${v}`).join(' | ');
             existing.updatedAt = new Date().toISOString();
         } else {
             const refsBySource = {};
-            if (ref) refsBySource[sourceBank] = ref;
+            const sourceKey = section ? `${sourceBank} (Sec ${section})` : sourceBank;
+            if (ref) refsBySource[sourceKey] = ref;
 
             AppState.workoutQuestions.push({
                 id: generateId(), course, subject, subtopic, section, sourceBank, ref, question, answer, difficulty, tags,

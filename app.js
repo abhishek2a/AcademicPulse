@@ -197,6 +197,17 @@ function loadData() {
     AppState.schedule = Storage.get(STORAGE_KEYS.SCHEDULE, []);
     AppState.achievements = Storage.get(STORAGE_KEYS.ACHIEVEMENTS, []);
     AppState.workoutQuestions = Storage.get(STORAGE_KEYS.WORKOUT, []);
+    
+    // Sort workout questions permanently by topic
+    AppState.workoutQuestions.sort((a, b) => {
+        const topicA = (a.course || '') + (a.subject || '') + (a.subtopic || '');
+        const topicB = (b.course || '') + (b.subject || '') + (b.subtopic || '');
+        if (topicA === topicB) {
+            return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+        }
+        return topicA.localeCompare(topicB);
+    });
+
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
     const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.62', availableUpdate: null, dataVersion: 1 });
@@ -3213,6 +3224,16 @@ window.saveWorkoutQuestion = function() {
             createdAt, timesAttempted: 0, timesCorrect: 0
         });
     }
+
+    // Permanently group by Topic so Q-numbers are sequential for the same topic
+    AppState.workoutQuestions.sort((a, b) => {
+        const topicA = (a.course || '') + (a.subject || '') + (a.subtopic || '');
+        const topicB = (b.course || '') + (b.subject || '') + (b.subtopic || '');
+        if (topicA === topicB) {
+            return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+        }
+        return topicA.localeCompare(topicB);
+    });
 
     saveData('workout');
     document.getElementById('workoutQuestionModal').classList.remove('active');

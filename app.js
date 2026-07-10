@@ -82,7 +82,7 @@ const AppState = {
     achievements: [],
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
-    currentVersion: 'v1.0.62',
+    currentVersion: 'v1.0.65',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -385,7 +385,7 @@ window.showWhatsNewPopup = async function() {
         description = data.description || '';
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
-        description = "Welcome to AcademicPulse v1.0.62! This update focuses on critical stability, smarter data caching, and rich improvements to our clientside PDF report generation tools.";
+        description = "Welcome to AcademicPulse v1.0.65! Improved Topic Merging: The system now correctly groups questions of varying exam sections (e.g. Sec A vs Sec B) into the same master topic card.";
         features = [
             "<div style='margin-bottom:8px'><b>&#128170; Workout Mode Refinements</b></div><b>Intelligent Field Constraints:</b> The source bank filter now automatically disables unsupported external options for the CSEB course tracking view, preventing configuration errors.<br/><br/><b>Smoother Dropdowns:</b> Enhanced the database routing hooks to ensure a cleaner, more responsive subtopic list population when picking subjects.",
             "<div style='margin-bottom:8px'><b>&#128269; Integrated Report Analyzer Fixes</b></div><b>Strict PDF Parsing:</b> Upgraded the embedded Report Analyzer within the Analytics hub to prevent processing crashes caused by missing colon formatting identifiers in incoming text streams.",

@@ -11,11 +11,11 @@ const firebaseConfig = {
 // Initialize Firebase using compat API
 const app = firebase.initializeApp(firebaseConfig);
 
-// Initialize Firebase App Check with reCAPTCHA v3
+// Initialize Firebase App Check with reCAPTCHA Enterprise
 try {
     const appCheck = firebase.appCheck();
     appCheck.activate(
-        '6LdSBBMtAAAAAAyOgUbNa37n9vUyU7WX6fMKYHC7',
+        new firebase.appCheck.ReCaptchaEnterpriseProvider('6LdSBBMtAAAAAAyOgUbNa37n9vUyU7WX6fMKYHC7'),
         true // isTokenAutoRefreshEnabled
     );
 } catch (e) {

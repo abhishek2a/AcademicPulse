@@ -40,7 +40,7 @@
         <div class="nav-item" data-target="view-focus"><span class="nav-icon">🧠</span><span class="nav-text">Focus Mode</span></div>
         <div class="nav-item" data-target="view-schedule"><span class="nav-icon">🗓️</span><span class="nav-text">Planner</span></div>
         <div class="nav-item" data-target="view-mocks"><span class="nav-icon">📝</span><span class="nav-text">Mock Exams</span></div>
-        <div class="nav-item" data-target="view-workout"><span class="nav-icon">💪</span><span class="nav-text">Workout</span></div>
+        <div class="nav-item" data-target="view-workout"><span class="nav-icon">🗃️</span><span class="nav-text">Question Bank</span></div>
         <div class="nav-item" data-target="view-analytics"><span class="nav-icon">📈</span><span class="nav-text">Analytics</span></div>
         <div class="nav-item" data-target="view-search"><span class="nav-icon">🔎</span><span class="nav-text">Search Data</span></div>
         <div class="nav-item" id="nav-software-update" style="display: none; align-items: center; justify-content: space-between;" data-target="view-update">
@@ -823,18 +823,13 @@
         <!-- view-analyzer kept as hidden redirect target for backward compat -->
         <section id="view-analyzer" class="view-section" style="display:none !important;"></section>
 
-        <!-- View: Workout -->
+        <!-- View: Workout / Question Bank -->
         <section id="view-workout" class="view-section">
             <div class="header">
-                <h1>💪 Workout</h1>
-                <p style="color:var(--text-muted); font-size:0.9rem; margin-top:4px;">Build your question bank and drill with flashcard workouts</p>
+                <h1>🗃️ Question Bank</h1>
+                <p style="color:var(--text-muted); font-size:0.9rem; margin-top:4px;">Manage and organise your custom question database</p>
             </div>
 
-            <!-- Sub-tabs -->
-            <div class="tab-bar" style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
-                <button class="btn workout-tab-btn active" id="tabWorkoutBank" onclick="switchWorkoutTab('bank',this)" style="background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-main); font-weight:600; padding:10px 20px; border-radius:12px;">📚 Question Bank</button>
-                <button class="btn workout-tab-btn" id="tabWorkoutDrill" onclick="switchWorkoutTab('drill',this)" style="background: transparent; border: 1px solid transparent; color: var(--text-muted); font-weight:600; padding:10px 20px; border-radius:12px;">🎯 Start Workout</button>
-            </div>
 
             <!-- ── Question Bank Tab ── -->
             <div id="workoutBankTab">
@@ -892,121 +887,11 @@
                 </div>
 
                 <!-- Stats bar -->
-                <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
-                    <div class="stat-card" style="padding:12px 18px; flex:1; min-width:120px;">
-                        <div class="stat-label">Total Questions</div>
-                        <div class="stat-value" id="wbTotalCount" style="font-size:1.6rem;">0</div>
-                    </div>
-                    <div class="stat-card" style="padding:12px 18px; flex:1; min-width:120px;">
-                        <div class="stat-label">CSEB</div>
-                        <div class="stat-value text-blue" id="wbCsebCount" style="font-size:1.6rem;">0</div>
-                    </div>
-                    <div class="stat-card" style="padding:12px 18px; flex:1; min-width:120px;">
-                        <div class="stat-label">ACCA</div>
-                        <div class="stat-value text-purple" id="wbAccaCount" style="font-size:1.6rem;">0</div>
-                    </div>
-                    <div class="stat-card" style="padding:12px 18px; flex:1; min-width:120px;">
-                        <div class="stat-label">Workouts Done</div>
-                        <div class="stat-value text-green" id="wbWorkoutsDone" style="font-size:1.6rem;">0</div>
-                    </div>
-                </div>
 
                 <!-- Question list -->
                 <div id="workoutBankList"></div>
             </div>
 
-            <!-- ── Drill Tab ── -->
-            <div id="workoutDrillTab" style="display:none;">
-                <!-- Setup screen -->
-                <div id="drillSetupScreen">
-                    <div class="chart-card" style="max-width:500px; margin:0 auto;">
-                        <h3 style="margin-top:0;">🎯 Configure Workout</h3>
-                        <div class="form-group">
-                            <label>Course</label>
-                            <select id="drillCourseSelect" class="form-control" onchange="populateDrillSubjects()">
-                                <option value="ALL">All Courses</option>
-                                <option value="CSEB">CSEB</option>
-                                <option value="ACCA">ACCA</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Subject / Topic</label>
-                            <select id="drillSubjectSelect" class="form-control">
-                                <option value="ALL">All Subjects</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Number of Questions</label>
-                            <select id="drillCountSelect" class="form-control">
-                                <option value="5">5 Questions</option>
-                                <option value="10" selected>10 Questions</option>
-                                <option value="20">20 Questions</option>
-                                <option value="ALL">All Available</option>
-                            </select>
-                        </div>
-                        <button class="btn" style="width:100%; background:var(--neon-blue); color:#fff; font-weight:700; padding:14px;" onclick="startWorkoutDrill()">🚀 Start Workout</button>
-                    </div>
-                </div>
-
-                <!-- Active drill screen -->
-                <div id="drillActiveScreen" style="display:none;">
-                    <div style="max-width:600px; margin:0 auto;">
-                        <!-- Progress -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                            <span id="drillProgressText" style="font-size:0.9rem; color:var(--text-muted);">Question 1 of 10</span>
-                            <span id="drillScoreText" style="font-size:0.9rem; color:var(--neon-green); font-weight:600;">✓ 0 &nbsp;✗ 0</span>
-                        </div>
-                        <div style="background:var(--glass-border); height:6px; border-radius:3px; margin-bottom:20px; overflow:hidden;">
-                            <div id="drillProgressBar" style="height:100%; background:var(--neon-blue); border-radius:3px; width:0%; transition:width 0.4s;"></div>
-                        </div>
-
-                        <!-- Flashcard -->
-                        <div id="drillFlashcard" style="
-                            background: var(--glass-bg);
-                            border: 1px solid var(--glass-border);
-                            border-radius: 20px;
-                            padding: 30px;
-                            min-height: 220px;
-                            cursor: pointer;
-                            transition: all 0.3s;
-                            position: relative;
-                            text-align: center;
-                        " onclick="toggleDrillAnswer()">
-                            <div id="drillQuestionNo" style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;"></div>
-                            <div id="drillSubjectBadge" style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; margin-bottom:14px; background:rgba(41,151,255,0.15); color:var(--neon-blue);"></div>
-                            <div id="drillQuestionText" style="font-size:1.1rem; font-weight:600; line-height:1.5; margin-bottom:20px;"></div>
-                            <div id="drillAnswerBlock" style="display:none; border-top:1px solid var(--glass-border); padding-top:16px; margin-top:16px;">
-                                <div style="font-size:0.75rem; color:var(--neon-green); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Answer</div>
-                                <div id="drillAnswerText" style="font-size:1rem; color:var(--text-main); line-height:1.6;"></div>
-                            </div>
-                            <div id="drillTapHint" style="font-size:0.8rem; color:var(--text-muted); margin-top:16px;">👆 Tap card to reveal answer</div>
-                        </div>
-
-                        <!-- Action buttons -->
-                        <div id="drillActionBtns" style="display:none; gap:12px; margin-top:16px; display:flex; flex-wrap:wrap;">
-                            <button onclick="markDrillQuestion(true)" style="flex:1; padding:14px; background:rgba(48,209,88,0.15); color:var(--neon-green); border:1px solid var(--neon-green); border-radius:12px; cursor:pointer; font-weight:700; font-size:0.95rem;">✓ Got It!</button>
-                            <button onclick="markDrillQuestion(false)" style="flex:1; padding:14px; background:rgba(255,69,58,0.15); color:var(--neon-red); border:1px solid var(--neon-red); border-radius:12px; cursor:pointer; font-weight:700; font-size:0.95rem;">✗ Need Practice</button>
-                        </div>
-                        <button onclick="exitWorkoutDrill()" style="width:100%; margin-top:12px; padding:10px; background:transparent; color:var(--text-muted); border:1px solid var(--glass-border); border-radius:10px; cursor:pointer;">✕ Exit Workout</button>
-                    </div>
-                </div>
-
-                <!-- Results screen -->
-                <div id="drillResultsScreen" style="display:none; max-width:500px; margin:0 auto; text-align:center;">
-                    <div class="chart-card">
-                        <div style="font-size:3rem; margin-bottom:10px;">🎉</div>
-                        <h2 style="margin-top:0;">Workout Complete!</h2>
-                        <div style="font-size:3rem; font-weight:800; color:var(--neon-green);" id="drillFinalScore">0/0</div>
-                        <div style="color:var(--text-muted); margin:8px 0 20px;">Accuracy</div>
-                        <div id="drillAccuracyBadge" style="display:inline-block; padding:6px 18px; border-radius:20px; font-weight:700; margin-bottom:20px;"></div>
-                        <div id="drillWeakList" style="text-align:left; margin-bottom:20px;"></div>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                            <button onclick="startWorkoutDrill()" style="flex:1; padding:12px; background:var(--neon-blue); color:#fff; border:none; border-radius:10px; cursor:pointer; font-weight:700;">🔁 Retry</button>
-                            <button onclick="switchWorkoutTab('bank', document.getElementById('tabWorkoutBank'))" style="flex:1; padding:12px; background:var(--glass-hover); color:var(--text-main); border:1px solid var(--glass-border); border-radius:10px; cursor:pointer;">📚 Bank</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </section>
 
         <!-- View: Notifications -->
@@ -1793,7 +1678,7 @@
     
     <script src="auth.js?v=14"></script>
     <script src="ai.js?v=4"></script>
-    <script src="app.js?v=89"></script>
+    <script src="app.js?v=98"></script>
     <script src="export.js?v=10"></script>
 </body>
 </html>

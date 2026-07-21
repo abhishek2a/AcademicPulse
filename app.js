@@ -82,7 +82,7 @@ const AppState = {
     achievements: [],
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
-    currentVersion: 'v1.0.67',
+    currentVersion: 'v1.0.75',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -210,10 +210,138 @@ function loadData() {
 
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.67', availableUpdate: null, dataVersion: 1 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.67';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.75', availableUpdate: null, dataVersion: 1 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.75';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
+
+    // V3 Migration: Retroactively merge existing cards from the same chapter
+    if (AppState.dataVersion < 3) {
+        const topicGroups = {};
+        const toDelete = new Set();
+        
+        AppState.workoutQuestions.forEach(q => {
+            const key = `${q.course}|${q.subject}|${q.subtopic}`;
+            if (!topicGroups[key]) topicGroups[key] = [];
+            topicGroups[key].push(q);
+        });
+        
+        let changed = false;
+        const isRefLine = l => /^\[.+\]\s+Q[\d\s,\-tToO]+/.test(l.trim()) || /^\(Refer to .+ Question Bank for .+\)$/.test(l.trim());
+        
+        Object.values(topicGroups).forEach(group => {
+            if (group.length > 1) {
+                // Pick the earliest created as master
+                group.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+                const master = group[0];
+                
+                for (let i = 1; i < group.length; i++) {
+                    const other = group[i];
+                    
+                    // Initialize refsBySource if missing
+                    if (!master.refsBySource) {
+                        master.refsBySource = {};
+                        if (master.sourceBank && master.sourceBank !== 'Mixed' && master.ref) {
+                            const oldKey = master.section ? `${master.sourceBank} (Sec ${master.section})` : master.sourceBank;
+                            master.refsBySource[oldKey] = master.ref;
+                        }
+                    }
+                    if (!other.refsBySource) {
+                        other.refsBySource = {};
+                        if (other.sourceBank && other.sourceBank !== 'Mixed' && other.ref) {
+                            const oldKey = other.section ? `${other.sourceBank} (Sec ${other.section})` : other.sourceBank;
+                            other.refsBySource[oldKey] = other.ref;
+                        }
+                    }
+                    
+                    // Merge refs
+                    Object.entries(other.refsBySource).forEach(([k, v]) => {
+                        master.refsBySource[k] = window.mergeAndSortRefs ? window.mergeAndSortRefs(master.refsBySource[k] || '', v) : (master.refsBySource[k] ? master.refsBySource[k] + ', ' + v : v);
+                    });
+                    
+                    // Determine if texts are pure auto-text
+                    const masterAutoQ = (master.question || '').split('\n').filter(l => l.trim()).every(isRefLine);
+                    const masterAutoA = (master.answer || '').split('\n').filter(l => l.trim()).every(isRefLine);
+                    const otherAutoQ = (other.question || '').split('\n').filter(l => l.trim()).every(isRefLine);
+                    const otherAutoA = (other.answer || '').split('\n').filter(l => l.trim()).every(isRefLine);
+                    
+                    // Generate new auto text for merged refs
+                    const newAutoLinesQ = [];
+                    const newAutoLinesA = [];
+                    Object.entries(master.refsBySource).forEach(([k, v]) => {
+                        newAutoLinesQ.push(`[${k}] ${v}`);
+                        newAutoLinesA.push(`(Refer to ${k} Question Bank for ${v})`);
+                    });
+                    
+                    // Safely merge Question
+                    if (masterAutoQ && otherAutoQ) {
+                        master.question = newAutoLinesQ.join('\n\n');
+                    } else if (!otherAutoQ && other.question && master.question !== other.question) {
+                        master.question = masterAutoQ ? other.question : master.question + '\n\n' + other.question;
+                    }
+                    
+                    // Safely merge Answer
+                    if (masterAutoA && otherAutoA) {
+                        master.answer = newAutoLinesA.join('\n\n');
+                    } else if (!otherAutoA && other.answer && master.answer !== other.answer) {
+                        master.answer = masterAutoA ? other.answer : master.answer + '\n\n' + other.answer;
+                    }
+                    
+                    master.sourceBank = 'Mixed';
+                    if (master.section && master.section !== other.section) master.section = '';
+                    master.ref = Object.entries(master.refsBySource).map(([k, v]) => `${k}: ${v}`).join(' | ');
+                    master.updatedAt = new Date().toISOString();
+                    
+                    toDelete.add(other.id);
+                    changed = true;
+                }
+            }
+        });
+        
+        if (changed) {
+            AppState.workoutQuestions = AppState.workoutQuestions.filter(q => !toDelete.has(q.id));
+            AppState.dataVersion = 3;
+            saveData('all');
+        } else {
+            AppState.dataVersion = 3;
+            saveData('system');
+        }
+    }
+
+    // V4 Migration: Fix dropped answer references on merged mixed cards
+    if (AppState.dataVersion < 4) {
+        let changed = false;
+        AppState.workoutQuestions.forEach(q => {
+            if (q.sourceBank === 'Mixed' && q.refsBySource) {
+                const qLines = (q.question || '').split('\n').filter(l => l.trim());
+                const isAutoQ = qLines.length > 0 && qLines.every(l => /^\[.+\]\s+Q[\d\s,\-tToO]+/.test(l.trim()));
+                
+                if (isAutoQ) {
+                    const aLines = (q.answer || '').split('\n').filter(l => l.trim());
+                    const isAutoA = aLines.length === 0 || aLines.every(l => /^\(Refer to .+ Question Bank for /i.test(l.trim()));
+                    
+                    if (isAutoA) {
+                        const newA = [];
+                        Object.entries(q.refsBySource).forEach(([k, v]) => {
+                            newA.push(`(Refer to ${k} Question Bank for ${v})`);
+                        });
+                        const generatedAnswer = newA.join('\n\n');
+                        if (q.answer !== generatedAnswer) {
+                            q.answer = generatedAnswer;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        });
+        
+        AppState.dataVersion = 4;
+        if (changed) {
+            saveData('all');
+        } else {
+            saveData('system');
+        }
+    }
     
     if (Object.keys(AppState.csebSyllabus).length === 0) {
         AppState.csebSyllabus = {
@@ -385,11 +513,14 @@ window.showWhatsNewPopup = async function() {
         description = data.description || '';
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
-        description = "Welcome to AcademicPulse v1.0.67! This release delivers a cleaner Question Bank UI, smarter source filtering, and key rendering performance improvements.";
+        description = "Welcome to AcademicPulse v1.0.75 \u2014 the biggest release yet! A comprehensive bug-fix sweep, data repair engine, and Question Bank overhaul.";
         features = [
-            "<div style='margin-bottom:8px'><b>\uD83E\uDDF9 Cleaner Question Bank Cards</b></div><b>Ref Text Removed:</b> The verbose <code>[Kaplan] Ref: Q2, Q51...</code> reference lines have been removed from card bodies. Source bank information is now displayed exclusively as compact, colour-coded badges in the card header \u2014 keeping your bank clean and readable.<br/><br/><b>Auto-Placeholder Suppression:</b> Cards created purely from a question reference number (with no custom text) no longer display auto-generated filler text in the question or answer area. The card displays cleanly with just the topic, date, section, and source badges.",
-            "<div style='margin-bottom:8px'><b>\uD83D\uDC1B Source Filter Bug Fix</b></div><b>Mixed Card Visibility:</b> Filtering the question bank by a specific source (e.g., <b>Kaplan</b> or <b>BPP</b>) now correctly surfaces merged topic cards that contain references from that source. Previously, merged cross-bank cards were completely invisible when using the source filter.",
-            "<div style='margin-bottom:8px'><b>\u26A1 Rendering Performance Optimisation</b></div><b>O(1) Card Indexing:</b> The card list renderer previously used a linear <code>indexOf</code> scan inside every iteration to compute the global question number \u2014 making it O(n\u00b2) for large banks. This has been replaced with a pre-built <code>Map</code> lookup, making card numbering instant regardless of bank size."
+            "<div style='margin-bottom:8px'><b>\uD83D\uDDC2\uFE0F Question Bank \u2014 Complete Overhaul</b></div><b>Renamed &amp; Streamlined:</b> 'Workout' is now officially <b>Question Bank</b>. The drill tab, stat boxes, and dashboard image have been removed for a cleaner, faster experience.",
+            "<div style='margin-bottom:8px'><b>\uD83D\uDEE0\uFE0F Deep Bug Fix: Stale DOM References</b></div>Removed 9 stale JS references to deleted HTML elements (<code>drillSetupScreen</code>, <code>wbWorkoutsDone</code>, <code>drillTapHint</code>, etc.) that were causing silent crashes and preventing the Question Bank list from rendering.",
+            "<div style='margin-bottom:8px'><b>\uD83D\uDD04 Multi-Stage Data Migration Engine</b></div><b>V3:</b> Retroactive topic merging. <b>V4:</b> Automatic repair of Mixed card answer references that were incorrectly preserved as custom text due to a regex mismatch on a missing closing parenthesis.",
+            "<div style='margin-bottom:8px'><b>\uD83E\uDDF9 Cleaner Cards &amp; Fixed Source Filter</b></div>Ref text lines removed from card bodies. Source badges shown in header. Filtering by Kaplan/BPP now correctly surfaces Mixed cross-bank cards.",
+            "<div style='margin-bottom:8px'><b>\uD83D\uDCE2 Automatic Update Popups</b></div>What's New modal now auto-appears once per version for all users.",
+            "<div style='margin-bottom:8px'><b>\u26A1 O(1) Card Indexing</b></div>Replaced O(n\u00b2) indexOf scan with a pre-built Map for instant card numbering regardless of bank size."
         ];
     }
     const contentDiv = document.getElementById('whatsNewModalContent');
@@ -2875,6 +3006,18 @@ window.initApp = function() {
             });
         }
         
+        // Push update popup automatically once per version
+        setTimeout(() => {
+            const lastSeenVersion = Storage.get('lastSeenWhatsNew', '');
+            if (lastSeenVersion !== AppState.currentVersion) {
+                if (window.showWhatsNewPopup) {
+                    window.showWhatsNewPopup();
+                    Storage.set('lastSeenWhatsNew', AppState.currentVersion);
+                }
+            }
+        }, 1000);
+        
+        
     } catch (error) {
         console.error("Init Error:", error);
         document.getElementById('loadingOverlay').classList.remove('active');
@@ -3026,9 +3169,9 @@ document.getElementById('wbSubjectFilter')?.addEventListener('change', () => {
 
 // ── Tab switching ───────────────────────────
 window.switchWorkoutTab = function(tab, btn) {
-    ['bank','drill'].forEach(t => {
-        document.getElementById(`workout${t.charAt(0).toUpperCase()+t.slice(1)}Tab`).style.display = t === tab ? '' : 'none';
-    });
+    // Only 'bank' tab now exists — drill was removed
+    const bankTab = document.getElementById('workoutBankTab');
+    if (bankTab) bankTab.style.display = '';
     document.querySelectorAll('#view-workout .workout-tab-btn').forEach(b => {
         b.classList.remove('active');
         b.style.background = 'transparent';
@@ -3041,11 +3184,7 @@ window.switchWorkoutTab = function(tab, btn) {
         btn.style.border = '1px solid var(--glass-border)';
         btn.style.color = 'var(--text-main)';
     }
-    if (tab === 'drill') {
-        populateDrillSubjects();
-        showDrillSetup();
-    }
-    if (tab === 'bank') renderWorkoutBank();
+    renderWorkoutBank();
 };
 
 // ── Question Bank Render ─────────────────────
@@ -3076,11 +3215,7 @@ window.renderWorkoutBank = function() {
 
     const qs = AppState.workoutQuestions;
 
-    // Stats
-    document.getElementById('wbTotalCount').textContent = qs.length;
-    document.getElementById('wbCsebCount').textContent = qs.filter(q => q.course === 'CSEB').length;
-    document.getElementById('wbAccaCount').textContent = qs.filter(q => q.course === 'ACCA').length;
-    document.getElementById('wbWorkoutsDone').textContent = AppState.workoutStats.totalDone;
+
 
     let filtered = [...qs];
     if (courseFilter !== 'ALL') filtered = filtered.filter(q => q.course === courseFilter);
@@ -3150,24 +3285,11 @@ window.renderWorkoutBank = function() {
                         ${sourceBadges}
                         ${tags}
                     </div>
-                    ${(() => {
-                        // Detect auto-generated ref-only placeholder text — hide question body if it's just ref lines
-                        const isAutoQ = q.refsBySource 
-                            ? q.question.split('\n').filter(l => l.trim()).every(l => /^\[.+\]\s+Q/.test(l.trim()))
-                            : q.ref && (q.question === `[${q.sourceBank}] ${q.ref}`);
-                        if (isAutoQ) return '';
-                        return `<div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px; white-space:pre-wrap;">${escapeHtml(q.question)}</div>`;
-                    })()}
-                    ${(() => {
-                        const isAutoA = q.refsBySource
-                            ? q.answer.split('\n').filter(l => l.trim()).every(l => /^\(Refer to .+ Question Bank for .+\)$/.test(l.trim()))
-                            : q.ref && (q.answer === `(Refer to ${q.sourceBank} Question Bank for ${q.ref})`);
-                        if (isAutoA) return '';
-                        return `<details style="cursor:pointer;">
-                            <summary style="font-size:0.82rem; color:var(--neon-green); font-weight:600; user-select:none;">▶ Show Answer</summary>
-                            <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main); white-space:pre-wrap;">${escapeHtml(q.answer)}</div>
-                        </details>`;
-                    })()}
+                    <div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px; white-space:pre-wrap;">${escapeHtml(q.question)}</div>
+                    <details style="cursor:pointer;">
+                        <summary style="font-size:0.82rem; color:var(--neon-green); font-weight:600; user-select:none;">▶ Show Answer</summary>
+                        <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main); white-space:pre-wrap;">${escapeHtml(q.answer)}</div>
+                    </details>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
                     <button onclick="openWorkoutQuestionModal('${q.id}')" style="background:transparent; color:var(--neon-blue); border:1px solid var(--glass-border); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">✎ Edit</button>
@@ -3357,59 +3479,17 @@ window.deleteWorkoutQuestion = function(id) {
 
 // ── Drill Logic ─────────────────────────────
 function showDrillSetup() {
-    document.getElementById('drillSetupScreen').style.display = '';
-    document.getElementById('drillActiveScreen').style.display = 'none';
-    document.getElementById('drillResultsScreen').style.display = 'none';
+    // Drill tab removed — no-op
 }
 
 window.startWorkoutDrill = function() {
-    const course = document.getElementById('drillCourseSelect')?.value || 'ALL';
-    const subj = document.getElementById('drillSubjectSelect')?.value || 'ALL';
-    const countVal = document.getElementById('drillCountSelect')?.value || '10';
-
-    let pool = AppState.workoutQuestions;
-    if (course !== 'ALL') pool = pool.filter(q => q.course === course);
-    if (subj !== 'ALL') pool = pool.filter(q => q.subject === subj);
-
-    if (pool.length === 0) {
-        alert('No questions available for this filter. Add some in the Question Bank!');
-        switchWorkoutTab('bank', document.getElementById('tabWorkoutBank'));
-        return;
-    }
-
-    // Shuffle
-    _drillQueue = [...pool].sort(() => Math.random() - 0.5);
-    if (countVal !== 'ALL') _drillQueue = _drillQueue.slice(0, parseInt(countVal));
-
-    _drillIndex = 0;
-    _drillCorrect = 0;
-    _drillWrong = [];
-    _drillAnswerShown = false;
-
-    document.getElementById('drillSetupScreen').style.display = 'none';
-    document.getElementById('drillActiveScreen').style.display = '';
-    document.getElementById('drillResultsScreen').style.display = 'none';
-
-    renderDrillCard();
+    // Drill feature removed — no-op
+    console.warn('Drill feature has been removed.');
 };
 
+
 function renderDrillCard() {
-    const q = _drillQueue[_drillIndex];
-    const total = _drillQueue.length;
-    const pct = Math.round((_drillIndex / total) * 100);
-
-    document.getElementById('drillProgressText').textContent = `Question ${_drillIndex + 1} of ${total}`;
-    document.getElementById('drillScoreText').innerHTML = `✓ ${_drillCorrect} &nbsp;✗ ${_drillWrong.length}`;
-    document.getElementById('drillProgressBar').style.width = pct + '%';
-
-    document.getElementById('drillQuestionNo').textContent = `Q${AppState.workoutQuestions.indexOf(q) + 1} · ${q.course}`;
-    document.getElementById('drillSubjectBadge').textContent = q.subject;
-    document.getElementById('drillQuestionText').textContent = q.question;
-    document.getElementById('drillAnswerText').textContent = q.answer;
-    document.getElementById('drillAnswerBlock').style.display = 'none';
-    document.getElementById('drillTapHint').style.display = '';
-    document.getElementById('drillActionBtns').style.display = 'none';
-    _drillAnswerShown = false;
+    // Drill tab removed — no-op
 }
 
 window.toggleDrillAnswer = function() {
@@ -3469,7 +3549,6 @@ function finishDrill() {
         weakDiv.innerHTML = '<div style="color:var(--neon-green); text-align:center; padding:10px;">🎯 Perfect score! All correct!</div>';
     }
 
-    document.getElementById('wbWorkoutsDone').textContent = AppState.workoutStats.totalDone;
     addNotification('Workout Done!', `Score: ${_drillCorrect}/${total} (${pct}%)`, pct >= 60 ? 'success' : 'info');
 }
 

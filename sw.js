@@ -3,7 +3,7 @@ const CACHE_NAME = 'academicpulse-v1.0.67';
 const STATIC_ASSETS = [
     'index.html',
     'style.css?v=18',
-    'app.js?v=88',
+    'app.js?v=89',
     'auth.js?v=14',
     'export.js?v=10',
     'manifest.json',

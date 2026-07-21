@@ -82,7 +82,7 @@ const AppState = {
     achievements: [],
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
-    currentVersion: 'v1.0.66',
+    currentVersion: 'v1.0.67',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -210,8 +210,8 @@ function loadData() {
 
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.66', availableUpdate: null, dataVersion: 1 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.66';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.67', availableUpdate: null, dataVersion: 1 });
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.67';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
     
@@ -385,7 +385,7 @@ window.showWhatsNewPopup = async function() {
         description = data.description || '';
     } catch(e) {
         console.warn('Could not fetch version details, using fallback.', e);
-        description = "Welcome to AcademicPulse v1.0.66! This stable architecture release introduces smart algorithmic updates, strict edge-case data corrections, and critical structural fixes to our native document engines.";
+        description = "Welcome to AcademicPulse v1.0.67!";
         features = [
             "<div style='margin-bottom:8px'><b>🧩 Smart Algorithmic Topic Merging</b></div><b>Unified Master Topic Cards:</b> The underlying sorting engine has been re-architected to dynamically parse and merge cross-sectional elements.<br/><br/><b>Section-Agnostic Aggregation:</b> The system now correctly groups questions belonging to different exam parts (e.g., Section A vs. Section B) into the same centralized master topic view, keeping your custom databases unified.",
             "<div style='margin-bottom:8px'><b>💪 Workout Mode Refinements</b></div><b>Intelligent Field Constraints:</b> The question source filter now automatically locks out and hides unsupported external databases when navigating a CSEB course view, preventing user data-entry errors.<br/><br/><b>Adaptive Dropdowns:</b> Database routing hooks have been rewritten to deliver a significantly smoother and cleaner subtopic checklist population during course manual configurations.",
@@ -3088,7 +3088,11 @@ window.renderWorkoutBank = function() {
     if (courseFilter !== 'ALL') filtered = filtered.filter(q => q.course === courseFilter);
     if (subjFilter !== 'ALL') filtered = filtered.filter(q => q.subject === subjFilter);
     if (subtopicFilter !== 'ALL') filtered = filtered.filter(q => q.subtopic === subtopicFilter);
-    if (sourceFilter !== 'ALL') filtered = filtered.filter(q => q.sourceBank === sourceFilter);
+    if (sourceFilter !== 'ALL') filtered = filtered.filter(q => {
+        if (q.sourceBank === sourceFilter) return true;
+        if (q.refsBySource && Object.keys(q.refsBySource).some(k => k === sourceFilter || k.startsWith(sourceFilter + ' ('))) return true;
+        return false;
+    });
     const sectionFilter = document.getElementById('wbSectionFilter')?.value;
     if (sectionFilter !== undefined && sectionFilter !== 'ALL') filtered = filtered.filter(q => (q.section || '') === sectionFilter);
 
@@ -3119,8 +3123,10 @@ window.renderWorkoutBank = function() {
     }
 
     const diffColor = { Easy: 'var(--neon-green)', Medium: 'var(--neon-gold)', Hard: 'var(--neon-red)' };
-    list.innerHTML = filtered.map((q, idx) => {
-        const globalIdx = qs.indexOf(q) + 1;
+    // Build a fast lookup map for globalIdx to avoid O(n²) indexOf
+    const globalIdxMap = new Map(qs.map((q, i) => [q.id, i + 1]));
+    list.innerHTML = filtered.map((q) => {
+        const globalIdx = globalIdxMap.get(q.id) || 0;
         const tags = (q.tags || []).map(t => `<span style="background:rgba(41,151,255,0.12); color:var(--neon-blue); padding:2px 8px; border-radius:12px; font-size:0.72rem; margin-right:4px;">${escapeHtml(t)}</span>`).join('');
         
         let sourceBadges = '';
@@ -3130,13 +3136,6 @@ window.renderWorkoutBank = function() {
             sourceBadges = `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; margin-left:4px;">${escapeHtml(q.sourceBank)}</span>`;
         }
 
-        let refHtml = '';
-        if (q.refsBySource) {
-            refHtml = Object.entries(q.refsBySource).map(([k, v]) => `<div style="font-size:0.85rem; color:var(--neon-green); font-weight:700; margin-bottom:2px;">[${escapeHtml(k)}] Ref: ${escapeHtml(v)}</div>`).join('');
-            if (refHtml) refHtml = `<div style="margin-bottom:6px;">${refHtml}</div>`;
-        } else if (q.ref) {
-            refHtml = `<div style="font-size:0.85rem; color:var(--neon-green); font-weight:700; margin-bottom:6px;">Ref: ${escapeHtml(q.ref)}</div>`;
-        }
 
         return `
         <div class="chart-card" style="margin-bottom:12px; padding:16px 20px;" id="wq-card-${q.id}">
@@ -3153,12 +3152,24 @@ window.renderWorkoutBank = function() {
                         ${sourceBadges}
                         ${tags}
                     </div>
-                    ${refHtml}
-                    <div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px; white-space:pre-wrap;">${escapeHtml(q.question)}</div>
-                    <details style="cursor:pointer;">
-                        <summary style="font-size:0.82rem; color:var(--neon-green); font-weight:600; user-select:none;">▶ Show Answer</summary>
-                        <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main); white-space:pre-wrap;">${escapeHtml(q.answer)}</div>
-                    </details>
+                    ${(() => {
+                        // Detect auto-generated ref-only placeholder text — hide question body if it's just ref lines
+                        const isAutoQ = q.refsBySource 
+                            ? q.question.split('\n').filter(l => l.trim()).every(l => /^\[.+\]\s+Q/.test(l.trim()))
+                            : q.ref && (q.question === `[${q.sourceBank}] ${q.ref}`);
+                        if (isAutoQ) return '';
+                        return `<div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px; white-space:pre-wrap;">${escapeHtml(q.question)}</div>`;
+                    })()}
+                    ${(() => {
+                        const isAutoA = q.refsBySource
+                            ? q.answer.split('\n').filter(l => l.trim()).every(l => /^\(Refer to .+ Question Bank for .+\)$/.test(l.trim()))
+                            : q.ref && (q.answer === `(Refer to ${q.sourceBank} Question Bank for ${q.ref})`);
+                        if (isAutoA) return '';
+                        return `<details style="cursor:pointer;">
+                            <summary style="font-size:0.82rem; color:var(--neon-green); font-weight:600; user-select:none;">▶ Show Answer</summary>
+                            <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main); white-space:pre-wrap;">${escapeHtml(q.answer)}</div>
+                        </details>`;
+                    })()}
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
                     <button onclick="openWorkoutQuestionModal('${q.id}')" style="background:transparent; color:var(--neon-blue); border:1px solid var(--glass-border); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">✎ Edit</button>

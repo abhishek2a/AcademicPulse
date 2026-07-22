@@ -523,12 +523,19 @@ window.toggleBetaUpdates = function(optIn) {
     localStorage.setItem('academicpulse_beta_opt_in', optIn ? 'true' : 'false');
     const badge = document.getElementById('betaBadgeProfile');
     if (badge) badge.style.display = optIn ? 'inline-block' : 'none';
+    
+    // Auto-update version when they switch channels and save to cloud
+    AppState.currentVersion = optIn ? 'v1.0.88-beta' : 'v1.0.87';
+    saveData('system');
+    
+    const profileV = document.getElementById('appVersionTextProfile');
+    if (profileV) profileV.textContent = AppState.currentVersion;
+
     if (optIn) {
         addNotification('Beta Updates Enabled', 'You are now opted in to receive experimental features.', 'success');
     } else {
-        addNotification('Beta Updates Disabled', 'You will only receive stable releases.', 'info');
+        addNotification('Beta Updates Disabled', 'Your version has been reverted to stable.', 'info');
     }
-    AppState.currentVersion = optIn ? 'v1.0.88-beta' : 'v1.0.87';
 };
 
 window.showWhatsNewPopup = async function() {

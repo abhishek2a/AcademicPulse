@@ -43,10 +43,10 @@
         <div class="nav-item" data-target="view-workout"><span class="nav-icon">🗃️</span><span class="nav-text">Question Bank</span></div>
         <div class="nav-item" data-target="view-analytics"><span class="nav-icon">📈</span><span class="nav-text">Analytics</span></div>
         <div class="nav-item" data-target="view-search"><span class="nav-icon">🔎</span><span class="nav-text">Search Data</span></div>
-        <div class="nav-item" id="nav-software-update" style="display: none; align-items: center; justify-content: space-between;" data-target="view-update">
+        <div class="nav-item" id="nav-software-update" style="display: none;" data-target="view-update">
             <div style="display: flex; align-items: center;">
-                <span class="nav-icon" style="color: var(--neon-blue);">⚡</span>
-                <span class="nav-text">Update Ready</span>
+                <span class="nav-icon">&#8593;</span>
+                <span class="nav-text">Software Update</span>
             </div>
             <span class="update-badge" id="updateSidebarBadge" style="display: none; background: var(--neon-red); color: #fff; font-size: 0.7rem; font-weight: bold; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; box-shadow: 0 0 10px var(--neon-red); margin-left: 10px;">1</span>
         </div>
@@ -66,6 +66,18 @@
                 <div class="date-display" id="currentDateDisplay"></div>
             </div>
             
+            <!-- Dashboard Update Banner -->
+            <div id="dashboardUpdateBanner" style="display:none; background:rgba(48,209,88,0.15); border:1px solid var(--neon-green); border-radius:12px; padding:16px; margin-bottom:20px; cursor:pointer; align-items:center; justify-content:space-between;" onclick="document.querySelector('.nav-item[data-target=\'view-update\']')?.click()">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:1.5rem;">✨</span>
+                    <div>
+                        <h4 style="margin:0 0 4px; color:var(--text-main); font-size:1.05rem;">A new version is available!</h4>
+                        <p style="margin:0; color:var(--text-muted); font-size:0.9rem;">Tap here to view the software update.</p>
+                    </div>
+                </div>
+                <button class="btn" style="background:var(--neon-green); color:#000; padding:8px 16px; font-weight:600; font-size:0.9rem;">View Update</button>
+            </div>
+
             <div id="achievementsBannerOverview"></div>
 
             <!-- Exam Widgets -->
@@ -1064,8 +1076,9 @@
                 </form>
 
                 <div style="text-align: center; margin-top: 40px;">
-                    <button id="btnBackupData" class="btn btn-outline" style="width: 100%; margin-bottom: 20px; border-color: var(--neon-gold); color: var(--neon-gold);">Export / Backup Data</button>
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version <span id="appVersionTextProfile">...</span> <span id="betaBadgeProfile" style="display:none; background: var(--neon-purple); color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 5px; text-transform: uppercase;">Beta</span></p>
+                    <button id="btnBackupData" class="btn btn-outline" style="width: 100%; margin-bottom: 12px; border-color: var(--neon-gold); color: var(--neon-gold);">Export / Backup Data</button>
+                    <button onclick="document.querySelector('.nav-item[data-target=\'view-update\']')?.click()" style="width:100%; margin-bottom:20px; background:transparent; border:1px solid var(--neon-blue); color:var(--neon-blue); border-radius:12px; padding:12px; font-size:0.95rem; font-weight:600; cursor:pointer;" id="profileUpdateBtnDynamic">🔍 Software Update</button>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom:4px;">App Version <span id="appVersionTextProfile">...</span> <span id="betaBadgeProfile" style="display:none; background: var(--neon-purple); color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 5px; text-transform: uppercase;">Beta</span></p>
                     <button id="btnLogout" class="btn" style="background: var(--neon-red); color: var(--text-main); margin-top: 10px; border: none; width: 100%;">Logout</button>
                 </div>
             </div>
@@ -1078,7 +1091,6 @@
                     <span style="font-size: 3rem; text-shadow: 0 0 15px var(--neon-blue);">🚀</span>
                 </div>
                 <h1 style="font-size: 2.5rem; margin-bottom: 10px;">Software Update</h1>
-                <p style="color: var(--text-muted); font-size: 1.1rem;">Updates are controlled by you — nothing installs automatically.</p>
             </div>
 
             <!-- Idle state: shown when no update is available -->

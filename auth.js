@@ -230,7 +230,9 @@ document.getElementById('resetPasswordForm').addEventListener('submit', (e) => {
 // Logout
 document.getElementById('btnLogout').addEventListener('click', () => {
     auth.signOut().then(() => {
-        // Force reload to clear state
+        // Clear all local storage to prevent data leakage to other accounts
+        localStorage.clear();
+        // Force reload to clear memory state
         window.location.reload();
     });
 });

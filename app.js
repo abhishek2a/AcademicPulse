@@ -220,9 +220,8 @@ function loadData() {
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
     const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.87', availableUpdate: null, dataVersion: 1 });
-    // Set version based on user's channel
-    const _isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-    AppState.currentVersion = _isBetaUser ? 'v1.0.88-beta' : 'v1.0.87';
+    // Use the version stored in the system state
+    AppState.currentVersion = sysState.currentVersion || 'v1.0.87';
     AppState.availableUpdate = sysState.availableUpdate;
     // Push version to UI immediately (before renderUpdateBadge fires)
     const _vEl = document.getElementById('appVersionTextProfile');
@@ -4705,14 +4704,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // SOFTWARE UPDATE SYSTEM
 // ==========================================
 function renderUpdateBadge() {
-    const navItem = document.getElementById('nav-software-update');
-    const badge = document.getElementById('updateSidebarBadge');
     const idleState = document.getElementById('updateIdleState');
     const availableState = document.getElementById('updateAvailableState');
 
     if (AppState.availableUpdate) {
-        if (navItem) navItem.style.display = 'flex';
-        if (badge) badge.style.display = 'block';
         if (idleState) idleState.style.display = 'none';
         if (availableState) availableState.style.display = 'block';
 
@@ -4729,8 +4724,6 @@ function renderUpdateBadge() {
             list.innerHTML = AppState.availableUpdate.features.map(f => `<li style="margin-bottom: 10px;">${f}</li>`).join('');
         }
     } else {
-        if (navItem) navItem.style.display = 'none';
-        if (badge) badge.style.display = 'none';
         if (idleState) idleState.style.display = 'block';
         if (availableState) availableState.style.display = 'none';
     }
@@ -4739,14 +4732,13 @@ function renderUpdateBadge() {
     if (profileV) profileV.textContent = AppState.currentVersion;
     const currentVLabel = document.getElementById('currentVersionLabel');
     if (currentVLabel) currentVLabel.textContent = AppState.currentVersion;
+    
+    // Toggle dashboard banner
+    const dashBanner = document.getElementById('dashboardUpdateBanner');
+    if (dashBanner) dashBanner.style.display = AppState.availableUpdate ? 'flex' : 'none';
 }
 
 function processNewUpdate(updateInfo) {
-    // Check device-local last-seen version first.
-    // This survives sign-out/sign-in because it's never cloud-synced.
-    const lastSeen = localStorage.getItem(STORAGE_KEYS.LAST_SEEN_VERSION);
-    if (lastSeen === updateInfo.version) return; // Already installed/dismissed on this device
-
     // Channel guard: stable users never receive beta builds
     const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
     const isBetaBuild = (updateInfo.version || '').includes('beta');
@@ -4758,12 +4750,6 @@ function processNewUpdate(updateInfo) {
         saveData('system');
         addNotification('System Update Available', `Version ${updateInfo.version} is ready to install.`, 'info');
         renderUpdateBadge();
-        
-        // Let the user click it instead of forcing it
-        const updateTab = document.getElementById('nav-software-update');
-        if (updateTab) {
-            updateTab.style.display = 'flex';
-        }
     }
 }
 
@@ -4775,7 +4761,6 @@ function installUpdate() {
     AppState.availableUpdate = null;
     saveData('system');
 
-    // Stamp this device so sign-out/re-login never re-triggers this popup
     localStorage.setItem(STORAGE_KEYS.LAST_SEEN_VERSION, newVersion);
     
     addNotification('Update Installed', `Successfully updated to ${newVersion}.`, 'success');
@@ -4784,7 +4769,6 @@ function installUpdate() {
     const overviewTab = document.querySelector('.nav-item[data-target="view-overview"]');
     if (overviewTab) overviewTab.click();
     
-    // Force cloud sync with updated systemState so cloud is also up to date
     if (typeof window.triggerCloudSync === 'function') window.triggerCloudSync();
 
     const doReload = () => {
@@ -4810,21 +4794,55 @@ window.checkForUpdates = function(btnEl) {
     if (btnEl) {
         btnEl.disabled = true;
         btnEl.textContent = '🔄 Checking...';
+        btnEl.style.background = 'var(--neon-blue)';
+        btnEl.style.color = '#000';
+        btnEl.style.borderColor = 'var(--neon-blue)';
     }
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        const isBeta = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-        navigator.serviceWorker.controller.postMessage({ type: 'CHECK_FOR_UPDATES', isBeta });
-        // Re-enable button after response window
-        setTimeout(() => {
+
+    const isBeta = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    const targetFile = isBeta ? './beta_version.json' : './version.json';
+
+    fetch(targetFile + '?t=' + Date.now())
+        .then(r => r.json())
+        .then(updateInfo => {
+            updateInfo.date = new Date().toLocaleDateString();
+            processNewUpdate(updateInfo);
+            renderUpdateBadge();
+            const hasUpdate = !!AppState.availableUpdate;
+            if (btnEl) {
+                btnEl.disabled = false;
+                if (hasUpdate) {
+                    btnEl.textContent = '✅ Update Available!';
+                    btnEl.style.background = 'var(--neon-green)';
+                    btnEl.style.color = '#000';
+                    btnEl.style.borderColor = 'var(--neon-green)';
+                } else {
+                    btnEl.textContent = '🔍 Check for Updates';
+                    btnEl.style.background = 'transparent';
+                    btnEl.style.color = 'var(--neon-blue)';
+                    btnEl.style.borderColor = 'var(--neon-blue)';
+                    addNotification('Up to Date', 'You are on the latest version.', 'success');
+                }
+            }
+            
+            // Sync profile button to show alert icon if needed
+            const profileBtn = document.getElementById('profileUpdateBtnDynamic');
+            if (profileBtn) {
+                profileBtn.textContent = AppState.availableUpdate ? '✅ Software Update Ready' : '🔍 Software Update';
+                profileBtn.style.color = AppState.availableUpdate ? 'var(--neon-green)' : 'var(--neon-blue)';
+                profileBtn.style.borderColor = AppState.availableUpdate ? 'var(--neon-green)' : 'var(--neon-blue)';
+            }
+        })
+        .catch(() => {
             if (btnEl) {
                 btnEl.disabled = false;
                 btnEl.textContent = '🔍 Check for Updates';
+                btnEl.style.background = 'transparent';
+                btnEl.style.color = 'var(--neon-blue)';
+                btnEl.style.borderColor = 'var(--neon-blue)';
             }
-        }, 4000);
-    } else {
-        addNotification('Update Check', 'Service worker not ready. Try reloading the page first.', 'info');
-        if (btnEl) { btnEl.disabled = false; btnEl.textContent = '🔍 Check for Updates'; }
-    }
+            addNotification('Update Check Failed', 'Could not reach the update server. Check your connection.', 'error');
+        });
 };
 
 document.addEventListener('DOMContentLoaded', () => {

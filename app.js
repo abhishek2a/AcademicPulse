@@ -222,6 +222,9 @@ function loadData() {
     const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.87', availableUpdate: null, dataVersion: 1 });
     // Use the version stored in the system state
     AppState.currentVersion = sysState.currentVersion || 'v1.0.87';
+    if (AppState.currentVersion.includes('beta')) {
+        localStorage.setItem('academicpulse_beta_opt_in', 'true');
+    }
     AppState.availableUpdate = sysState.availableUpdate;
     // Push version to UI immediately (before renderUpdateBadge fires)
     const _vEl = document.getElementById('appVersionTextProfile');
@@ -4744,8 +4747,23 @@ function processNewUpdate(updateInfo) {
     const isBetaBuild = (updateInfo.version || '').includes('beta');
     if (isBetaBuild && !isBetaUser) return; // Don't show beta updates to stable users
 
-    if (updateInfo.version !== AppState.currentVersion &&
-        (!AppState.availableUpdate || AppState.availableUpdate.version !== updateInfo.version)) {
+    // Prevent downgrades by comparing semantic versions
+    const compareVersions = (v1, v2) => {
+        const c1 = v1.replace('v', '').split('-')[0].split('.').map(Number);
+        const c2 = v2.replace('v', '').split('-')[0].split('.').map(Number);
+        for(let i=0; i<Math.max(c1.length, c2.length); i++) {
+            if ((c1[i] || 0) > (c2[i] || 0)) return 1;
+            if ((c1[i] || 0) < (c2[i] || 0)) return -1;
+        }
+        const b1 = v1.includes('beta');
+        const b2 = v2.includes('beta');
+        if (b1 && !b2) return -1;
+        if (!b1 && b2) return 1;
+        return 0;
+    };
+
+    if (compareVersions(updateInfo.version, AppState.currentVersion) > 0 &&
+        (!AppState.availableUpdate || compareVersions(updateInfo.version, AppState.availableUpdate.version) > 0)) {
         AppState.availableUpdate = updateInfo;
         saveData('system');
         addNotification('System Update Available', `Version ${updateInfo.version} is ready to install.`, 'info');

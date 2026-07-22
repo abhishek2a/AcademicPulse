@@ -11,8 +11,7 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-    // Force immediate activation so new cache takes effect right away
-    self.skipWaiting();
+    // Do NOT skip waiting — new SW waits until user clicks "Update Now"
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(STATIC_ASSETS).catch(err => console.warn('Static assets cache warning:', err)))

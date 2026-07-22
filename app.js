@@ -220,9 +220,13 @@ function loadData() {
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
     const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.87', availableUpdate: null, dataVersion: 1 });
-    // Force version to 1.0.87 to bypass local storage stuck versions for local users
-    AppState.currentVersion = 'v1.0.87';
+    // Set version based on user's channel
+    const _isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    AppState.currentVersion = _isBetaUser ? 'v1.0.88-beta' : 'v1.0.87';
     AppState.availableUpdate = sysState.availableUpdate;
+    // Push version to UI immediately (before renderUpdateBadge fires)
+    const _vEl = document.getElementById('appVersionTextProfile');
+    if (_vEl) _vEl.textContent = AppState.currentVersion;
     AppState.dataVersion = sysState.dataVersion || 1;
 
     // V3 Migration: Retroactively merge existing cards from the same chapter
@@ -522,16 +526,33 @@ window.toggleBetaUpdates = function(optIn) {
     } else {
         addNotification('Beta Updates Disabled', 'You will only receive stable releases.', 'info');
     }
+    AppState.currentVersion = optIn ? 'v1.0.88-beta' : 'v1.0.87';
 };
 
 window.showWhatsNewPopup = async function() {
-    let description = "Welcome to AcademicPulse v1.0.87 — The Pulse AI & Stability Update! We've made massive improvements under the hood to ensure your data stays intact.";
-    let features = [
-        "<div style='margin-bottom:8px'><b>🤖 Pulse AI Overhaul</b></div>The Pulse AI coach has been completely redesigned with a cleaner UI and smarter insights to help you track your streaks, study focus, and mock test readiness.",
-        "<div style='margin-bottom:8px'><b>🛡️ Uncompromised Stability</b></div>We've rewritten our data syncing algorithms and squashed bugs that caused dashboard freezes, ensuring your data is always safe and correctly rendered.",
-        "<div style='margin-bottom:8px'><b>☁️ Bulletproof Cloud Sync</b></div>Cloud syncing now safely waits for completion before any app updates, guaranteeing that your latest changes are backed up.",
-        "<div style='margin-bottom:8px'><b>🧑‍💻 Beta Channel Access</b></div>Opt in from the Profile tab to test bleeding-edge features before they hit the main release!"
-    ];
+    const isBeta = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+
+    let description, features;
+
+    if (isBeta) {
+        description = "You're on <b>v1.0.88 Beta</b> — the Question Bank Overhaul update! Thanks for testing bleeding-edge features.";
+        features = [
+            "<div style='margin-bottom:8px'><b>&#128218; Question Bank: Multi-Source Badges Fixed</b></div>Questions with both Kaplan and BPP references now correctly display separate gold badges side by side (e.g., <b>Kaplan (Sec A)</b> and <b>BPP (Sec A)</b>).",
+            "<div style='margin-bottom:8px'><b>&#127991; Section Badge Layout Fixed</b></div>The section label no longer corrupts into broken characters. It now cleanly shows inside the source badge as <b>Kaplan (Sec A)</b>.",
+            "<div style='margin-bottom:8px'><b>&#9998; Edit Modal: All Sources Load Correctly</b></div>Opening Edit on a multi-source question now loads ALL source references into the editor &mdash; previously only the first source was shown.",
+            "<div style='margin-bottom:8px'><b>&#128221; Smart Reference Display</b></div>If a question has no custom text, the reference is automatically shown in the card body so nothing is ever left blank.",
+            "<div style='margin-bottom:8px'><b>&#9989; Mixed Sources Filter</b></div>A new <b>Mixed Sources</b> filter option lets you quickly find all questions that span multiple question banks."
+        ];
+    } else {
+        description = "Welcome to AcademicPulse v1.0.87 &#x1F44B; The Pulse AI &amp; Stability Update! We've made massive improvements under the hood to ensure your data stays intact.";
+        features = [
+            "<div style='margin-bottom:8px'><b>&#129302; Pulse AI Overhaul</b></div>The Pulse AI coach has been completely redesigned with a cleaner UI and smarter insights to help you track your streaks, study focus, and mock test readiness.",
+            "<div style='margin-bottom:8px'><b>&#128737;&#65039; Uncompromised Stability</b></div>We've rewritten our data syncing algorithms and squashed bugs that caused dashboard freezes, ensuring your data is always safe and correctly rendered.",
+            "<div style='margin-bottom:8px'><b>&#9729;&#65039; Bulletproof Cloud Sync</b></div>Cloud syncing now safely waits for completion before any app updates, guaranteeing that your latest changes are backed up.",
+            "<div style='margin-bottom:8px'><b>&#129489;&#8205;&#128187; Beta Channel Access</b></div>Opt in from the Profile tab to test bleeding-edge features before they hit the main release!"
+        ];
+    }
+
     const contentDiv = document.getElementById('whatsNewModalContent');
     if(contentDiv) {
         let html = '';
@@ -3309,7 +3330,6 @@ window.renderWorkoutBank = function() {
     }
 
     const diffColor = { Easy: 'var(--neon-green)', Medium: 'var(--neon-gold)', Hard: 'var(--neon-red)' };
-    // Build a fast lookup map for globalIdx to avoid O(n²) indexOf
     const globalIdxMap = new Map(qs.map((q, i) => [q.id, i + 1]));
     list.innerHTML = filtered.map((q) => {
         const globalIdx = globalIdxMap.get(q.id) || 0;
@@ -3319,9 +3339,20 @@ window.renderWorkoutBank = function() {
         if (q.refsBySource) {
             sourceBadges = Object.keys(q.refsBySource).map(k => `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; margin-left:4px;">${escapeHtml(k)}</span>`).join('');
         } else if (q.sourceBank && q.sourceBank !== 'Custom' && q.sourceBank !== 'Mixed') {
-            sourceBadges = `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; margin-left:4px;">${escapeHtml(q.sourceBank)}</span>`;
+            const sLabel = q.section ? `${q.sourceBank} (Sec ${q.section})` : q.sourceBank;
+            sourceBadges = `<span style="background:var(--glass-hover); color:var(--neon-gold); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; margin-left:4px;">${escapeHtml(sLabel)}</span>`;
         }
 
+        // Build fallback body text from ref data if no custom question text
+        let bodyQ = q.question || '';
+        let bodyA = q.answer || '';
+        if (!bodyQ) {
+            if (q.refsBySource) {
+                bodyQ = Object.entries(q.refsBySource).map(([k,v]) => `[${k}] ${v}`).join('\n');
+            } else if (q.ref && q.sourceBank && q.sourceBank !== 'Custom') {
+                bodyQ = `[${q.sourceBank}${q.section ? ` (Sec ${q.section})` : ''}] ${q.ref}`;
+            }
+        }
 
         return `
         <div class="chart-card" style="margin-bottom:12px; padding:16px 20px;" id="wq-card-${q.id}">
@@ -3331,22 +3362,22 @@ window.renderWorkoutBank = function() {
                         <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Q${globalIdx}</span>
                         <span style="background:rgba(41,151,255,0.15); color:var(--neon-blue); padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700;">${escapeHtml(q.course)}</span>
                         <span style="background:rgba(100,100,100,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">${escapeHtml(q.subject)}</span>
-                        ${q.section ? `<span style="background:rgba(180,100,255,0.15); color:#c77dff; border:1px solid rgba(180,100,255,0.35); padding:2px 9px; border-radius:10px; font-size:0.72rem; font-weight:700;">§ ${escapeHtml(q.section)}</span>` : ''}
+                        ${q.section ? `<span style="background:rgba(180,100,255,0.15); color:#c77dff; border:1px solid rgba(180,100,255,0.35); padding:2px 9px; border-radius:10px; font-size:0.72rem; font-weight:700;">Sec. ${escapeHtml(q.section)}</span>` : ''}
                         ${q.createdAt ? `<span style="font-size:0.7rem; color:var(--text-muted); margin-left:4px;">${q.createdAt.split('T')[0]}</span>` : ''}
-                        ${q.subtopic ? `<span style="background:rgba(200,200,200,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">↳ ${escapeHtml(q.subtopic)}</span>` : ''}
+                        ${q.subtopic ? `<span style="background:rgba(200,200,200,0.15); color:var(--text-muted); padding:2px 8px; border-radius:10px; font-size:0.72rem;">&#127991; ${escapeHtml(q.subtopic)}</span>` : ''}
                         <span style="color:${diffColor[q.difficulty] || 'var(--text-muted)'}; font-size:0.72rem; font-weight:700;">${q.difficulty}</span>
                         ${sourceBadges}
                         ${tags}
                     </div>
-                    <div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px; white-space:pre-wrap;">${escapeHtml(q.question)}</div>
-                    <details style="cursor:pointer;">
-                        <summary style="font-size:0.82rem; color:var(--neon-green); font-weight:600; user-select:none;">▶ Show Answer</summary>
-                        <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main); white-space:pre-wrap;">${escapeHtml(q.answer)}</div>
-                    </details>
+                    ${bodyQ ? `<div style="font-weight:600; font-size:0.95rem; line-height:1.4; margin-bottom:8px; white-space:pre-wrap;">${escapeHtml(bodyQ)}</div>` : ''}
+                    ${bodyA ? `<details style="cursor:pointer;">
+                        <summary style="font-size:0.82rem; color:var(--neon-green); font-weight:600; user-select:none;">&#9654; Show Answer</summary>
+                        <div style="margin-top:8px; padding:10px; background:rgba(48,209,88,0.06); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text-main); white-space:pre-wrap;">${escapeHtml(bodyA)}</div>
+                    </details>` : ''}
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
-                    <button onclick="openWorkoutQuestionModal('${q.id}')" style="background:transparent; color:var(--neon-blue); border:1px solid var(--glass-border); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">✎ Edit</button>
-                    <button onclick="deleteWorkoutQuestion('${q.id}')" style="background:transparent; color:var(--neon-red); border:1px solid var(--glass-border); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">✕ Del</button>
+                    <button onclick="openWorkoutQuestionModal('${q.id}')" style="background:transparent; color:var(--neon-blue); border:1px solid var(--glass-border); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">&#9998; Edit</button>
+                    <button onclick="deleteWorkoutQuestion('${q.id}')" style="background:transparent; color:var(--neon-red); border:1px solid var(--glass-border); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">&#128465; Del</button>
                 </div>
             </div>
         </div>`;
@@ -3368,10 +3399,16 @@ window.openWorkoutQuestionModal = function(id) {
         document.getElementById('wqSubject').value = q.subject;
         populateWqSubtopicList();
         document.getElementById('wqSubtopic').value = q.subtopic || '';
-        document.getElementById('wqSourceBank').value = q.sourceBank || 'Custom';
-        document.getElementById('wqRef').value = q.ref || '';
-        document.getElementById('wqQuestion').value = q.question;
-        document.getElementById('wqAnswer').value = q.answer;
+        document.getElementById('wqQuestion').value = q.question || '';
+        document.getElementById('wqAnswer').value = q.answer || '';
+        if (q.refsBySource && Object.keys(q.refsBySource).length > 0) {
+            document.getElementById('wqSourceBank').value = 'Mixed';
+            document.getElementById('wqRef').value = Object.entries(q.refsBySource).map(([k, v]) => `${k}: ${v}`).join(' | ');
+        } else {
+            document.getElementById('wqSourceBank').value = q.sourceBank || 'Custom';
+            document.getElementById('wqRef').value = q.ref || '';
+        }
+
         document.getElementById('wqDifficulty').value = q.difficulty || 'Medium';
         document.getElementById('wqTags').value = (q.tags || []).join(', ');
         document.getElementById('wqDate').value = q.createdAt ? q.createdAt.split('T')[0] : TimeUtils.getDateKey();
@@ -3416,27 +3453,33 @@ window.saveWorkoutQuestion = function() {
     const ref = document.getElementById('wqRef').value.trim();
     let question = document.getElementById('wqQuestion').value.trim();
     let answer = document.getElementById('wqAnswer').value.trim();
+    
+    if (!question && !ref) {
+        alert('Please enter a question or provide a Q Reference.');
+        return;
+    }
+    
     const difficulty = document.getElementById('wqDifficulty').value;
     const tags = document.getElementById('wqTags').value.split(',').map(t => t.trim()).filter(Boolean);
     const dateInput = document.getElementById('wqDate').value;
     const createdAt = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
     const section = document.getElementById('wqSection')?.value || '';
 
-    if (!question && ref) {
-        question = `[${sourceBank}] ${ref}`;
-    }
-    if (!answer && ref) {
-        answer = `(Refer to ${sourceBank} Question Bank for ${ref})`;
-    }
-
-    if (!question || !answer) {
-        alert('Please enter a question and answer, or provide a Q Reference.');
-        return;
-    }
-
     if (id) {
         const q = AppState.workoutQuestions.find(x => x.id === id);
-        if (q) { Object.assign(q, { course, subject, subtopic, section, sourceBank, ref, question, answer, difficulty, tags, createdAt, updatedAt: new Date().toISOString() }); }
+        if (q) { 
+            let newRefsBySource = q.refsBySource;
+            if (sourceBank === 'Mixed' && ref.includes(':')) {
+                newRefsBySource = {};
+                ref.split('|').forEach(part => {
+                    const [k, v] = part.split(':').map(s => s.trim());
+                    if (k && v) newRefsBySource[k] = v;
+                });
+            } else if (sourceBank !== 'Mixed') {
+                newRefsBySource = null;
+            }
+            Object.assign(q, { course, subject, subtopic, section, sourceBank, ref, refsBySource: newRefsBySource, question, answer, difficulty, tags, createdAt, updatedAt: new Date().toISOString() }); 
+        }
     } else {
         const existing = AppState.workoutQuestions.find(q => 
             q.course === course && 
@@ -4664,19 +4707,23 @@ document.addEventListener('DOMContentLoaded', () => {
 function renderUpdateBadge() {
     const navItem = document.getElementById('nav-software-update');
     const badge = document.getElementById('updateSidebarBadge');
-    
+    const idleState = document.getElementById('updateIdleState');
+    const availableState = document.getElementById('updateAvailableState');
+
     if (AppState.availableUpdate) {
         if (navItem) navItem.style.display = 'flex';
         if (badge) badge.style.display = 'block';
-        
+        if (idleState) idleState.style.display = 'none';
+        if (availableState) availableState.style.display = 'block';
+
         const vText = document.getElementById('updateVersionText');
         const bText = document.getElementById('updateBuildText');
         const dText = document.getElementById('updateDateText');
-        
+
         if (vText) vText.textContent = AppState.availableUpdate.version;
         if (bText) bText.textContent = AppState.availableUpdate.build;
         if (dText) dText.textContent = AppState.availableUpdate.date;
-        
+
         const list = document.getElementById('updateFeaturesList');
         if (list) {
             list.innerHTML = AppState.availableUpdate.features.map(f => `<li style="margin-bottom: 10px;">${f}</li>`).join('');
@@ -4684,10 +4731,14 @@ function renderUpdateBadge() {
     } else {
         if (navItem) navItem.style.display = 'none';
         if (badge) badge.style.display = 'none';
+        if (idleState) idleState.style.display = 'block';
+        if (availableState) availableState.style.display = 'none';
     }
-    
+
     const profileV = document.getElementById('appVersionTextProfile');
     if (profileV) profileV.textContent = AppState.currentVersion;
+    const currentVLabel = document.getElementById('currentVersionLabel');
+    if (currentVLabel) currentVLabel.textContent = AppState.currentVersion;
 }
 
 function processNewUpdate(updateInfo) {
@@ -4695,6 +4746,11 @@ function processNewUpdate(updateInfo) {
     // This survives sign-out/sign-in because it's never cloud-synced.
     const lastSeen = localStorage.getItem(STORAGE_KEYS.LAST_SEEN_VERSION);
     if (lastSeen === updateInfo.version) return; // Already installed/dismissed on this device
+
+    // Channel guard: stable users never receive beta builds
+    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    const isBetaBuild = (updateInfo.version || '').includes('beta');
+    if (isBetaBuild && !isBetaUser) return; // Don't show beta updates to stable users
 
     if (updateInfo.version !== AppState.currentVersion &&
         (!AppState.availableUpdate || AppState.availableUpdate.version !== updateInfo.version)) {
@@ -4748,6 +4804,28 @@ function installUpdate() {
         doReload();
     }
 }
+
+// Manual update check — called only by "Check for Updates" button
+window.checkForUpdates = function(btnEl) {
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.textContent = '🔄 Checking...';
+    }
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        const isBeta = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+        navigator.serviceWorker.controller.postMessage({ type: 'CHECK_FOR_UPDATES', isBeta });
+        // Re-enable button after response window
+        setTimeout(() => {
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.textContent = '🔍 Check for Updates';
+            }
+        }, 4000);
+    } else {
+        addNotification('Update Check', 'Service worker not ready. Try reloading the page first.', 'info');
+        if (btnEl) { btnEl.disabled = false; btnEl.textContent = '🔍 Check for Updates'; }
+    }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     const devBtn = document.getElementById('devTriggerUpdateBtn');
@@ -4816,19 +4894,10 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.serviceWorker.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
                 const payload = event.data.payload;
-                
-                // Phased Rollout Logic Disabled: All users receive updates instantly
                 processNewUpdate(payload);
             }
         });
-        
-        // Check for updates shortly after load
-        setTimeout(() => {
-            if (navigator.serviceWorker.controller) {
-                const isBeta = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_FOR_UPDATES', isBeta });
-            }
-        }, 5000);
+        // NO automatic check on load — updates only happen via "Check for Updates" button
     }
 
     renderUpdateBadge();

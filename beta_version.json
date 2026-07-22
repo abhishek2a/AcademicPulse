@@ -1,0 +1,12 @@
+{
+  "version": "1.0.87-beta",
+  "build": "2026.07.22-beta",
+  "title": "v1.0.87-beta \u2014 The Pulse AI & Stability Update",
+  "description": "Welcome to AcademicPulse v1.0.87-beta! You're testing the latest Pulse AI features and core stability fixes.",
+  "features": [
+    "<div style='margin-bottom:8px'><b>\uD83E\uDD16 Pulse AI Overhaul</b></div>The Pulse AI coach has been completely redesigned with a cleaner UI and smarter insights.",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDEE1\uFE0F Uncompromised Stability</b></div>We've rewritten our data syncing algorithms and squashed bugs that caused dashboard freezes.",
+    "<div style='margin-bottom:8px'><b>\u2601\uFE0F Bulletproof Cloud Sync</b></div>Cloud syncing now safely waits for completion before any app updates, guaranteeing that your latest changes are backed up.",
+    "<div style='margin-bottom:8px'><b>\uD83E\uDDD1\u200D\uD83D\uDCBB Beta Channel Access</b></div>Thanks for being a beta tester!"
+  ]
+}

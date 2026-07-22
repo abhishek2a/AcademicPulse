@@ -48,6 +48,10 @@ body.light-theme .chart-card,
 body.light-theme .chart-card--goals {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
+body.light-theme .chart-card:hover {
+    border-color: rgba(0, 0, 0, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
 
 /* Progress bar track — hardcoded dark rgba */
 body.light-theme .progress-bar-bg {
@@ -628,12 +632,17 @@ body.light-theme input[type="time"]::-webkit-calendar-picker-indicator {
 .chart-card {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    padding: 25px;
+    padding: 30px; 
     border-radius: 20px;
-    text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.3s ease;
+}
+.chart-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
 }
 .chart-card h3 { margin-top: 0; margin-bottom: 20px; font-weight: 500; color: #fff; }
 
@@ -822,3 +831,105 @@ body.light-theme .auth-logo, body.light-theme .app-logo { background: linear-gra
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 
 /* Performance patch for backdrop filter */
+.nav-bottom, .modal-card {
+    will-change: transform;
+}
+
+/* ── Custom multi-select styles ── */
+select[multiple] {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+select[multiple]::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+select[multiple]::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+select[multiple]::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+select[multiple]::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+select[multiple] option {
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    line-height: 1.4;
+}
+body.light-theme select[multiple] option {
+    border-bottom-color: rgba(0,0,0,0.05);
+}
+
+/* Custom Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 24px;
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: .3s;
+    border-radius: 24px;
+    border: 1px solid var(--glass-border);
+}
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-muted);
+    transition: .3s;
+    border-radius: 50%;
+}
+input:checked + .toggle-slider {
+    background-color: var(--neon-blue);
+    border-color: var(--neon-blue);
+}
+input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+    background-color: #000;
+}
+body.light-theme .toggle-slider {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+body.light-theme input:checked + .toggle-slider:before {
+    background-color: #fff;
+}
+
+/* Premium Webkit Scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+body.light-theme ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+}
+body.light-theme ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}

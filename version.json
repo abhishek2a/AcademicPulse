@@ -1,14 +1,12 @@
 {
-  "version": "1.0.75",
+  "version": "1.0.87",
   "build": "2026.07.22-stable",
-  "title": "v1.0.75 \u2014 Massive Update",
-  "description": "Welcome to AcademicPulse v1.0.75! This is the biggest release yet \u2014 a comprehensive bug-fix sweep, data repair engine, and Question Bank overhaul that resolves every known issue and makes the app faster and more reliable than ever.",
+  "title": "v1.0.87 \u2014 The Pulse AI & Stability Update",
+  "description": "Welcome to AcademicPulse v1.0.87! We've made massive improvements under the hood to ensure your data stays intact and revamped the Pulse AI coach.",
   "features": [
-    "<div style='margin-bottom:8px'><b>\uD83D\uDDC2\uFE0F Question Bank \u2014 Complete Overhaul</b></div><b>Renamed &amp; Streamlined:</b> The 'Workout' section has been officially renamed to <b>Question Bank</b> and stripped down to what matters \u2014 building and managing your question database. The 'Start Workout' drill tab, stat boxes (Total Questions / CSEB / ACCA / Workouts Done) and the dashboard image have all been removed for a cleaner, faster interface.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDEE0\uFE0F Deep Bug Fix: Stale DOM References</b></div>Removed 9 stale JavaScript references to deleted HTML elements (<code>drillSetupScreen</code>, <code>drillActiveScreen</code>, <code>drillResultsScreen</code>, <code>wbWorkoutsDone</code>, <code>drillCourseSelect</code>, <code>drillSubjectSelect</code>, <code>drillTapHint</code>, <code>drillActionBtns</code>, <code>drillProgressBar</code>) that were causing silent crashes and preventing the Question Bank list from rendering correctly.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDD04 Multi-Stage Data Migration Engine</b></div><b>V3 \u2014 Retroactive Topic Merging:</b> Automatically merged pre-existing duplicate cards from the same chapter into unified Master Topic Cards (e.g., separate Kaplan and BPP cards for <i>IFRS 16 Leases</i> merged into one clean Mixed card).<br/><br/><b>V4 \u2014 Answer Ref Repair:</b> Fixed merged Mixed cards whose BPP answer references were incorrectly preserved as 'custom text' due to a regex mismatch on a missing closing parenthesis. All affected cards have been automatically repaired.",
-    "<div style='margin-bottom:8px'><b>\uD83E\uDDF9 Cleaner Question Bank Cards</b></div><b>Ref Text Removed:</b> The verbose <code>[Kaplan] Ref: Q2, Q51...</code> reference lines have been removed from card bodies. Source bank information is now shown exclusively as compact, colour-coded gold badges in the card header.<br/><br/><b>Source Filter Fixed:</b> Filtering by Kaplan or BPP now correctly surfaces Mixed cross-bank cards that contain references from that source.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDCE2 Automatic Update Popups</b></div>The What's New modal now automatically appears once per version for every user. No more missing important updates \u2014 the system stores the last-seen version locally and shows the popup on first launch of each new release.",
-    "<div style='margin-bottom:8px'><b>\u26A1 Performance Improvements</b></div><b>O(1) Card Indexing:</b> Replaced O(n\u00b2) <code>indexOf</code> scan with a pre-built <code>Map</code> lookup for card numbering, making rendering instant regardless of how many cards you have."
+    "<div style='margin-bottom:8px'><b>\uD83E\uDD16 Pulse AI Overhaul</b></div>The Pulse AI coach has been completely redesigned with a cleaner UI and smarter insights to help you track your streaks, study focus, and mock test readiness.",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDEE1\uFE0F Uncompromised Stability</b></div>We've rewritten our data syncing algorithms and squashed bugs that caused dashboard freezes, ensuring your data is always safe and correctly rendered.",
+    "<div style='margin-bottom:8px'><b>\u2601\uFE0F Bulletproof Cloud Sync</b></div>Cloud syncing now safely waits for completion before any app updates, guaranteeing that your latest changes are backed up.",
+    "<div style='margin-bottom:8px'><b>\uD83E\uDDD1\u200D\uD83D\uDCBB Beta Channel Access</b></div>Opt in from the Profile tab to test bleeding-edge features before they hit the main release!"
   ]
 }

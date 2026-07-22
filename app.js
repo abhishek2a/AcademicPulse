@@ -82,7 +82,7 @@ const AppState = {
     achievements: [],
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
-    currentVersion: 'v1.0.75',
+    currentVersion: 'v1.0.87',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -113,7 +113,16 @@ const Storage = {
         } catch (e) { return fallback; }
     },
     set(key, val) {
-        try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+        try { 
+            localStorage.setItem(key, JSON.stringify(val)); 
+        } catch(e) {
+            console.error('Storage error saving', key, ':', e);
+            if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+                if (window.addNotification) {
+                    window.addNotification('Storage Full', 'Your device storage is full. Some data could not be saved.', 'error');
+                }
+            }
+        }
     }
 };
 
@@ -210,8 +219,9 @@ function loadData() {
 
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
-    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.75', availableUpdate: null, dataVersion: 1 });
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.75';
+    const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.87', availableUpdate: null, dataVersion: 1 });
+    // Force version to 1.0.87 to bypass local storage stuck versions for local users
+    AppState.currentVersion = 'v1.0.87';
     AppState.availableUpdate = sysState.availableUpdate;
     AppState.dataVersion = sysState.dataVersion || 1;
 
@@ -503,26 +513,25 @@ function buildDefaultAccaTopics() {
     };
 }
 
-window.showWhatsNewPopup = async function() {
-    let features = [];
-    let description = '';
-    try {
-        const res = await fetch('version.json?t=' + new Date().getTime());
-        const data = await res.json();
-        features = data.features;
-        description = data.description || '';
-    } catch(e) {
-        console.warn('Could not fetch version details, using fallback.', e);
-        description = "Welcome to AcademicPulse v1.0.75 \u2014 the biggest release yet! A comprehensive bug-fix sweep, data repair engine, and Question Bank overhaul.";
-        features = [
-            "<div style='margin-bottom:8px'><b>\uD83D\uDDC2\uFE0F Question Bank \u2014 Complete Overhaul</b></div><b>Renamed &amp; Streamlined:</b> 'Workout' is now officially <b>Question Bank</b>. The drill tab, stat boxes, and dashboard image have been removed for a cleaner, faster experience.",
-            "<div style='margin-bottom:8px'><b>\uD83D\uDEE0\uFE0F Deep Bug Fix: Stale DOM References</b></div>Removed 9 stale JS references to deleted HTML elements (<code>drillSetupScreen</code>, <code>wbWorkoutsDone</code>, <code>drillTapHint</code>, etc.) that were causing silent crashes and preventing the Question Bank list from rendering.",
-            "<div style='margin-bottom:8px'><b>\uD83D\uDD04 Multi-Stage Data Migration Engine</b></div><b>V3:</b> Retroactive topic merging. <b>V4:</b> Automatic repair of Mixed card answer references that were incorrectly preserved as custom text due to a regex mismatch on a missing closing parenthesis.",
-            "<div style='margin-bottom:8px'><b>\uD83E\uDDF9 Cleaner Cards &amp; Fixed Source Filter</b></div>Ref text lines removed from card bodies. Source badges shown in header. Filtering by Kaplan/BPP now correctly surfaces Mixed cross-bank cards.",
-            "<div style='margin-bottom:8px'><b>\uD83D\uDCE2 Automatic Update Popups</b></div>What's New modal now auto-appears once per version for all users.",
-            "<div style='margin-bottom:8px'><b>\u26A1 O(1) Card Indexing</b></div>Replaced O(n\u00b2) indexOf scan with a pre-built Map for instant card numbering regardless of bank size."
-        ];
+window.toggleBetaUpdates = function(optIn) {
+    localStorage.setItem('academicpulse_beta_opt_in', optIn ? 'true' : 'false');
+    const badge = document.getElementById('betaBadgeProfile');
+    if (badge) badge.style.display = optIn ? 'inline-block' : 'none';
+    if (optIn) {
+        addNotification('Beta Updates Enabled', 'You are now opted in to receive experimental features.', 'success');
+    } else {
+        addNotification('Beta Updates Disabled', 'You will only receive stable releases.', 'info');
     }
+};
+
+window.showWhatsNewPopup = async function() {
+    let description = "Welcome to AcademicPulse v1.0.87 — The Pulse AI & Stability Update! We've made massive improvements under the hood to ensure your data stays intact.";
+    let features = [
+        "<div style='margin-bottom:8px'><b>🤖 Pulse AI Overhaul</b></div>The Pulse AI coach has been completely redesigned with a cleaner UI and smarter insights to help you track your streaks, study focus, and mock test readiness.",
+        "<div style='margin-bottom:8px'><b>🛡️ Uncompromised Stability</b></div>We've rewritten our data syncing algorithms and squashed bugs that caused dashboard freezes, ensuring your data is always safe and correctly rendered.",
+        "<div style='margin-bottom:8px'><b>☁️ Bulletproof Cloud Sync</b></div>Cloud syncing now safely waits for completion before any app updates, guaranteeing that your latest changes are backed up.",
+        "<div style='margin-bottom:8px'><b>🧑‍💻 Beta Channel Access</b></div>Opt in from the Profile tab to test bleeding-edge features before they hit the main release!"
+    ];
     const contentDiv = document.getElementById('whatsNewModalContent');
     if(contentDiv) {
         let html = '';
@@ -2360,65 +2369,116 @@ function generateAICoachAnalysis(type) {
         const streaks = calculateStreaks();
 
         if (type === 'general') {
-            insight = `<b style="color:var(--neon-blue); font-size:1.1rem;">Holistic Performance Review</b><br/><br/>`;
-            
-            if (streaks.current > 0) {
-                insight += `<span style="font-size:1.1rem;">🔥</span> You're riding a <b>${streaks.current}-day streak</b>! Consistency is the ultimate key to passing exams. `;
-            } else {
-                insight += `<span style="font-size:1.1rem;">⚠️</span> You broke your streak recently. Today is the perfect day to start a new one! `;
-            }
-            
-            if (totalRecordedDays > 5) {
-                insight += `Your 30-day attendance rate is <b>${attendanceRate.toFixed(0)}%</b>. `;
-                if (attendanceRate > 80) insight += `You are showing phenomenal discipline! `;
-                else insight += `Try to aim for above 80% to ensure steady progress. `;
-            }
+            insight = `
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: var(--neon-blue); margin-bottom: 10px; font-size: 1.2rem;">Pulse AI Insights</h3>
+                    <p style="color: var(--text-main); line-height: 1.5; font-size: 0.95rem;">Here is a breakdown of your recent performance based on the data you've logged.</p>
+                </div>
+                
+                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-green);">Streak Momentum:</b><br/>
+                    You are currently on a <b>${streaks.current}-day streak</b>! ${streaks.current > 3 ? "Fantastic consistency! Keep this momentum going." : "Every grand journey begins with a single step. Keep going!"}
+                </div>
 
-            if (topicSet.size > 0) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">📚</span> You've explored <b>${topicSet.size} unique topics</b> across your subjects, ensuring broad syllabus coverage. `;
-            }
-            
-            if (avgMockScore > 0) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">📝</span> `;
-                if (avgMockScore >= 80) insight += `Your recent mock exams average an excellent <b>${avgMockScore.toFixed(0)}%</b>. Keep up the high accuracy!`;
-                else if (avgMockScore >= 60) insight += `Your recent mock exams average <b>${avgMockScore.toFixed(0)}%</b>. Try to push past the 70% mark.`;
-                else insight += `Your recent mock exams average <b>${avgMockScore.toFixed(0)}%</b>. This indicates a need for deeper review of core concepts before the real exam.`;
-            } else {
-                insight += `<br/><br/><span style="font-size:1.1rem;">📝</span> You haven't taken any mock exams recently. Start testing your knowledge soon!`;
-            }
+                <div class="ai-insight-card" style="background: rgba(10,132,255,0.1); border-left: 4px solid var(--neon-blue); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-blue);">Study Focus:</b><br/>
+                    You've tackled <b>${topicSet.size} unique topics</b> recently. ${bestSubj ? `Your most studied subject is <b>${bName}</b>.` : ''} ${worstSubj ? `Consider spending more time on <b>${wName}</b> to ensure balanced preparation.` : ''}
+                </div>
+                
+                <div class="ai-insight-card" style="background: rgba(255,159,10,0.1); border-left: 4px solid var(--neon-gold); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-gold);">Practice Readiness:</b><br/>
+                    ${avgMockScore > 0 ? `Your mock exams average is <b>${avgMockScore.toFixed(0)}%</b>. ${avgMockScore >= 80 ? 'You are highly prepared for the real exam!' : 'Target specific weak areas to push your score above 80%.'}` : 'You haven\'t logged any mock tests recently. Regular practice under exam conditions is highly recommended.'}
+                </div>
+                
+                <div class="ai-insight-card" style="background: rgba(191,90,242,0.1); border-left: 4px solid var(--neon-purple); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-purple);">Schedule Adherence:</b><br/>
+                    Your task completion rate this week is <b>${scheduleRate.toFixed(0)}%</b>. ${scheduleRate > 75 ? 'Excellent discipline following your plan!' : 'Try breaking tasks down into smaller steps if you find yourself falling behind.'}
+                </div>
+            `;
         } else if (type === 'strengths') {
-            insight = `<b style="color:var(--neon-green); font-size:1.1rem;">Your Superpowers</b><br/><br/>`;
+            insight = `
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: var(--neon-green); margin-bottom: 10px; font-size: 1.2rem;">Your Superpowers</h3>
+                    <p style="color: var(--text-main); line-height: 1.5; font-size: 0.95rem;">These are the areas where you are excelling and outperforming your goals.</p>
+                </div>
+            `;
             
             if (bName) {
-                insight += `<span style="font-size:1.1rem;">⭐</span> <b>Deep Focus:</b> You have incredible dedication when studying <b>${bName}</b> (${(bestTime/3600).toFixed(1)} hours). It is clearly your strongest domain. `;
+                insight += `
+                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-green);">Deep Focus:</b><br/>
+                    You have incredible dedication when studying <b>${bName}</b> (${(bestTime/3600).toFixed(1)} hours). It is clearly your strongest domain.
+                </div>`;
             }
             
             if (scheduleTotal > 0 && scheduleRate >= 75) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Exceptional Planner:</b> You completed <b>${scheduleRate.toFixed(0)}%</b> of your scheduled tasks this week. Your time management is top-tier! `;
+                insight += `
+                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-green);">Exceptional Planner:</b><br/>
+                    You completed <b>${scheduleRate.toFixed(0)}%</b> of your scheduled tasks this week. Your time management is top-tier!
+                </div>`;
             }
             
             if (avgMockScore >= 75) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Exam Readiness:</b> With a recent mock average of ${avgMockScore.toFixed(0)}%, you are proving that you can perform under pressure.`;
+                insight += `
+                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-green);">Exam Readiness:</b><br/>
+                    With a recent mock average of <b>${avgMockScore.toFixed(0)}%</b>, you are proving that you can perform under pressure.
+                </div>`;
             } else if (streaks.best > 3) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">⭐</span> <b>Grit & Discipline:</b> You've proven you can maintain focus with a personal best streak of <b>${streaks.best} days</b>.`;
+                insight += `
+                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-green);">Grit & Discipline:</b><br/>
+                    You've proven you can maintain focus with a personal best streak of <b>${streaks.best} days</b>.
+                </div>`;
             }
+            
+            if (insight.indexOf('ai-insight-card') === -1) {
+                insight += `<div style="color: var(--text-muted); text-align: center; padding: 20px;">Keep logging your study sessions and tests to reveal your superpowers!</div>`;
+            }
+
         } else if (type === 'weaknesses') {
-            insight = `<b style="color:var(--neon-red); font-size:1.1rem;">Areas for Growth</b><br/><br/>`;
+            insight = `
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: var(--neon-red); margin-bottom: 10px; font-size: 1.2rem;">Areas for Growth</h3>
+                    <p style="color: var(--text-main); line-height: 1.5; font-size: 0.95rem;">Identify your weak spots and turn them into strengths.</p>
+                </div>
+            `;
             
             if (wName && wName !== bName) {
-                insight += `<span style="font-size:1.1rem;">🎯</span> <b>Procrastination Alert:</b> You are heavily avoiding <b>${wName}</b> (only ${(worstTime/3600).toFixed(1)} hours). Procrastination often hides behind the subjects we find most difficult. Tackle this subject first thing tomorrow morning! `;
+                insight += `
+                <div class="ai-insight-card" style="background: rgba(255,69,58,0.1); border-left: 4px solid var(--neon-red); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-red);">Procrastination Alert:</b><br/>
+                    You are heavily avoiding <b>${wName}</b> (only ${(worstTime/3600).toFixed(1)} hours). Procrastination often hides behind the subjects we find most difficult. Tackle this subject first thing tomorrow morning!
+                </div>`;
             }
             
             if (scheduleTotal > 0 && scheduleRate < 50) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">🎯</span> <b>Planning Fallacy:</b> You only completed <b>${scheduleRate.toFixed(0)}%</b> of your scheduled tasks this week. You might be scheduling too much at once. Try scheduling fewer, highly-focused blocks instead. `;
+                insight += `
+                <div class="ai-insight-card" style="background: rgba(255,69,58,0.1); border-left: 4px solid var(--neon-red); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-red);">Planning Fallacy:</b><br/>
+                    You only completed <b>${scheduleRate.toFixed(0)}%</b> of your scheduled tasks this week. You might be scheduling too much at once. Try scheduling fewer, highly-focused blocks instead.
+                </div>`;
             }
             
             if (topicSet.size > 0 && topicSet.size <= 3 && Object.keys(subjTotals).length > 1) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">🎯</span> <b>Tunnel Vision:</b> You've spent a lot of time recently but only covered <b>${topicSet.size} topics</b>. Make sure you aren't ignoring the rest of your syllabus!`;
+                insight += `
+                <div class="ai-insight-card" style="background: rgba(255,69,58,0.1); border-left: 4px solid var(--neon-red); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-red);">Tunnel Vision:</b><br/>
+                    You've spent a lot of time recently but only covered <b>${topicSet.size} topics</b>. Make sure you aren't ignoring the rest of your syllabus!
+                </div>`;
             }
             
             if (totalRecordedDays > 5 && attendanceRate < 60) {
-                insight += `<br/><br/><span style="font-size:1.1rem;">🎯</span> <b>Inconsistent Routine:</b> Your attendance rate is dropping (${attendanceRate.toFixed(0)}%). Remember, studying 2 hours every day is far better than studying 10 hours on one day!`;
+                insight += `
+                <div class="ai-insight-card" style="background: rgba(255,69,58,0.1); border-left: 4px solid var(--neon-red); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
+                    <b style="color: var(--neon-red);">📉 Inconsistent Routine:</b><br/>
+                    Your attendance rate is dropping (<b>${attendanceRate.toFixed(0)}%</b>). Remember, studying 2 hours every day is far better than studying 10 hours on one day!
+                </div>`;
+            }
+            
+            if (insight.indexOf('ai-insight-card') === -1) {
+                insight += `<div style="color: var(--text-muted); text-align: center; padding: 20px;">You are doing fantastic! We couldn't find any major weak spots right now.</div>`;
             }
         }
 
@@ -2597,8 +2657,8 @@ function initRetrospectiveLogging() {
         const subjectId = document.getElementById('logSubjectInput').value;
         const topic = document.getElementById('logTopicDropdown').value;
         const notes = document.getElementById('logNotesInput').value;
-        const hours = parseInt(document.getElementById('logHoursInput').value) || 0;
-        const minutes = parseInt(document.getElementById('logMinutesInput').value) || 0;
+        const hours = parseInt(document.getElementById('logHoursInput').value, 10) || 0;
+        const minutes = parseInt(document.getElementById('logMinutesInput').value, 10) || 0;
         
         if (!dateKey || !subjectId) return alert('Date and Subject are required.');
         
@@ -2799,9 +2859,9 @@ function initEditGoals() {
     });
 
     document.getElementById('saveGoalsBtn').addEventListener('click', () => {
-        AppState.goals.daily = parseInt(document.getElementById('goalDailyInput').value) || 8;
-        AppState.goals.weekly = parseInt(document.getElementById('goalWeeklyInput').value) || 40;
-        AppState.goals.monthly = parseInt(document.getElementById('goalMonthlyInput').value) || 160;
+        AppState.goals.daily = parseInt(document.getElementById('goalDailyInput').value, 10) || 8;
+        AppState.goals.weekly = parseInt(document.getElementById('goalWeeklyInput').value, 10) || 40;
+        AppState.goals.monthly = parseInt(document.getElementById('goalMonthlyInput').value, 10) || 160;
         
         saveData('goals');
         debouncedRenderOverview();
@@ -2990,6 +3050,10 @@ window.initApp = function() {
             document.getElementById('loadingOverlay').classList.remove('active');
         }, 500);
         
+        if (AppState.currentVersion !== 'v1.0.87' && AppState.currentVersion.startsWith('v1.0')) {
+        // Future migration hook if needed
+    }
+        
         const openAchBtn = document.getElementById('btnOpenAchievements');
         if (openAchBtn) {
             openAchBtn.addEventListener('click', () => {
@@ -3006,18 +3070,7 @@ window.initApp = function() {
             });
         }
         
-        // Push update popup automatically once per version
-        setTimeout(() => {
-            const lastSeenVersion = Storage.get('lastSeenWhatsNew', '');
-            if (lastSeenVersion !== AppState.currentVersion) {
-                if (window.showWhatsNewPopup) {
-                    window.showWhatsNewPopup();
-                    Storage.set('lastSeenWhatsNew', AppState.currentVersion);
-                }
-            }
-        }, 1000);
-        
-        
+
     } catch (error) {
         console.error("Init Error:", error);
         document.getElementById('loadingOverlay').classList.remove('active');
@@ -3664,8 +3717,8 @@ function initMocksAndPractice() {
     const addBtn = document.getElementById('practiceAddBtn');
     if (addBtn) {
         addBtn.onclick = () => {
-        const addAtt = parseInt(document.getElementById('practiceAddAttempted').value) || 0;
-        const addCor = parseInt(document.getElementById('practiceAddCorrect').value) || 0;
+        const addAtt = parseInt(document.getElementById('practiceAddAttempted').value, 10) || 0;
+        const addCor = parseInt(document.getElementById('practiceAddCorrect').value, 10) || 0;
         if(addAtt === 0 && addCor === 0) return;
         
         const c = document.getElementById('practiceCourseInput')?.value;
@@ -4016,7 +4069,7 @@ function analyzeReportText(text) {
     else if(hoursMatch2) totalHours = parseFloat(hoursMatch2[1]);
     
     const attMatch = text.match(/Attendance\s*Percentage:?\s*(\d+)%/i);
-    if(attMatch) attendance = parseInt(attMatch[1]);
+    if(attMatch) attendance = parseInt(attMatch[1], 10);
     
     document.getElementById('analyzerHours').textContent = totalHours > 0 ? `${totalHours}h` : 'N/A';
     document.getElementById('analyzerAttendance').textContent = attendance > 0 ? `${attendance}%` : 'N/A';
@@ -4110,7 +4163,7 @@ function renderNotifications() {
         let color = 'var(--neon-blue)';
         let icon = '🔔';
         if (n.type === 'success') { color = 'var(--neon-green)'; icon = '✅'; }
-        if (n.type === 'warning') { color = 'var(--neon-red)'; icon = '⚠️'; }
+        if (n.type === 'warning' || n.type === 'error') { color = 'var(--neon-red)'; icon = '⚠️'; }
         if (n.type === 'goal') { color = 'var(--neon-gold)'; icon = '🎯'; }
         
         const div = document.createElement('div');
@@ -4678,12 +4731,21 @@ function installUpdate() {
     // Force cloud sync with updated systemState so cloud is also up to date
     if (typeof window.triggerCloudSync === 'function') window.triggerCloudSync();
 
-    // If there's a service worker, tell it to skip waiting so new cache takes over
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
-        setTimeout(() => {
+    const doReload = () => {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        } else {
             window.location.reload();
-        }, 500);
+        }
+    };
+
+    if (window.firebaseAuth && window.firebaseAuth.currentUser && typeof syncDataToCloud === 'function') {
+        syncDataToCloud(window.firebaseAuth.currentUser.uid).then(doReload).catch(doReload);
+    } else {
+        doReload();
     }
 }
 
@@ -4704,6 +4766,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 ]
             });
             alert('System Update Triggered! Check the sidebar for the new Software Update tab.');
+        });
+    }
+
+    // Initialize beta toggle
+    const betaToggle = document.getElementById('betaUpdatesToggle');
+    const isOptedIn = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    if (betaToggle) {
+        betaToggle.checked = isOptedIn;
+    }
+    const betaBadge = document.getElementById('betaBadgeProfile');
+    if (betaBadge) {
+        betaBadge.style.display = isOptedIn ? 'inline-block' : 'none';
+    }
+
+    const backupBtn = document.getElementById('btnBackupData');
+    if (backupBtn) {
+        backupBtn.addEventListener('click', () => {
+            const dataStr = JSON.stringify(AppState, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `academicpulse_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            addNotification('Backup Complete', 'Your data has been successfully exported.', 'success');
         });
     }
 
@@ -4737,7 +4825,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check for updates shortly after load
         setTimeout(() => {
             if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_FOR_UPDATES' });
+                const isBeta = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_FOR_UPDATES', isBeta });
             }
         }, 5000);
     }
@@ -4957,8 +5046,8 @@ window.saveEditAttendance = function() {
     const date = document.getElementById('editAttendanceDate').value;
     const subj = document.getElementById('editAttendanceSubject').value;
     const notes = document.getElementById('editAttendanceNotes').value;
-    const h = parseInt(document.getElementById('editAttendanceHours').value) || 0;
-    const m = parseInt(document.getElementById('editAttendanceMinutes').value) || 0;
+    const h = parseInt(document.getElementById('editAttendanceHours').value, 10) || 0;
+    const m = parseInt(document.getElementById('editAttendanceMinutes').value, 10) || 0;
     
     const session = AppState.sessions.find(s => s.id === id);
     if (!session) return;
@@ -5021,8 +5110,8 @@ window.editPractice = function(id) {
 window.saveEditPractice = function() {
     const id = document.getElementById('editPracticeId').value;
     const date = document.getElementById('editPracticeDate').value;
-    const attempted = parseInt(document.getElementById('editPracticeAttempted').value) || 0;
-    const correct = parseInt(document.getElementById('editPracticeCorrect').value) || 0;
+    const attempted = parseInt(document.getElementById('editPracticeAttempted').value, 10) || 0;
+    const correct = parseInt(document.getElementById('editPracticeCorrect').value, 10) || 0;
     const notes = document.getElementById('editPracticeNotes').value || '';
     
     if (!date || attempted < 1) return alert("Valid date and attempted questions > 0 are required.");
@@ -5131,7 +5220,7 @@ function initFocusMode() {
         if (mode === 'pomodoro') {
             modePomodoroBtn.classList.add('active');
             document.getElementById('pomodoroConfigContainer').style.display = 'inline-block';
-            let mins = parseInt(durationInput.value) || 25;
+            let mins = parseInt(durationInput.value, 10) || 25;
             focusSecondsRemaining = mins * 60;
         } else {
             document.getElementById('pomodoroConfigContainer').style.display = 'none';
@@ -5154,7 +5243,7 @@ function initFocusMode() {
 
     durationInput.addEventListener('change', () => {
         if (focusMode === 'pomodoro' && focusState === 'stopped') {
-            let mins = parseInt(durationInput.value) || 25;
+            let mins = parseInt(durationInput.value, 10) || 25;
             focusSecondsRemaining = mins * 60;
             updateDisplay();
         }
@@ -5217,7 +5306,7 @@ function initFocusMode() {
         pauseBtn.style.display = 'none';
         
         if (focusMode === 'pomodoro') {
-            let mins = parseInt(durationInput.value) || 25;
+            let mins = parseInt(durationInput.value, 10) || 25;
             focusSecondsRemaining = mins * 60;
         } else if (focusMode === 'shortBreak') {
             focusSecondsRemaining = 5 * 60;
@@ -5236,7 +5325,7 @@ function initFocusMode() {
     function showLogOptions() {
         if (focusMode === 'shortBreak' || focusMode === 'longBreak') return; 
         
-        let totalSecs = focusMode === 'stopwatch' ? focusStopwatchSeconds : (parseInt(durationInput.value) || 25) * 60;
+        let totalSecs = focusMode === 'stopwatch' ? focusStopwatchSeconds : (parseInt(durationInput.value, 10) || 25) * 60;
         let mins = Math.floor(totalSecs / 60);
         
         if (mins < 1) return; 
@@ -5289,6 +5378,7 @@ function initSchedule() {
     document.getElementById('tabScheduleToday').addEventListener('click', () => setScheduleTab('today'));
     document.getElementById('tabScheduleUpcoming').addEventListener('click', () => setScheduleTab('upcoming'));
     document.getElementById('tabSchedulePast').addEventListener('click', () => setScheduleTab('past'));
+    document.getElementById('tabScheduleRevision').addEventListener('click', () => setScheduleTab('revision'));
     
     document.getElementById('addScheduleBtn').addEventListener('click', () => openScheduleModal());
     document.getElementById('saveScheduleBtn').addEventListener('click', saveSchedulePlan);
@@ -5307,26 +5397,25 @@ function initSchedule() {
     document.getElementById('scheduleSubjectInput').addEventListener('change', (e) => {
         populateScheduleTopics(e.target.value);
     });
-
-    document.getElementById('scheduleTopicDropdown').addEventListener('change', (e) => {
-        // ... (removed custom topic logic)
-    });
 }
 
 function updateScheduleModalFields() {
     const type = document.getElementById('scheduleTypeInput').value;
     const isExamReg = type === 'exam_register';
+    const isRevision = type === 'revision';
     
     const standardFields = document.getElementById('scheduleStandardFields');
     const examRegFields = document.getElementById('scheduleExamRegFields');
     const timeFields = document.getElementById('scheduleTimeFields');
+    const revisionFields = document.getElementById('scheduleRevisionFields');
     const dateLabel = document.querySelector('#scheduleDateInput')?.previousElementSibling;
 
     if (standardFields) standardFields.style.display = isExamReg ? 'none' : 'block';
     if (examRegFields) examRegFields.style.display = isExamReg ? 'block' : 'none';
     if (timeFields) timeFields.style.display = isExamReg ? 'none' : 'flex';
+    if (revisionFields) revisionFields.style.display = isRevision ? 'block' : 'none';
     
-    // For exam_register, the Date field label changes to "Registration Planning Date"
+    // For exam_register, the Date field label changes
     if (dateLabel && dateLabel.tagName === 'LABEL') {
         dateLabel.textContent = isExamReg ? 'Registration Planning Date' : 'Date';
     }
@@ -5421,21 +5510,62 @@ function populateScheduleSubjects(course) {
     if(filtered.length > 0) {
         populateScheduleTopics(filtered[0].id);
     } else {
-        document.getElementById('scheduleTopicDropdown').innerHTML = '<option value="">-- Select a Topic (Optional) --</option>';
+        const td = document.getElementById('scheduleTopicDropdown');
+        if (td) td.innerHTML = '<option value="">-- No topic --</option>';
     }
 }
 
-function populateScheduleTopics(subjId) {
-    const topicDropdown = document.getElementById('scheduleTopicDropdown');
-    topicDropdown.innerHTML = '<option value="">-- Select a Topic (Optional) --</option>';
+// ── Topic dropdown (standard single select -> multiple chips) ─────────────────
+window._selectedScheduleTopics = [];
+
+window.onTopicSelected = function() {
+    const td = document.getElementById('scheduleTopicDropdown');
+    const val = td.value;
+    if (val && !window._selectedScheduleTopics.includes(val)) {
+        window._selectedScheduleTopics.push(val);
+        renderScheduleTopicChips();
+    }
+    td.value = ''; // Reset dropdown after selection
+};
+
+function renderScheduleTopicChips() {
+    const chipsDiv = document.getElementById('scheduleTopicChips');
+    if (!chipsDiv) return;
     
+    if (window._selectedScheduleTopics.length === 0) {
+        chipsDiv.innerHTML = '';
+        return;
+    }
+    
+    chipsDiv.innerHTML = window._selectedScheduleTopics.map(t =>
+        `<span style="display:inline-flex; align-items:center; gap:5px; background:rgba(255,214,10,0.15); color:var(--neon-gold); border:1px solid rgba(255,214,10,0.35); padding:3px 10px; border-radius:20px; font-size:0.78rem; font-weight:600;">
+            ${escapeHtml(t)}
+            <button onclick="window.removeScheduleTopic(event, ${escapeHtml(JSON.stringify(t))})" type="button" style="background:none; border:none; cursor:pointer; color:inherit; font-size:0.85rem; padding:0; line-height:1;">&times;</button>
+        </span>`
+    ).join('');
+}
+
+window.removeScheduleTopic = function(e, topic) {
+    if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+    window._selectedScheduleTopics = window._selectedScheduleTopics.filter(t => t !== topic);
+    renderScheduleTopicChips();
+};
+
+function populateScheduleTopics(subjId) {
+    const dropdown = document.getElementById('scheduleTopicDropdown');
+    if (!dropdown) return;
+    dropdown.innerHTML = '<option value="">-- Add a Topic (Optional) --</option>';
+
     const subj = AppState.subjects.find(s => s.id === subjId);
     if (!subj) return;
-    
+
     let syllabusTopics = null;
     const currentViewCourse = subj.course || 'CSEB';
     const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
-    
+
     if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
         const key = Object.keys(AppState.csebSyllabus).find(k => {
             const cleanK = k.toLowerCase();
@@ -5445,24 +5575,25 @@ function populateScheduleTopics(subjId) {
     } else if (currentViewCourse === 'ACCA' && AppState.accaTopics) {
         syllabusTopics = [].concat(...Object.values(AppState.accaTopics));
     }
-    
-    if (syllabusTopics) {
+
+    if (syllabusTopics && syllabusTopics.length > 0) {
         syllabusTopics.forEach(t => {
             const name = t.name || t.topic || t;
             const opt = document.createElement('option');
             opt.value = name;
             opt.textContent = name;
-            topicDropdown.appendChild(opt);
+            dropdown.appendChild(opt);
         });
     }
 }
 
 function setScheduleTab(tab) {
     currentScheduleTab = tab;
-    ['tabScheduleToday', 'tabScheduleUpcoming', 'tabSchedulePast'].forEach(id => {
+    ['tabScheduleToday', 'tabScheduleUpcoming', 'tabSchedulePast', 'tabScheduleRevision'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
-        if (id.toLowerCase().includes(tab)) {
+        const tabKey = id.replace('tabSchedule', '').toLowerCase();
+        if (tabKey === tab) {
             el.style.background = 'var(--glass-bg)';
             el.style.border = '1px solid var(--glass-border)';
             el.style.color = 'var(--text-main)';
@@ -5490,8 +5621,22 @@ window.openScheduleModal = function(id = null) {
         if (item.subjectId) {
             document.getElementById('scheduleSubjectInput').value = item.subjectId;
             populateScheduleTopics(item.subjectId);
-            if (item.topic) document.getElementById('scheduleTopicDropdown').value = item.topic;
+            const savedTopics = item.topics && item.topics.length > 0 ? item.topics : (item.topic ? [item.topic] : []);
+            window._selectedScheduleTopics = [...savedTopics];
+            setTimeout(() => {
+                renderScheduleTopicChips();
+                const td = document.getElementById('scheduleTopicDropdown');
+                if (td) td.value = '';
+            }, 50);
         }
+        // Restore revision fields
+        if (item.type === 'revision') {
+            const revMethod = document.getElementById('scheduleRevisionMethod');
+            const revIntensity = document.getElementById('scheduleRevisionIntensity');
+            if (revMethod && item.revisionMethod) revMethod.value = item.revisionMethod;
+            if (revIntensity && item.revisionIntensity) revIntensity.value = item.revisionIntensity;
+        }
+
         document.getElementById('scheduleTitleInput').value = item.title || '';
         document.getElementById('scheduleDateInput').value = item.date;
         document.getElementById('scheduleStartTimeInput').value = item.startTime || '10:00';
@@ -5520,12 +5665,23 @@ window.openScheduleModal = function(id = null) {
         document.getElementById('scheduleDateInput').value = today;
         document.getElementById('scheduleStartTimeInput').value = '10:00';
         document.getElementById('scheduleEndTimeInput').value = '11:00';
+        
+        // Reset topic selection
+        window._selectedScheduleTopics = [];
+        renderScheduleTopicChips();
+        const tdReset = document.getElementById('scheduleTopicDropdown');
+        if (tdReset) tdReset.value = '';
         // Reset exam reg fields
         ['scheduleExamRegTitle','scheduleExamNotifNo','scheduleExamRegNo','scheduleExamNotes'].forEach(id => {
             const el = document.getElementById(id); if (el) el.value = '';
         });
         const examDateEl = document.getElementById('scheduleExamDate');
         if (examDateEl) examDateEl.value = '';
+        // Reset revision fields
+        const revMethod = document.getElementById('scheduleRevisionMethod');
+        const revIntensity = document.getElementById('scheduleRevisionIntensity');
+        if (revMethod) revMethod.value = 'past_questions';
+        if (revIntensity) revIntensity.value = 'light';
     }
     updateScheduleModalFields();
     modal.classList.add('active');
@@ -5581,10 +5737,13 @@ function saveSchedulePlan() {
     // Standard types
     const course = document.getElementById('scheduleCourseInput').value;
     const subjectId = document.getElementById('scheduleSubjectInput').value;
-    const topic = document.getElementById('scheduleTopicDropdown').value;
+    const topics = window._selectedScheduleTopics.length > 0 ? [...window._selectedScheduleTopics] : [];
+    const topic = topics[0] || ''; // legacy compat single-topic field
     const title = document.getElementById('scheduleTitleInput').value.trim();
     const startTime = document.getElementById('scheduleStartTimeInput').value;
     const endTime = document.getElementById('scheduleEndTimeInput').value;
+    const revisionMethod = document.getElementById('scheduleRevisionMethod')?.value || '';
+    const revisionIntensity = document.getElementById('scheduleRevisionIntensity')?.value || '';
     
     if (!subjectId || !date || !startTime || !endTime) {
         return alert('Please fill in all required fields (Subject, Date, Times)');
@@ -5596,11 +5755,16 @@ function saveSchedulePlan() {
             item.type = type;
             item.course = course;
             item.subjectId = subjectId;
+            item.topics = topics;
             item.topic = topic;
             item.title = title;
             item.date = date;
             item.startTime = startTime;
             item.endTime = endTime;
+            if (type === 'revision') {
+                item.revisionMethod = revisionMethod;
+                item.revisionIntensity = revisionIntensity;
+            }
             // Reset status so rescheduled/edited missed items become pending again
             if (item.status === 'missed') item.status = 'pending';
         }
@@ -5610,12 +5774,15 @@ function saveSchedulePlan() {
             type,
             course,
             subjectId,
+            topics,
             topic,
             title,
             date,
             startTime,
             endTime,
-            status: 'pending' // pending, completed
+            revisionMethod: type === 'revision' ? revisionMethod : undefined,
+            revisionIntensity: type === 'revision' ? revisionIntensity : undefined,
+            status: 'pending'
         });
     }
     
@@ -5714,6 +5881,7 @@ function renderScheduleList() {
         if (currentScheduleTab === 'today') return s.date === todayStr;
         if (currentScheduleTab === 'upcoming') return s.date > todayStr;
         if (currentScheduleTab === 'past') return s.date < todayStr;
+        if (currentScheduleTab === 'revision') return s.type === 'revision';
         return false;
     });
     
@@ -5732,12 +5900,14 @@ function renderScheduleList() {
         const isClass = item.type === 'class';
         const isPending = item.type === 'pending_topic';
         const isMock = item.type === 'mock_test';
+        const isRevision = item.type === 'revision';
         let color = 'var(--neon-blue)';
         let icon = '&#128218;';
         if (isClass) { color = 'var(--neon-purple)'; icon = '&#127979;'; }
         else if (isPending) { color = 'var(--neon-gold)'; icon = '&#128203;'; }
         else if (isMock) { color = 'var(--neon-red)'; icon = '&#127919;'; }
         else if (item.type === 'exam_register') { color = 'var(--neon-green)'; icon = '&#128196;'; }
+        else if (isRevision) { color = '#00d4aa'; icon = '&#128260;'; }
         
         const card = document.createElement('div');
         card.style.background = 'var(--glass-bg)';
@@ -5792,15 +5962,32 @@ function renderScheduleList() {
         } else {
             const subj = AppState.subjects.find(s => s.id === item.subjectId);
             const subjName = subj ? subj.name : 'Unknown Subject';
-            const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');
+            // Support both new multi-topics array and legacy single topic
+            const topicsArr = (item.topics && item.topics.length > 0) ? item.topics : (item.topic ? [item.topic] : []);
+            const topicDisplay = topicsArr.length > 0
+                ? topicsArr.map(t => `<span style="display:inline-block; background:rgba(255,214,10,0.12); color:var(--neon-gold); border:1px solid rgba(255,214,10,0.3); border-radius:12px; padding:2px 9px; font-size:0.72rem; font-weight:600; margin-right:4px;">${escapeHtml(t)}</span>`).join('')
+                : '';
+            const displayTitle = [subjName, item.title].filter(Boolean).join(' — ');
+            
+            // Revision badges
+            const methodLabels = { past_questions: '📋 Past Questions', flash_cards: '⚡ Flash Cards', reread_notes: '📖 Re-read Notes', mind_map: '💡 Mind Map', practice_problems: '✏️ Practice Problems' };
+            const intensityLabels = { light: '🟢 Easy Review', active: '🟡 Active Recall', full: '🔴 Full Revision' };
+            const isRevision = item.type === 'revision';
+            const revisionBadges = isRevision ? `
+                <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">
+                    ${item.revisionMethod ? `<span style="background:rgba(0,212,170,0.12); color:#00d4aa; border:1px solid rgba(0,212,170,0.3); border-radius:10px; padding:2px 9px; font-size:0.72rem; font-weight:600;">${escapeHtml(methodLabels[item.revisionMethod] || item.revisionMethod)}</span>` : ''}
+                    ${item.revisionIntensity ? `<span style="background:rgba(255,255,255,0.06); color:var(--text-muted); border:1px solid var(--glass-border); border-radius:10px; padding:2px 9px; font-size:0.72rem;">${escapeHtml(intensityLabels[item.revisionIntensity] || item.revisionIntensity)}</span>` : ''}
+                </div>` : '';
             cardBody = `
                 ${dateDisp}
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px;">
-                    <div style="display:flex; align-items:center; gap:10px; flex: 1; min-width: 0;">
-                        <div style="width:30px; height:30px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);">${icon}</div>
+                    <div style="display:flex; align-items:flex-start; gap:10px; flex: 1; min-width: 0;">
+                        <div style="width:30px; height:30px; flex-shrink: 0; border-radius:50%; background:var(--glass-bg); color:var(--text-main); display:flex; align-items:center; justify-content:center; font-size:1.1rem; box-shadow:0 2px 5px rgba(0,0,0,0.2); margin-top:2px;">${icon}</div>
                         <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight:600; font-size:1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
-                            <div style="font-size:0.85rem; color:var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}</div>
+                            <div style="font-weight:600; font-size:1.05rem; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
+                            <div style="font-size:0.85rem; color:var(--text-muted);">${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}</div>
+                            ${topicsArr.length > 0 ? `<div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:3px;">${topicDisplay}</div>` : ''}
+                            ${revisionBadges}
                         </div>
                     </div>
                     <div style="display:flex; gap:5px; flex-shrink: 0;">
@@ -5857,6 +6044,7 @@ function renderOverviewScheduleWidget() {
         else if (isPending) { color = 'var(--neon-gold)'; icon = '&#128203;'; }
         else if (isMock) { color = 'var(--neon-red)'; icon = '&#127919;'; }
         else if (isExamReg) { color = 'var(--neon-green)'; icon = '&#128196;'; }
+        else if (item.type === 'revision') { color = '#00d4aa'; icon = '&#128260;'; }
         
         if (isExamReg) {
             html += `

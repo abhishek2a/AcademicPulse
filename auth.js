@@ -143,16 +143,32 @@ async function syncDataToCloud(uid) {
         });
     } catch (error) {
         console.error("Error saving to cloud:", error);
+        if (window.addNotification) {
+            window.addNotification('Cloud Sync Failed', 'Could not save data to the cloud. Check your connection.', 'warning');
+        }
     }
 }
 
 let syncTimer = null;
-// Global function to trigger sync on saveData
+// Global function to trigger sync on saveData (debounced)
 window.triggerCloudSync = () => {
     if (auth.currentUser) {
-        syncDataToCloud(auth.currentUser.uid);
+        if (syncTimer) clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => {
+            syncDataToCloud(auth.currentUser.uid);
+            syncTimer = null;
+        }, 2000);
     }
 }
+
+// Ensure data is synced safely if the user leaves the page
+window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && syncTimer && auth.currentUser) {
+        clearTimeout(syncTimer);
+        syncTimer = null;
+        syncDataToCloud(auth.currentUser.uid);
+    }
+});
 
 // Login
 document.getElementById('loginForm').addEventListener('submit', (e) => {

@@ -941,10 +941,11 @@
                 </button>
             </div>
             
-            <div class="schedule-tabs" style="display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px;">
+            <div class="schedule-tabs" style="display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; flex-wrap:wrap;">
                 <button class="btn" id="tabScheduleToday" style="background: var(--glass-bg); border: 1px solid var(--glass-border);">Today</button>
                 <button class="btn" id="tabScheduleUpcoming" style="background: transparent; border: 1px solid transparent; color: var(--text-muted);">Upcoming</button>
                 <button class="btn" id="tabSchedulePast" style="background: transparent; border: 1px solid transparent; color: var(--text-muted);">Past</button>
+                <button class="btn" id="tabScheduleRevision" style="background: transparent; border: 1px solid transparent; color: var(--text-muted);">Revision</button>
             </div>
 
             <div id="scheduleListContainer" style="display: flex; flex-direction: column; gap: 12px;">
@@ -1016,7 +1017,21 @@
                         <span style="font-size: 0.85rem; color: var(--text-muted);">View the latest features and updates</span>
                     </div>
                     <button onclick="showWhatsNewPopup()" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.9rem; color: var(--neon-blue); border-color: var(--neon-blue);">What's New</button>
-                </div>                <!-- Subscriptions -->
+                </div>
+                
+                <!-- Beta Updates Settings -->
+                <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin-top: 0; margin-bottom: 5px; font-size: 0.95rem; color: var(--text-main);">Beta Updates</h3>
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">Receive early access to experimental features</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="betaUpdatesToggle" onchange="window.toggleBetaUpdates(this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <!-- Subscriptions -->
                 <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px;">
                     <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Active Subscriptions</h3>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--glass-border);">
@@ -1048,7 +1063,8 @@
                 </form>
 
                 <div style="text-align: center; margin-top: 40px;">
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version <span id="appVersionTextProfile">v1.1.21</span></p>
+                    <button id="btnBackupData" class="btn btn-outline" style="width: 100%; margin-bottom: 20px; border-color: var(--neon-gold); color: var(--neon-gold);">Export / Backup Data</button>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">App Version <span id="appVersionTextProfile">v1.1.21</span> <span id="betaBadgeProfile" style="display:none; background: var(--neon-purple); color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 5px; text-transform: uppercase;">Beta</span></p>
                     <button id="btnLogout" class="btn" style="background: var(--neon-red); color: var(--text-main); margin-top: 10px; border: none; width: 100%;">Logout</button>
                 </div>
             </div>
@@ -1089,7 +1105,7 @@
                 
                 <div style="display: flex; gap: 20px; justify-content: center; align-items: center; margin-top: 30px;">
                     <button class="btn btn-outline" id="cancelUpdateBtn" style="padding: 16px 30px; font-size: 1.1rem; border-radius: 30px; border-color: rgba(255,255,255,0.2); color: var(--text-muted); min-width: 150px;">Not Now</button>
-                    <button class="btn" id="installUpdateBtn" style="padding: 16px 45px; font-size: 1.1rem; border-radius: 30px; background: var(--neon-blue); color: #000; font-weight: 600; box-shadow: 0 10px 20px rgba(10, 132, 255, 0.3); min-width: 250px;">Install & Relaunch</button>
+                    <button class="btn" id="installUpdateBtn" style="padding: 16px 45px; font-size: 1.1rem; border-radius: 30px; background: var(--neon-blue); color: #000; font-weight: 600; box-shadow: 0 10px 20px rgba(10, 132, 255, 0.3); min-width: 250px;">Update Now</button>
                 </div>
             </div>
         </section>
@@ -1270,6 +1286,7 @@
                 <label>Type</label>
                 <select id="scheduleTypeInput">
                     <option value="study">&#128218; Self Study</option>
+                    <option value="revision">&#128260; Revision</option>
                     <option value="class">&#127979; Class</option>
                     <option value="pending_topic">&#128203; Pending Topic</option>
                     <option value="mock_test">&#127919; Mock Test</option>
@@ -1297,15 +1314,41 @@
                 </div>
                 
                 <div class="form-group">
-                    <label>Syllabus Topic (Optional)</label>
-                    <select id="scheduleTopicDropdown">
-                        <option value="">-- Select a Topic --</option>
+                    <label>Syllabus Topic(s) (Optional)</label>
+                    <select id="scheduleTopicDropdown" onchange="window.onTopicSelected()">
+                        <option value="">-- Add a Topic (Optional) --</option>
                     </select>
+                    <!-- Selected topics chips display -->
+                    <div id="scheduleTopicChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; min-height:0;"></div>
                 </div>
                 
                 <div class="form-group">
                     <label>Title / Notes (Optional)</label>
                     <input type="text" id="scheduleTitleInput" placeholder="e.g. Chapter 4 Review">
+                </div>
+
+                <!-- Revision-specific fields -->
+                <div id="scheduleRevisionFields" style="display:none;">
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                        <div class="form-group" style="flex:1; min-width:140px;">
+                            <label>Revision Method</label>
+                            <select id="scheduleRevisionMethod">
+                                <option value="past_questions">&#128203; Past Questions</option>
+                                <option value="flash_cards">&#9889; Flash Cards</option>
+                                <option value="reread_notes">&#128366; Re-read Notes</option>
+                                <option value="mind_map">&#128161; Mind Map</option>
+                                <option value="practice_problems">&#9997;&#65039; Practice Problems</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1; min-width:140px;">
+                            <label>Intensity</label>
+                            <select id="scheduleRevisionIntensity">
+                                <option value="light">&#128994; Easy Review</option>
+                                <option value="active">&#128993; Active Recall</option>
+                                <option value="full">&#128308; Full Revision</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1678,7 +1721,7 @@
     
     <script src="auth.js?v=14"></script>
     <script src="ai.js?v=4"></script>
-    <script src="app.js?v=98"></script>
+    <script src="app.js?v=109"></script>
     <script src="export.js?v=10"></script>
 </body>
 </html>

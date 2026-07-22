@@ -532,8 +532,10 @@ window.toggleBetaUpdates = function(optIn) {
     if (profileV) profileV.textContent = AppState.currentVersion;
 
     if (optIn) {
+        alert("You have successfully opted into the Beta channel! Your version has been upgraded to beta. Please hard refresh (Ctrl + F5) to apply changes.");
         addNotification('Beta Updates Enabled', 'You are now opted in to receive experimental features.', 'success');
     } else {
+        alert("You have opted out of the Beta channel. Your version has been reverted to the stable release. Please hard refresh (Ctrl + F5) to apply changes.");
         addNotification('Beta Updates Disabled', 'Your version has been reverted to stable.', 'info');
     }
 };

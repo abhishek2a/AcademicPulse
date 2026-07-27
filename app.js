@@ -525,18 +525,24 @@ window.toggleBetaUpdates = function(optIn) {
     if (badge) badge.style.display = optIn ? 'inline-block' : 'none';
     
     // Auto-update version when they switch channels and save to cloud
-    AppState.currentVersion = optIn ? 'v1.0.88-beta' : 'v1.0.87';
+    AppState.currentVersion = optIn ? 'v1.0.89-beta' : 'v1.0.87';
     saveData('system');
     
     const profileV = document.getElementById('appVersionTextProfile');
     if (profileV) profileV.textContent = AppState.currentVersion;
 
-    if (optIn) {
-        alert("You have successfully opted into the Beta channel! Your version has been upgraded to beta. Please hard refresh (Ctrl + F5) to apply changes.");
-        addNotification('Beta Updates Enabled', 'You are now opted in to receive experimental features.', 'success');
+    const msg = optIn 
+        ? "You have successfully opted into the Beta channel! Your version is being upgraded... The app will now restart." 
+        : "You have opted out of the Beta channel. Your version is being reverted to stable... The app will now restart.";
+    
+    alert(msg);
+
+    if (window.firebaseAuth && window.firebaseAuth.currentUser && typeof syncDataToCloud === 'function') {
+        syncDataToCloud(window.firebaseAuth.currentUser.uid)
+            .then(() => window.location.reload())
+            .catch(() => window.location.reload());
     } else {
-        alert("You have opted out of the Beta channel. Your version has been reverted to the stable release. Please hard refresh (Ctrl + F5) to apply changes.");
-        addNotification('Beta Updates Disabled', 'Your version has been reverted to stable.', 'info');
+        window.location.reload();
     }
 };
 
@@ -1494,16 +1500,27 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, isFocusMode: s.isFocusMode });
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, isFocusMode: s.isFocusMode, type: s.type });
     });
 
+    const typeLabels = {
+        'study': '📚 Self Study',
+        'revision': '🔄 Revision',
+        'class': '🏫 Class',
+        'pending_topic': '📑 Pending Topic',
+        'mock_test': '🎯 Mock Test'
+    };
+
     // Build HTML with placeholders, then fill in user-supplied text safely via textContent
-    let html = sessionDataForRender.map((d, i) => `
+    let html = sessionDataForRender.map((d, i) => {
+        const typeHtml = d.type && typeLabels[d.type] ? `<span style="background:rgba(255,255,255,0.1); color:var(--text-main); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid var(--glass-border);">${typeLabels[d.type]}</span>` : '';
+        return `
         <div class="report-session-item" style="border-left: 4px solid ${d.color}">
             <div class="report-session-header">
                 <div>
                     <span class="rsi-subj-${i}"></span>
                     ${d.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">✨ FOCUS</span>` : ''}
+                    ${typeHtml}
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: var(--neon-blue);">${d.timeStr}</span>
@@ -1514,7 +1531,7 @@ function renderDayReport(dateKey) {
             <div class="rsi-topic-${i}" style="font-size:0.85rem; font-weight:600; color:var(--text-main); margin-bottom:2px;"></div>
             <div class="rsi-notes-${i} report-session-notes"></div>
         </div>
-    `).join('');
+    `}).join('');
 
     let totalHrs = 0;
     let totalMins = 0;
@@ -2689,6 +2706,7 @@ function initRetrospectiveLogging() {
         const subjectId = document.getElementById('logSubjectInput').value;
         const topic = document.getElementById('logTopicDropdown').value;
         const notes = document.getElementById('logNotesInput').value;
+        const type = document.getElementById('logTypeInput').value;
         const hours = parseInt(document.getElementById('logHoursInput').value, 10) || 0;
         const minutes = parseInt(document.getElementById('logMinutesInput').value, 10) || 0;
         
@@ -2725,6 +2743,7 @@ function initRetrospectiveLogging() {
             subjectId: subjectId,
             topic: topic,
             notes: notes,
+            type: type,
             startTime: sessionStart.toISOString(),
             endTime: sessionEnd.toISOString(),
             duration: durationSecs,
@@ -5099,6 +5118,11 @@ window.editAttendance = function(id) {
     document.getElementById('editAttendanceSubject').value = session.subjectId;
     
     document.getElementById('editAttendanceNotes').value = session.notes || '';
+    if (session.type) {
+        document.getElementById('editAttendanceType').value = session.type;
+    } else {
+        document.getElementById('editAttendanceType').value = 'study'; // default
+    }
     
     const durSecs = session.duration || 0;
     const h = Math.floor(durSecs / 3600);
@@ -5160,6 +5184,7 @@ window.saveEditAttendance = function() {
     const date = document.getElementById('editAttendanceDate').value;
     const subj = document.getElementById('editAttendanceSubject').value;
     const notes = document.getElementById('editAttendanceNotes').value;
+    const type = document.getElementById('editAttendanceType').value;
     const h = parseInt(document.getElementById('editAttendanceHours').value, 10) || 0;
     const m = parseInt(document.getElementById('editAttendanceMinutes').value, 10) || 0;
     
@@ -5198,6 +5223,7 @@ window.saveEditAttendance = function() {
     session.endTime = sessionEnd.toISOString();
     session.subjectId = subj;
     session.notes = notes;
+    session.type = type;
     session.duration = durSecs;
     
     saveData('sessions');

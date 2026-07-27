@@ -524,15 +524,17 @@ window.toggleBetaUpdates = function(optIn) {
     const badge = document.getElementById('betaBadgeProfile');
     if (badge) badge.style.display = optIn ? 'inline-block' : 'none';
     
-    // Auto-update version when they switch channels and save to cloud
-    AppState.currentVersion = optIn ? 'v1.0.89-beta' : 'v1.0.87';
+    if (!optIn) {
+        // Only force version downgrade when opting out
+        AppState.currentVersion = 'v1.0.87';
+    }
     saveData('system');
     
     const profileV = document.getElementById('appVersionTextProfile');
     if (profileV) profileV.textContent = AppState.currentVersion;
 
     const msg = optIn 
-        ? "You have successfully opted into the Beta channel! Your version is being upgraded... The app will now restart." 
+        ? "You have successfully opted into the Beta channel! The app will now restart. Please check for updates in the Software Update tab to install the latest beta." 
         : "You have opted out of the Beta channel. Your version is being reverted to stable... The app will now restart.";
     
     alert(msg);
@@ -3082,6 +3084,10 @@ window.initApp = function() {
         initSchedule();
         initWorkout();
         debouncedRenderOverview();
+
+        if (typeof window.checkForUpdates === 'function') {
+            window.checkForUpdates(null);
+        }
         
         // Start live clock — only update the date/time display, not full render
         if (window._overviewInterval) clearInterval(window._overviewInterval);

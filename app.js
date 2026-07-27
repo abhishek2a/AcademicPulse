@@ -552,13 +552,12 @@ window.showWhatsNewPopup = async function() {
     let description, features;
 
     if (isBeta) {
-        description = "You're on <b>v1.0.88 Beta</b> — the Question Bank Overhaul update! Thanks for testing bleeding-edge features.";
+        description = "You're on <b>v1.0.89 Beta</b> — the Advanced Attendance Logging update! Thanks for testing bleeding-edge features.";
         features = [
-            "<div style='margin-bottom:8px'><b>&#128218; Question Bank: Multi-Source Badges Fixed</b></div>Questions with both Kaplan and BPP references now correctly display separate gold badges side by side (e.g., <b>Kaplan (Sec A)</b> and <b>BPP (Sec A)</b>).",
-            "<div style='margin-bottom:8px'><b>&#127991; Section Badge Layout Fixed</b></div>The section label no longer corrupts into broken characters. It now cleanly shows inside the source badge as <b>Kaplan (Sec A)</b>.",
-            "<div style='margin-bottom:8px'><b>&#9998; Edit Modal: All Sources Load Correctly</b></div>Opening Edit on a multi-source question now loads ALL source references into the editor &mdash; previously only the first source was shown.",
-            "<div style='margin-bottom:8px'><b>&#128221; Smart Reference Display</b></div>If a question has no custom text, the reference is automatically shown in the card body so nothing is ever left blank.",
-            "<div style='margin-bottom:8px'><b>&#9989; Mixed Sources Filter</b></div>A new <b>Mixed Sources</b> filter option lets you quickly find all questions that span multiple question banks."
+            "<div style='margin-bottom:8px'><b>&#128203; Detailed Session Types</b></div>You can now categorize your logged attendance sessions with specific types: Self Study, Revision, Class, Pending Topic, and Mock Test.",
+            "<div style='margin-bottom:8px'><b>&#128221; Edit Session Types</b></div>Forgot to log the type? You can now edit past study sessions and set their session type retroactively.",
+            "<div style='margin-bottom:8px'><b>&#127775; Day Report Badges</b></div>Your day report now beautifully displays the session type alongside the Focus badge, giving you instant clarity on how you spent your time.",
+            "<div style='margin-bottom:8px'><b>&#128736;&#65039; Beta Opt-in Fix</b></div>Fixed a major bug where toggling the Beta switch artificially upgraded your version without actually downloading the update, leaving you stuck."
         ];
     } else {
         description = "Welcome to AcademicPulse v1.0.87 &#x1F44B; The Pulse AI &amp; Stability Update! We've made massive improvements under the hood to ensure your data stays intact.";

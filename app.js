@@ -62,10 +62,8 @@ const DEFAULT_SUBJECTS = [
 ];
 
 const EXAMS = [
-    { category: 'ACCA · UPCOMING', date: '2026-09-10T00:00:00', title: 'Financial Reporting (FR)', subtext: 'Sep 2026 Session' },
-    { category: 'CAT 11/2026', date: null, title: 'Junior Clerk / Cashier', subtext: 'Special Grade · Class-I Banks', postponed: true },
-    { category: 'CAT 10/2026', date: null, title: 'Junior Clerk / Cashier', subtext: 'Super Grade Banks', postponed: true },
-    { category: 'CAT 09/2026', date: null, title: 'Assistant Secretary', subtext: '', postponed: true }
+    { category: 'ACCA · SYLLABUS TARGET', date: '2026-09-10T00:00:00', title: 'FR Full Portion Completion', subtext: 'Complete All Chapters & Topics' },
+    { category: 'ACCA · FINAL EXAM', date: '2026-12-10T00:00:00', title: 'Financial Reporting (FR)', subtext: 'Dec 2026 Exam Session' }
 ];
 
 const AppState = {
@@ -3083,6 +3081,7 @@ window.initApp = function() {
         initFocusMode();
         initSchedule();
         initWorkout();
+        initTasks();
         debouncedRenderOverview();
 
         if (typeof window.checkForUpdates === 'function') {
@@ -3688,6 +3687,93 @@ function initWorkout() {
     populateWbSubjectFilter();
     renderWorkoutBank();
 }
+
+// ==========================================
+// TO-DO LIST FEATURE
+// ==========================================
+function initTasks() {
+    const form = document.getElementById('taskForm');
+    if (form) {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('taskInput');
+            const priority = document.getElementById('taskPriority');
+            if (!input || !input.value.trim()) return;
+
+            const newTask = {
+                id: 'todo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                text: input.value.trim(),
+                priority: priority ? priority.value : 'medium',
+                completed: false,
+                createdAt: new Date().toISOString()
+            };
+
+            if (!AppState.todos) AppState.todos = [];
+            AppState.todos.unshift(newTask);
+            saveData('todos');
+            input.value = '';
+            renderTasks();
+            addNotification('Task Added', `"${newTask.text}" has been added to your to-do list.`, 'success');
+        });
+    }
+    renderTasks();
+}
+
+window.renderTasks = function() {
+    const container = document.getElementById('taskListContainer');
+    const completedCount = document.getElementById('taskCompletedCount');
+    const totalCount = document.getElementById('taskTotalCount');
+    if (!container) return;
+
+    const todos = AppState.todos || [];
+    if (completedCount) completedCount.textContent = todos.filter(t => t.completed).length;
+    if (totalCount) totalCount.textContent = todos.length;
+
+    if (todos.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:40px 20px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:16px; color:var(--text-muted);">
+            <div style="font-size:3rem; margin-bottom:10px;">✨</div>
+            <p style="margin:0; font-size:1.1rem;">Your task list is completely clean! Add a task above to get organized.</p>
+        </div>`;
+        return;
+    }
+
+    const priorityColors = {
+        low: 'var(--neon-gold, #FFD60A)',
+        medium: 'var(--neon-blue, #0A84FF)',
+        high: 'var(--neon-red, #FF453A)'
+    };
+    const priorityNames = { low: 'Low', medium: 'Medium', high: 'High' };
+
+    container.innerHTML = todos.map(t => `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:14px; transition:all 0.2s ease; opacity:${t.completed ? 0.6 : 1}; ${t.completed ? 'text-decoration:line-through;' : ''}">
+            <div style="display:flex; align-items:center; gap:14px; flex:1;">
+                <input type="checkbox" ${t.completed ? 'checked' : ''} onclick="window.toggleTask('${t.id}')" style="width:22px; height:22px; cursor:pointer; accent-color:var(--neon-blue);">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:1.05rem; color:var(--text-main); font-weight:500;">${escapeHtml(t.text)}</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted); display:inline-block; border-left:3px solid ${priorityColors[t.priority] || '#A1A1AA'}; padding-left:6px;">${priorityNames[t.priority] || 'Normal'} Priority</span>
+                </div>
+            </div>
+            <button onclick="window.deleteTask('${t.id}')" class="btn btn-outline" style="padding:8px 12px; color:var(--neon-red); border-color:transparent; background:rgba(255,69,58,0.08); transition:all 0.2s;" title="Delete task">🗑️</button>
+        </div>
+    `).join('');
+};
+
+window.toggleTask = function(id) {
+    if (!AppState.todos) return;
+    const task = AppState.todos.find(t => t.id === id);
+    if (task) {
+        task.completed = !task.completed;
+        saveData('todos');
+        renderTasks();
+    }
+};
+
+window.deleteTask = function(id) {
+    if (!AppState.todos) return;
+    AppState.todos = AppState.todos.filter(t => t.id !== id);
+    saveData('todos');
+    renderTasks();
+};
 
 // ==========================================
 // MOCKS & PRACTICE
@@ -4842,6 +4928,13 @@ function installUpdate() {
 
 // Manual update check — called only by "Check for Updates" button
 window.checkForUpdates = function(btnEl) {
+    if (window.location.protocol === 'file:') {
+        if (btnEl) {
+            addNotification('Local File Mode', 'Update checks require running on a localhost server (http://), not file://.', 'info');
+        }
+        return;
+    }
+
     if (btnEl) {
         btnEl.disabled = true;
         btnEl.textContent = '🔄 Checking...';
@@ -4958,7 +5051,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
         navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW failed:', err));
         navigator.serviceWorker.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'UPDATE_AVAILABLE') {

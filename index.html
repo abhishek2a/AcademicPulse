@@ -6,7 +6,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>AcademicPulse</title>
-    <link rel="manifest" href="manifest.json?v=19">
+    <script>
+        if (window.location.protocol !== 'file:') {
+            const mLink = document.createElement('link');
+            mLink.rel = 'manifest';
+            mLink.href = 'manifest.json?v=19';
+            document.head.appendChild(mLink);
+        }
+    </script>
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css?v=16">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -318,6 +325,10 @@
                     border: 1px solid rgba(255,255,255,0.03);
                     word-break: break-word;
                 }
+                body.light-theme .ai-coach-body {
+                    background: rgba(255, 255, 255, 0.85);
+                    border-color: rgba(0, 0, 0, 0.08);
+                }
                 .ai-coach-controls {
                     display: flex;
                     gap: 12px;
@@ -343,15 +354,20 @@
                 .ai-coach-btn:hover {
                     background: rgba(255,255,255,0.05);
                     border-color: var(--btn-color);
-                    color: #fff;
+                    color: var(--text-main);
                     transform: translateY(-2px);
                     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
                 }
                 .ai-coach-btn.active-prompt {
                     background: rgba(255,255,255,0.08);
                     border-color: var(--btn-color);
-                    color: #fff;
+                    color: var(--text-main);
                     box-shadow: inset 0 0 0 1px var(--btn-color), 0 0 15px rgba(0,0,0,0.3);
+                }
+                body.light-theme .ai-coach-btn:hover,
+                body.light-theme .ai-coach-btn.active-prompt {
+                    color: #1D1D1F !important;
+                    background: rgba(0, 0, 0, 0.06);
                 }
             </style>
 
@@ -366,7 +382,7 @@
                 </div>
                 
                 <div id="aiCoachContent" class="ai-coach-body">
-                    <div style="text-align: center; color: rgba(255,255,255,0.3); padding: 20px 0; font-style: italic;">Select an analysis module to begin...</div>
+                    <div style="text-align: center; color: var(--text-muted); padding: 20px 0; font-style: italic;">Select an analysis module to begin...</div>
                 </div>
 
                 <div class="ai-coach-controls">
@@ -1765,7 +1781,6 @@
     </div>
     
     <script src="auth.js?v=14"></script>
-    <script src="ai.js?v=4"></script>
     <script src="app.js?v=109"></script>
     <script src="export.js?v=10"></script>
 </body>

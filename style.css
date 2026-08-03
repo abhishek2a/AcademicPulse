@@ -933,3 +933,28 @@ body.light-theme ::-webkit-scrollbar-thumb {
 body.light-theme ::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.25);
 }
+
+/* Additional Light Mode Legibility Enhancements */
+body.light-theme .ai-insight-card {
+    color: #1D1D1F !important;
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.06);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+body.light-theme .ai-insight-card b {
+    filter: brightness(0.85);
+}
+body.light-theme #view-tasks input[type="checkbox"] {
+    accent-color: #005BBB;
+}
+body.light-theme .ai-coach-btn {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #48484A !important;
+}
+body.light-theme .ai-coach-btn:hover,
+body.light-theme .ai-coach-btn.active-prompt {
+    color: #000 !important;
+    background: rgba(0, 0, 0, 0.06) !important;
+}
+

@@ -113,6 +113,7 @@ async function syncDataFromCloud(uid) {
             if (data.systemState) localStorage.setItem('cseb_system_state', JSON.stringify(data.systemState));
             if (data.workoutQuestions) localStorage.setItem('cseb_workout_questions', JSON.stringify(data.workoutQuestions));
             if (data.workoutStats) localStorage.setItem('cseb_workout_stats', JSON.stringify(data.workoutStats));
+            if (data.todos) localStorage.setItem('cseb_todos', JSON.stringify(data.todos));
         } else {
             // First login, push local data to cloud
             await syncDataToCloud(uid);
@@ -139,7 +140,8 @@ async function syncDataToCloud(uid) {
             achievements: JSON.parse(localStorage.getItem('cseb_achievements') || '[]'),
             systemState: JSON.parse(localStorage.getItem('cseb_system_state') || '{"currentVersion":"v1.0.60"}'),
             workoutQuestions: JSON.parse(localStorage.getItem('cseb_workout_questions') || '[]'),
-            workoutStats: JSON.parse(localStorage.getItem('cseb_workout_stats') || '{"totalDone":0,"totalCorrect":0}')
+            workoutStats: JSON.parse(localStorage.getItem('cseb_workout_stats') || '{"totalDone":0,"totalCorrect":0}'),
+            todos: JSON.parse(localStorage.getItem('cseb_todos') || '[]')
         });
     } catch (error) {
         console.error("Error saving to cloud:", error);

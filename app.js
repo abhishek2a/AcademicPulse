@@ -80,7 +80,7 @@ const AppState = {
     achievements: [],
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
-    currentVersion: 'v1.0.87',
+    currentVersion: 'v1.0.89-beta',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -1023,6 +1023,7 @@ window.openSyllabusModal = (subjId) => {
         label.style.cursor = 'pointer';
         label.style.padding = '10px 0';
         label.style.borderBottom = '1px solid var(--glass-border)';
+        label.style.userSelect = 'none';
         
         const cb = document.createElement('input');
         cb.type = 'checkbox';
@@ -1060,8 +1061,10 @@ window.openSyllabusModal = (subjId) => {
                 span.style.color = 'var(--text-main)';
             }
             
-            renderSubjects();
-            debouncedRenderAnalytics();
+            setTimeout(() => {
+                renderSubjects();
+                debouncedRenderAnalytics();
+            }, 10);
         });
         
         label.appendChild(cb);
@@ -1357,33 +1360,25 @@ function renderExams() {
     today.setHours(0,0,0,0);
 
     EXAMS.forEach(exam => {
+        if (!exam.date) return;
         const card = document.createElement('div');
         card.className = 'exam-card';
 
-        if (exam.postponed) {
-            card.innerHTML = `
-                <div class="exam-meta">${exam.category}</div>
-                <div class="exam-date" style="color:var(--text-muted); font-size:0.85rem;">Date TBA</div>
-                <div class="exam-title">${exam.title}${exam.subtext ? `<br><span style="font-size:0.8rem; color:#6E6E73;">${exam.subtext}</span>` : ''}</div>
-                <div class="exam-days" style="color:#FF9F0A; font-size:0.8rem; font-weight:600;">&#128337; Date Postponed</div>
-            `;
-        } else {
-            const examDate = new Date(exam.date);
-            const diffTime = examDate.getTime() - today.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const examDate = new Date(exam.date);
+        const diffTime = examDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-            let daysText = diffDays > 0 ? `${diffDays} days left` : diffDays === 0 ? 'Today!' : 'Passed';
-            let daysColor = diffDays > 14 ? '#30D158' : diffDays > 7 ? '#FFD60A' : diffDays >= 0 ? '#FF453A' : '#6E6E73';
+        let daysText = diffDays > 0 ? `${diffDays} days left` : diffDays === 0 ? 'Today!' : 'Passed';
+        let daysColor = diffDays > 14 ? '#30D158' : diffDays > 7 ? '#FFD60A' : diffDays >= 0 ? '#FF453A' : '#6E6E73';
 
-            const formattedDate = examDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const formattedDate = examDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-            card.innerHTML = `
-                <div class="exam-meta">${exam.category}</div>
-                <div class="exam-date">${formattedDate}</div>
-                <div class="exam-title">${exam.title}${exam.subtext ? `<br><span style="font-size:0.8rem; color:#6E6E73;">${exam.subtext}</span>` : ''}</div>
-                <div class="exam-days" style="color: ${daysColor}">${daysText}</div>
-            `;
-        }
+        card.innerHTML = `
+            <div class="exam-meta">${exam.category}</div>
+            <div class="exam-date">${formattedDate}</div>
+            <div class="exam-title">${exam.title}${exam.subtext ? `<br><span style="font-size:0.8rem; color:#6E6E73;">${exam.subtext}</span>` : ''}</div>
+            <div class="exam-days" style="color: ${daysColor}">${daysText}</div>
+        `;
 
         container.appendChild(card);
     });
@@ -3745,26 +3740,43 @@ window.renderTasks = function() {
     const priorityNames = { low: 'Low', medium: 'Medium', high: 'High' };
 
     container.innerHTML = todos.map(t => `
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:14px; transition:all 0.2s ease; opacity:${t.completed ? 0.6 : 1}; ${t.completed ? 'text-decoration:line-through;' : ''}">
-            <div style="display:flex; align-items:center; gap:14px; flex:1;">
-                <input type="checkbox" ${t.completed ? 'checked' : ''} onclick="window.toggleTask('${t.id}')" style="width:22px; height:22px; cursor:pointer; accent-color:var(--neon-blue);">
+        <div id="todo_row_${t.id}" style="display:flex; align-items:center; justify-content:space-between; padding:16px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:14px; transition:all 0.2s ease; opacity:${t.completed ? 0.6 : 1}; ${t.completed ? 'text-decoration:line-through;' : ''}">
+            <label style="display:flex; align-items:center; gap:14px; flex:1; cursor:pointer; margin:0; user-select:none;">
+                <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="window.toggleTask('${t.id}', this.checked)" style="width:22px; height:22px; cursor:pointer; accent-color:var(--neon-blue); flex-shrink:0;">
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <span style="font-size:1.05rem; color:var(--text-main); font-weight:500;">${escapeHtml(t.text)}</span>
                     <span style="font-size:0.75rem; color:var(--text-muted); display:inline-block; border-left:3px solid ${priorityColors[t.priority] || '#A1A1AA'}; padding-left:6px;">${priorityNames[t.priority] || 'Normal'} Priority</span>
                 </div>
-            </div>
-            <button onclick="window.deleteTask('${t.id}')" class="btn btn-outline" style="padding:8px 12px; color:var(--neon-red); border-color:transparent; background:rgba(255,69,58,0.08); transition:all 0.2s;" title="Delete task">🗑️</button>
+            </label>
+            <button onclick="window.deleteTask('${t.id}')" class="btn btn-outline" style="padding:8px 12px; color:var(--neon-red); border-color:transparent; background:rgba(255,69,58,0.08); transition:all 0.2s; flex-shrink:0;" title="Delete task">🗑️</button>
         </div>
     `).join('');
 };
 
-window.toggleTask = function(id) {
+window.toggleTask = function(id, checkedVal) {
     if (!AppState.todos) return;
     const task = AppState.todos.find(t => t.id === id);
     if (task) {
-        task.completed = !task.completed;
+        if (typeof checkedVal === 'boolean') {
+            task.completed = checkedVal;
+        } else {
+            task.completed = !task.completed;
+        }
         saveData('todos');
-        renderTasks();
+
+        // In-place DOM styling to prevent list jumping and dropped clicks
+        const completedCount = document.getElementById('taskCompletedCount');
+        if (completedCount) completedCount.textContent = AppState.todos.filter(t => t.completed).length;
+
+        const row = document.getElementById('todo_row_' + id);
+        if (row) {
+            row.style.opacity = task.completed ? '0.6' : '1';
+            row.style.textDecoration = task.completed ? 'line-through' : 'none';
+            const cb = row.querySelector('input[type="checkbox"]');
+            if (cb && cb.checked !== task.completed) cb.checked = task.completed;
+        } else {
+            renderTasks();
+        }
     }
 };
 

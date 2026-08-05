@@ -1,9 +1,9 @@
-const CACHE_NAME = 'academicpulse-v1.0.86';
+const CACHE_NAME = 'academicpulse-v1.0.89';
 
 const STATIC_ASSETS = [
     'index.html',
-    'style.css?v=18',
-    'app.js?v=109',
+    'style.css?v=19',
+    'app.js?v=110',
     'auth.js?v=14',
     'export.js?v=10',
     'manifest.json',
@@ -11,7 +11,7 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-    // Do NOT skip waiting — new SW waits until user clicks "Update Now"
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(STATIC_ASSETS).catch(err => console.warn('Static assets cache warning:', err)))

@@ -958,3 +958,48 @@ body.light-theme .ai-coach-btn.active-prompt {
     background: rgba(0, 0, 0, 0.06) !important;
 }
 
+/* ── Total Mobile Anti-Jump & Touch Stabilization ── */
+@media (hover: none) and (pointer: coarse), (max-width: 900px) {
+    * {
+        -webkit-tap-highlight-color: transparent !important;
+        touch-action: manipulation !important;
+    }
+    /* Neutralize jumpy hover transforms on touchscreen devices */
+    .stat-card:hover,
+    .subject-card:hover,
+    .chart-card:hover,
+    .exam-card:hover,
+    .btn:hover,
+    .btn:active,
+    .btn-export:hover,
+    .btn-premium:hover,
+    .btn-start:hover,
+    .btn-pause:hover,
+    .btn-stop:hover,
+    .nav-item:hover,
+    .nav-item:active,
+    .day-cell:hover,
+    .hover-lift:hover,
+    [class*="card"]:hover,
+    [class*="btn"]:hover,
+    [class*="btn"]:active,
+    button:hover,
+    button:active,
+    label:hover,
+    label:active,
+    a:hover,
+    a:active {
+        transform: none !important;
+    }
+
+    /* Prevent iOS Safari input focus auto-zoom jumping */
+    input, select, textarea, .form-control, .form-group input, .form-group select, .form-group textarea {
+        font-size: 16px !important;
+    }
+
+    /* Remove spatial transform animations on touch to ensure native-like UI stability */
+    .chart-card, .stat-card, .subject-card, .exam-card, .btn, .nav-item {
+        transition: opacity 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
+    }
+}
+

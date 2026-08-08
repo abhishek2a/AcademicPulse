@@ -19,6 +19,7 @@ const STORAGE_KEYS = {
     SYSTEM_STATE: 'cseb_system_state',
     ACHIEVEMENTS: 'cseb_achievements',
     WORKOUT: 'cseb_workout_questions',
+    UPCOMING_MOCKS: 'cseb_upcoming_mocks',
     // Device-local only — never cloud-synced.
     // Tracks the last version the user installed so sign-out/re-login
     // never re-triggers the update popup for an already-seen version.
@@ -80,7 +81,8 @@ const AppState = {
     achievements: [],
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
-    currentVersion: 'v1.0.89-beta',
+    upcomingMocks: [],
+    currentVersion: 'v1.0.91-beta',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -204,6 +206,7 @@ function loadData() {
     AppState.schedule = Storage.get(STORAGE_KEYS.SCHEDULE, []);
     AppState.achievements = Storage.get(STORAGE_KEYS.ACHIEVEMENTS, []);
     AppState.workoutQuestions = Storage.get(STORAGE_KEYS.WORKOUT, []);
+    AppState.upcomingMocks = Storage.get(STORAGE_KEYS.UPCOMING_MOCKS, []);
     
     // Sort workout questions permanently by topic
     AppState.workoutQuestions.sort((a, b) => {
@@ -552,12 +555,12 @@ window.showWhatsNewPopup = async function() {
     let description, features;
 
     if (isBeta) {
-        description = "You're on <b>v1.0.89 Beta</b> — the Advanced Attendance Logging update! Thanks for testing bleeding-edge features.";
+        description = "You're on <b>v1.0.91 Beta</b> \u2014 the Upcoming Mocks update! Thanks for testing bleeding-edge features.";
         features = [
-            "<div style='margin-bottom:8px'><b>&#128203; Detailed Session Types</b></div>You can now categorize your logged attendance sessions with specific types: Self Study, Revision, Class, Pending Topic, and Mock Test.",
-            "<div style='margin-bottom:8px'><b>&#128221; Edit Session Types</b></div>Forgot to log the type? You can now edit past study sessions and set their session type retroactively.",
-            "<div style='margin-bottom:8px'><b>&#127775; Day Report Badges</b></div>Your day report now beautifully displays the session type alongside the Focus badge, giving you instant clarity on how you spent your time.",
-            "<div style='margin-bottom:8px'><b>&#128736;&#65039; Beta Opt-in Fix</b></div>Fixed a major bug where toggling the Beta switch artificially upgraded your version without actually downloading the update, leaving you stuck."
+            "<div style='margin-bottom:8px'><b>\uD83D\uDCC5 Schedule Upcoming Mocks</b></div>Plan out your mock exams! You can now schedule upcoming mock exams, see a countdown on your dashboard, and keep track of them in your Planner.",
+            "<div style='margin-bottom:8px'><b>\u23F0 Log Result Shortcut</b></div>When a mock exam date arrives, you'll be alerted and can log the result with a single tap, pre-filling the mock test form instantly.",
+            "<div style='margin-bottom:8px'><b>\uD83D\uDCDD Smart Text Wrapping</b></div>Extremely long mock exam titles will now beautifully wrap across multiple lines without breaking your dashboard layout.",
+            "<div style='margin-bottom:8px'><b>\uD83E\uDD16 Pulse AI Enhancements</b></div>Continued improvements to the Pulse AI coaching algorithms and background stability."
         ];
     } else {
         description = "Welcome to AcademicPulse v1.0.87 &#x1F44B; The Pulse AI &amp; Stability Update! We've made massive improvements under the hood to ensure your data stays intact.";
@@ -601,6 +604,7 @@ function saveData(key) {
     if (key === 'achievements' || key === 'all') Storage.set(STORAGE_KEYS.ACHIEVEMENTS, AppState.achievements);
     if (key === 'workout' || key === 'all') Storage.set(STORAGE_KEYS.WORKOUT, AppState.workoutQuestions);
     if (key === 'workoutStats' || key === 'all') Storage.set('cseb_workout_stats', AppState.workoutStats);
+    if (key === 'upcomingMocks' || key === 'all') Storage.set(STORAGE_KEYS.UPCOMING_MOCKS, AppState.upcomingMocks);
     if (key === 'system' || key === 'all') Storage.set(STORAGE_KEYS.SYSTEM_STATE, {
         currentVersion: AppState.currentVersion,
         availableUpdate: AppState.availableUpdate,
@@ -785,6 +789,9 @@ function initNavigation() {
             if (targetId === 'view-schedule') {
                 const todayTab = document.getElementById('tabScheduleToday');
                 if(todayTab) todayTab.click();
+            }
+            if (targetId === 'view-mocks') {
+                renderUpcomingMocksInMocks();
             }
             if (targetId === 'view-focus') {
                 try {
@@ -1359,6 +1366,7 @@ function renderExams() {
     const today = new Date();
     today.setHours(0,0,0,0);
 
+    // Render hardcoded milestone exams
     EXAMS.forEach(exam => {
         if (!exam.date) return;
         const card = document.createElement('div');
@@ -1379,10 +1387,55 @@ function renderExams() {
             <div class="exam-title">${exam.title}${exam.subtext ? `<br><span style="font-size:0.8rem; color:#6E6E73;">${exam.subtext}</span>` : ''}</div>
             <div class="exam-days" style="color: ${daysColor}">${daysText}</div>
         `;
+        container.appendChild(card);
+    });
+
+    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    if (!isBetaUser) return;
+
+    // Render upcoming scheduled mock exams from AppState
+    const sortedUpcoming = [...(AppState.upcomingMocks || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+    sortedUpcoming.forEach(mock => {
+        if (!mock.date) return;
+        const examDate = new Date(mock.date);
+        examDate.setHours(0,0,0,0);
+        const diffTime = examDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        // Hide cards older than 7 days
+        if (diffDays < -7) return;
+
+        const card = document.createElement('div');
+        card.className = 'exam-card';
+        card.style.borderColor = 'rgba(255, 159, 10, 0.35)';
+
+        const formattedDate = examDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        let daysText, daysColor;
+
+        if (diffDays > 0) {
+            daysText = `${diffDays} days left`;
+            daysColor = diffDays > 14 ? '#30D158' : diffDays > 7 ? '#FFD60A' : '#FF453A';
+        } else if (diffDays === 0) {
+            daysText = 'Today! \uD83D\uDD25';
+            daysColor = '#FF9F0A';
+        } else {
+            daysText = `${Math.abs(diffDays)} days ago`;
+            daysColor = '#6E6E73';
+        }
+
+        const mockIdSafe = escapeHtml(mock.id);
+        card.innerHTML = `
+            <div class="exam-meta" style="color:#FF9F0A;">${escapeHtml(mock.course)} \xB7 MOCK EXAM</div>
+            <div class="exam-date">${formattedDate}</div>
+            <div class="exam-title" style="word-break: break-word;">${escapeHtml(mock.name)}${mock.syllabusArea ? `<br><span style="font-size:0.8rem; color:#6E6E73;">${escapeHtml(mock.syllabusArea)}</span>` : ''}</div>
+            <div class="exam-days" style="color: ${daysColor}">${daysText}</div>
+            ${diffDays <= 0 ? `<button onclick="logResultForUpcomingMock('${mockIdSafe}')" style="margin-top:10px; width:100%; padding:8px; background:var(--neon-blue); color:#fff; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-size:0.85rem; touch-action:manipulation;">Log Result \u2192</button>` : ''}
+        `;
 
         container.appendChild(card);
     });
 }
+
 
 function renderDayReport(dateKey) {
     const d = new Date(dateKey);
@@ -3119,7 +3172,9 @@ window.initApp = function() {
                 if (modal) modal.classList.remove('active');
             });
         }
-        
+
+        // Check for past-due upcoming mocks and alert user
+        setTimeout(checkAndAlertPastDueUpcomingMocks, 1500);
 
     } catch (error) {
         console.error("Init Error:", error);
@@ -4027,6 +4082,20 @@ function initMocksAndPractice() {
         });
         
         saveData('mocks');
+
+        // Auto-remove matching upcoming mock (by name+course, case-insensitive)
+        const nameLower = name.toLowerCase().trim();
+        const before = (AppState.upcomingMocks || []).length;
+        AppState.upcomingMocks = (AppState.upcomingMocks || []).filter(m =>
+            !(m.name.toLowerCase().trim() === nameLower && m.course === course)
+        );
+        if (AppState.upcomingMocks.length < before) {
+            saveData('upcomingMocks');
+            renderExams(); // refresh dashboard countdown cards
+            renderUpcomingMocksInMocks(); // refresh the mocks section list
+            addNotification('✅ Mock Result Logged', `"${name}" removed from upcoming exams. Well done!`, 'success');
+        }
+
         document.getElementById('mockNameInput').value = '';
         document.getElementById('mockScoreInput').value = '';
         if(document.getElementById('mockNotesInput')) document.getElementById('mockNotesInput').value = '';
@@ -4039,6 +4108,7 @@ function initMocksAndPractice() {
         debouncedRenderAnalytics();
     };
     }
+
 
     renderMocksHistory();
 }
@@ -4115,7 +4185,7 @@ function renderMocksHistory() {
         tr.innerHTML = `
             <td style="padding:15px 10px;">${new Date(m.date).toLocaleDateString()}</td>
             <td style="padding:15px 10px;">
-                <div class="mock-name-title" style="font-weight: 600; color: var(--text-main);"></div>
+                <div class="mock-name-title" style="font-weight: 600; color: var(--text-main); word-break: break-word; line-height: 1.3;"></div>
                 <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 4px;">
                     ${m.course} - ${m.syllabusArea}
                     ${m.topic && m.topic !== 'All Topics' && m.topic !== '' ? ' &bull; ' + m.topic : ''}
@@ -4131,6 +4201,284 @@ function renderMocksHistory() {
         tr.querySelector('.mock-name-title').textContent = m.name;
         tbody.appendChild(tr);
     });
+}
+
+// ==========================================
+// UPCOMING MOCK EXAMS FEATURE
+// ==========================================
+
+/**
+ * Called on startup: fires a notification for each upcoming mock exam
+ * that has already passed (so user is reminded to log the result).
+ */
+function checkAndAlertPastDueUpcomingMocks() {
+    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    if (!isBetaUser) return;
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const mocks = AppState.upcomingMocks || [];
+    mocks.forEach(mock => {
+        if (!mock.date) return;
+        const examDate = new Date(mock.date);
+        examDate.setHours(0,0,0,0);
+        const diffDays = Math.ceil((examDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        // Alert for today and overdue (within 14 days)
+        if (diffDays <= 0 && diffDays >= -14) {
+            const label = diffDays === 0 ? 'is today' : `was ${Math.abs(diffDays)} day${Math.abs(diffDays) > 1 ? 's' : ''} ago`;
+            addNotification(
+                `📋 Mock Exam: ${mock.name}`,
+                `Your ${mock.course} mock "${mock.name}" ${label}. Don't forget to log your result in Mock Exams!`,
+                'warning'
+            );
+        }
+    });
+}
+
+function renderUpcomingMocksInMocks() {
+    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    const wrapper = document.getElementById('upcomingMocksBetaContainer');
+    if (!isBetaUser) {
+        if (wrapper) wrapper.style.display = 'none';
+        return;
+    }
+    if (wrapper) wrapper.style.display = 'block';
+
+    const container = document.getElementById('upcomingMocksListInMocks');
+    if (!container) return;
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const upcoming = [...(AppState.upcomingMocks || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (upcoming.length === 0) {
+        container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px 0; font-style:italic;">No upcoming mock exams scheduled.<br><button onclick="openAddUpcomingMockModal()" style="margin-top:12px; background:var(--neon-blue); color:#fff; border:none; border-radius:10px; padding:10px 22px; cursor:pointer; font-weight:700; touch-action:manipulation;">+ Schedule First Mock</button></div>`;
+        return;
+    }
+
+    container.innerHTML = '';
+    upcoming.forEach(mock => {
+        const examDate = new Date(mock.date);
+        examDate.setHours(0,0,0,0);
+        const diffDays = Math.ceil((examDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        let badgeText, badgeBg;
+        if (diffDays > 0) {
+            badgeText = `${diffDays}d left`;
+            badgeBg = diffDays > 14 ? 'var(--neon-green)' : diffDays > 7 ? '#FFD60A' : 'var(--neon-red)';
+        } else if (diffDays === 0) {
+            badgeText = 'Today!';
+            badgeBg = '#FF9F0A';
+        } else {
+            badgeText = `${Math.abs(diffDays)}d ago`;
+            badgeBg = '#6E6E73';
+        }
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; gap:12px; padding:14px 16px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:14px; margin-bottom:10px; flex-wrap:wrap;';
+        row.innerHTML = `
+            <div style="flex:1; min-width:150px;">
+                <div style="font-weight:700; color:var(--text-main); font-size:1rem; word-break: break-word; line-height: 1.3;">${escapeHtml(mock.name)}</div>
+                <div style="font-size:0.82rem; color:var(--text-muted); margin-top:4px;">
+                    ${escapeHtml(mock.course)}${mock.syllabusArea ? ' &middot; ' + escapeHtml(mock.syllabusArea) : ''}
+                    &middot; ${examDate.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})}
+                </div>
+                ${mock.notes ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px; font-style:italic; word-break: break-word;">${escapeHtml(mock.notes)}</div>` : ''}
+            </div>
+            <span style="background:${badgeBg}; color:#000; font-weight:800; font-size:0.8rem; padding:4px 12px; border-radius:20px; white-space:nowrap; flex-shrink:0;">${badgeText}</span>
+            <div style="display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;">
+                ${diffDays <= 0 ? `<button onclick="logResultForUpcomingMock('${escapeHtml(mock.id)}')" style="background:var(--neon-blue); color:#fff; border:none; border-radius:10px; padding:8px 14px; cursor:pointer; font-weight:700; font-size:0.82rem; touch-action:manipulation;">&#x1F4DD; Log Result</button>` : ''}
+                <button onclick="openEditUpcomingMockModal('${escapeHtml(mock.id)}')" style="background:var(--glass-hover); color:var(--text-main); border:1px solid var(--glass-border); border-radius:10px; padding:8px 14px; cursor:pointer; font-size:0.82rem; touch-action:manipulation;">Edit</button>
+                <button onclick="deleteUpcomingMock('${escapeHtml(mock.id)}')" style="background:rgba(255,69,58,0.1); color:var(--neon-red); border:1px solid rgba(255,69,58,0.3); border-radius:10px; padding:8px 14px; cursor:pointer; font-size:0.82rem; touch-action:manipulation;">Delete</button>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function renderUpcomingMocksInPlanner() {
+    const container = document.getElementById('scheduleListContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const upcoming = [...(AppState.upcomingMocks || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (upcoming.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:40px; color:var(--text-muted);">
+                <div style="font-size:2.5rem; margin-bottom:12px;">📋</div>
+                <div style="font-size:1rem; font-weight:600; margin-bottom:8px;">No Upcoming Mocks Scheduled</div>
+                <div style="font-size:0.9rem; margin-bottom:20px;">Plan your next mock exam to stay on track.</div>
+                <button onclick="openAddUpcomingMockModal()" style="background:var(--neon-blue); color:#fff; border:none; border-radius:12px; padding:12px 28px; cursor:pointer; font-weight:700; font-size:1rem; touch-action:manipulation;">+ Schedule Mock Exam</button>
+            </div>`;
+        return;
+    }
+
+    upcoming.forEach(mock => {
+        const examDate = new Date(mock.date);
+        examDate.setHours(0,0,0,0);
+        const diffDays = Math.ceil((examDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        let badgeText, badgeBg, statusIcon;
+        if (diffDays > 0) {
+            badgeText = `${diffDays} days left`;
+            badgeBg = diffDays > 14 ? 'rgba(48,209,88,0.15)' : diffDays > 7 ? 'rgba(255,214,10,0.15)' : 'rgba(255,69,58,0.15)';
+            statusIcon = diffDays > 14 ? '🟢' : diffDays > 7 ? '🟡' : '🔴';
+        } else if (diffDays === 0) {
+            badgeText = 'Today!';
+            badgeBg = 'rgba(255,159,10,0.15)';
+            statusIcon = '🔥';
+        } else {
+            badgeText = 'Awaiting result';
+            badgeBg = 'rgba(110,110,115,0.15)';
+            statusIcon = '⏳';
+        }
+
+        const card = document.createElement('div');
+        card.style.cssText = `background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:16px; padding:18px 20px; display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;`;
+        card.innerHTML = `
+            <div style="flex-shrink:0; width:48px; height:48px; border-radius:14px; background:rgba(255,159,10,0.12); border:1px solid rgba(255,159,10,0.25); display:flex; align-items:center; justify-content:center; font-size:1.5rem;">${statusIcon}</div>
+            <div style="flex:1; min-width:180px;">
+                <div style="font-weight:700; font-size:1.05rem; color:var(--text-main); word-break: break-word; line-height: 1.3;">${escapeHtml(mock.name)}</div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">
+                    ${escapeHtml(mock.course)}${mock.syllabusArea ? ' &middot; ' + escapeHtml(mock.syllabusArea) : ''}
+                </div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">📅 ${examDate.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})}</div>
+                ${mock.notes ? `<div style="font-size:0.82rem; color:var(--text-muted); margin-top:8px; font-style:italic; padding:8px 12px; background:var(--glass-hover); border-radius:8px; word-break: break-word;">${escapeHtml(mock.notes)}</div>` : ''}
+                <div style="margin-top:10px; display:inline-block; background:${badgeBg}; padding:4px 14px; border-radius:20px; font-size:0.82rem; font-weight:700; color:var(--text-main);">${badgeText}</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; flex-shrink:0;">
+                ${diffDays <= 0 ? `<button onclick="logResultForUpcomingMock('${escapeHtml(mock.id)}')" style="background:var(--neon-blue); color:#fff; border:none; border-radius:10px; padding:9px 16px; cursor:pointer; font-weight:700; font-size:0.85rem; touch-action:manipulation; white-space:nowrap;">&#x1F4DD; Log Result</button>` : ''}
+                <button onclick="openEditUpcomingMockModal('${escapeHtml(mock.id)}')" style="background:var(--glass-hover); color:var(--text-main); border:1px solid var(--glass-border); border-radius:10px; padding:9px 16px; cursor:pointer; font-size:0.85rem; touch-action:manipulation;">✏️ Edit</button>
+                <button onclick="deleteUpcomingMock('${escapeHtml(mock.id)}')" style="background:rgba(255,69,58,0.1); color:var(--neon-red); border:1px solid rgba(255,69,58,0.3); border-radius:10px; padding:9px 16px; cursor:pointer; font-size:0.85rem; touch-action:manipulation;">🗑️ Delete</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+let _editingUpcomingMockId = null;
+
+function openAddUpcomingMockModal() {
+    _editingUpcomingMockId = null;
+    const modal = document.getElementById('upcomingMockModal');
+    if (!modal) return;
+    document.getElementById('umModalTitle').textContent = 'Schedule Upcoming Mock';
+    document.getElementById('umNameInput').value = '';
+    document.getElementById('umCourseInput').value = 'ACCA';
+    document.getElementById('umDateInput').value = '';
+    document.getElementById('umNotesInput').value = '';
+    _populateUMAreaDropdown('ACCA');
+    modal.classList.add('active');
+}
+
+function openEditUpcomingMockModal(id) {
+    const mock = (AppState.upcomingMocks || []).find(m => m.id === id);
+    if (!mock) return;
+    _editingUpcomingMockId = id;
+    const modal = document.getElementById('upcomingMockModal');
+    if (!modal) return;
+    document.getElementById('umModalTitle').textContent = 'Edit Upcoming Mock';
+    document.getElementById('umNameInput').value = mock.name || '';
+    document.getElementById('umCourseInput').value = mock.course || 'ACCA';
+    const d = new Date(mock.date);
+    document.getElementById('umDateInput').value = d.toISOString().split('T')[0];
+    document.getElementById('umNotesInput').value = mock.notes || '';
+    _populateUMAreaDropdown(mock.course || 'ACCA', mock.syllabusArea || '');
+    modal.classList.add('active');
+}
+
+function _populateUMAreaDropdown(course, selectedArea) {
+    const sel = document.getElementById('umAreaInput');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">No specific area</option>';
+    const syllabusObj = course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
+    Object.keys(syllabusObj || {}).forEach(area => {
+        const opt = document.createElement('option');
+        opt.value = area;
+        opt.textContent = area;
+        if (selectedArea && area === selectedArea) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+function saveUpcomingMock() {
+    const name = (document.getElementById('umNameInput')?.value || '').trim();
+    const course = document.getElementById('umCourseInput')?.value || 'ACCA';
+    const dateStr = document.getElementById('umDateInput')?.value || '';
+    const area = document.getElementById('umAreaInput')?.value || '';
+    const notes = (document.getElementById('umNotesInput')?.value || '').trim();
+
+    if (!name) { alert('Please enter a mock exam name.'); return; }
+    if (!dateStr) { alert('Please select an exam date.'); return; }
+
+    const record = { id: _editingUpcomingMockId || generateId(), name, course, syllabusArea: area, date: new Date(dateStr).toISOString(), notes };
+
+    if (_editingUpcomingMockId) {
+        const idx = (AppState.upcomingMocks || []).findIndex(m => m.id === _editingUpcomingMockId);
+        if (idx !== -1) AppState.upcomingMocks[idx] = record;
+    } else {
+        if (!AppState.upcomingMocks) AppState.upcomingMocks = [];
+        AppState.upcomingMocks.push(record);
+    }
+
+    saveData('upcomingMocks');
+    document.getElementById('upcomingMockModal')?.classList.remove('active');
+
+    // Refresh all panels
+    renderExams();
+    renderUpcomingMocksInMocks();
+    if (document.getElementById('view-schedule')?.classList.contains('active')) {
+        if (document.getElementById('tabScheduleUpcomingMocks')?.classList.contains('active-tab')) {
+            renderUpcomingMocksInPlanner();
+        }
+    }
+}
+
+function deleteUpcomingMock(id) {
+    if (!confirm('Delete this upcoming mock exam?')) return;
+    AppState.upcomingMocks = (AppState.upcomingMocks || []).filter(m => m.id !== id);
+    saveData('upcomingMocks');
+    renderExams();
+    renderUpcomingMocksInMocks();
+    if (document.getElementById('view-schedule')?.classList.contains('active')) {
+        renderUpcomingMocksInPlanner();
+    }
+}
+
+function logResultForUpcomingMock(id) {
+    const mock = (AppState.upcomingMocks || []).find(m => m.id === id);
+    if (!mock) return;
+
+    // Navigate to mocks tab
+    const mocksNav = document.querySelector('.nav-item[data-target="view-mocks"]');
+    if (mocksNav) mocksNav.click();
+
+    setTimeout(() => {
+        const courseInput = document.getElementById('mockCourseInput');
+        const nameInput = document.getElementById('mockNameInput');
+        if (courseInput) courseInput.value = mock.course;
+        if (courseInput) courseInput.dispatchEvent(new Event('change'));
+
+        setTimeout(() => {
+            if (nameInput) nameInput.value = mock.name;
+            // Try to match syllabus area
+            if (mock.syllabusArea) {
+                const areaInput = document.getElementById('mockAreaInput');
+                if (areaInput) {
+                    const opt = [...areaInput.options].find(o => o.value === mock.syllabusArea);
+                    if (opt) { areaInput.value = mock.syllabusArea; areaInput.dispatchEvent(new Event('change')); }
+                }
+            }
+            // Scroll the form into view
+            const form = document.querySelector('#view-mocks .chart-card');
+            if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+    }, 200);
 }
 
 window.addEventListener('storage', (event) => {
@@ -5630,6 +5978,17 @@ function initSchedule() {
     document.getElementById('tabSchedulePast').addEventListener('click', () => setScheduleTab('past'));
     document.getElementById('tabScheduleRevision').addEventListener('click', () => setScheduleTab('revision'));
     
+    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    const umTab = document.getElementById('tabScheduleUpcomingMocks');
+    if (umTab) {
+        if (isBetaUser) {
+            umTab.style.display = 'inline-block';
+            umTab.addEventListener('click', () => setScheduleTab('upcomingmocks'));
+        } else {
+            umTab.style.display = 'none';
+        }
+    }
+    
     document.getElementById('addScheduleBtn').addEventListener('click', () => openScheduleModal());
     document.getElementById('saveScheduleBtn').addEventListener('click', saveSchedulePlan);
     
@@ -5839,10 +6198,12 @@ function populateScheduleTopics(subjId) {
 
 function setScheduleTab(tab) {
     currentScheduleTab = tab;
-    ['tabScheduleToday', 'tabScheduleUpcoming', 'tabSchedulePast', 'tabScheduleRevision'].forEach(id => {
+    const allTabIds = ['tabScheduleToday', 'tabScheduleUpcoming', 'tabSchedulePast', 'tabScheduleRevision', 'tabScheduleUpcomingMocks'];
+    allTabIds.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
-        const tabKey = id.replace('tabSchedule', '').toLowerCase();
+        // Map id => key: strip 'tabSchedule' prefix and lowercase
+        let tabKey = id.replace('tabSchedule', '').toLowerCase();
         if (tabKey === tab) {
             el.style.background = 'var(--glass-bg)';
             el.style.border = '1px solid var(--glass-border)';
@@ -5855,7 +6216,11 @@ function setScheduleTab(tab) {
             el.style.boxShadow = 'none';
         }
     });
-    renderScheduleList();
+    if (tab === 'upcomingmocks') {
+        renderUpcomingMocksInPlanner();
+    } else {
+        renderScheduleList();
+    }
 }
 
 window.openScheduleModal = function(id = null) {

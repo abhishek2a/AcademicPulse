@@ -773,6 +773,19 @@
                 </div>
             </div>
 
+            <!-- Scheduled Upcoming Mocks -->
+            <div id="upcomingMocksBetaContainer" class="chart-card" style="margin-bottom: 30px; text-align: left; position: relative; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">Scheduled Upcoming Mocks</h3>
+                    <button class="btn btn-outline" onclick="openAddUpcomingMockModal()" style="padding: 6px 12px; font-size: 0.85rem; display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:1.1rem; line-height:1;">+</span> Schedule
+                    </button>
+                </div>
+                <div id="upcomingMocksListInMocks" style="display: flex; flex-direction: column;">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
             <!-- Add Mock Exam -->
             <div class="chart-card" style="margin-bottom: 30px; text-align: left;">
                 <h3 style="margin-bottom: 15px;">Log New Mock Test</h3>
@@ -975,6 +988,7 @@
                 <button class="btn" id="tabScheduleUpcoming" style="background: transparent; border: 1px solid transparent; color: var(--text-muted);">Upcoming</button>
                 <button class="btn" id="tabSchedulePast" style="background: transparent; border: 1px solid transparent; color: var(--text-muted);">Past</button>
                 <button class="btn" id="tabScheduleRevision" style="background: transparent; border: 1px solid transparent; color: var(--text-muted);">Revision</button>
+                <button class="btn" id="tabScheduleUpcomingMocks" style="display: none; background: transparent; border: 1px solid transparent; color: var(--neon-blue); font-weight:700;">Mock Exams</button>
             </div>
 
             <div id="scheduleListContainer" style="display: flex; flex-direction: column; gap: 12px;">
@@ -1780,8 +1794,51 @@
         </div>
     </div>
     
+    <!-- Upcoming Mock Modal -->
+    <div class="modal-overlay" id="upcomingMockModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="umModalTitle">Schedule Upcoming Mock</h3>
+                <button class="close-btn" onclick="document.getElementById('upcomingMockModal').classList.remove('active')">x</button>
+            </div>
+            
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Mock Exam Name *</label>
+                <input type="text" id="umNameInput" class="form-input" placeholder="e.g. Mock Exam 1">
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Course *</label>
+                    <select id="umCourseInput" class="form-input" onchange="_populateUMAreaDropdown(this.value)">
+                        <option value="ACCA">ACCA</option>
+                        <option value="CSEB">CSEB</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Date *</label>
+                    <input type="date" id="umDateInput" class="form-input">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Syllabus Area (Optional)</label>
+                <select id="umAreaInput" class="form-input">
+                    <option value="">No specific area</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Notes</label>
+                <input type="text" id="umNotesInput" class="form-input" placeholder="e.g. Needs to cover recent topics">
+            </div>
+            
+            <button class="btn hover-lift" onclick="saveUpcomingMock()" style="width: 100%; background: var(--neon-blue); color: #000;">Save Upcoming Mock</button>
+        </div>
+    </div>
+    
     <script src="auth.js?v=14"></script>
-    <script src="app.js?v=110"></script>
+    <script src="app.js?v=112"></script>
     <script src="export.js?v=10"></script>
 </body>
 </html>

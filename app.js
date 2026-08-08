@@ -1547,7 +1547,7 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, workLink: s.workLink, isFocusMode: s.isFocusMode, type: s.type });
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, workLink: s.workLink, qpSources: s.qpSources, isFocusMode: s.isFocusMode, type: s.type });
     });
 
     const typeLabels = {
@@ -1561,6 +1561,7 @@ function renderDayReport(dateKey) {
     // Build HTML with placeholders, then fill in user-supplied text safely via textContent
     let html = sessionDataForRender.map((d, i) => {
         const typeHtml = d.type && typeLabels[d.type] ? `<span style="background:rgba(255,255,255,0.1); color:var(--text-main); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid var(--glass-border);">${typeLabels[d.type]}</span>` : '';
+        const qpHtml = (d.qpSources && d.qpSources.length > 0) ? d.qpSources.map(qp => `<span style="background:rgba(10,132,255,0.15); color:var(--neon-blue); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid rgba(10,132,255,0.3);">${qp}</span>`).join('') : '';
         return `
         <div class="report-session-item" style="border-left: 4px solid ${d.color}">
             <div class="report-session-header">
@@ -1568,6 +1569,7 @@ function renderDayReport(dateKey) {
                     <span class="rsi-subj-${i}"></span>
                     ${d.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">✨ FOCUS</span>` : ''}
                     ${typeHtml}
+                    ${qpHtml}
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: var(--neon-blue);">${d.timeStr}</span>
@@ -2755,6 +2757,7 @@ function initRetrospectiveLogging() {
         const topic = document.getElementById('logTopicDropdown').value;
         const notes = document.getElementById('logNotesInput').value;
         const workLink = document.getElementById('logLinkInput')?.value || '';
+        const qpSources = Array.from(document.querySelectorAll('.log-qp-checkbox:checked')).map(cb => cb.value);
         const type = document.getElementById('logTypeInput').value;
         const hours = parseInt(document.getElementById('logHoursInput').value, 10) || 0;
         const minutes = parseInt(document.getElementById('logMinutesInput').value, 10) || 0;
@@ -2793,6 +2796,7 @@ function initRetrospectiveLogging() {
             topic: topic,
             notes: notes,
             workLink: workLink,
+            qpSources: qpSources,
             type: type,
             startTime: sessionStart.toISOString(),
             endTime: sessionEnd.toISOString(),
@@ -2931,6 +2935,8 @@ function populateLogTopics(subjId) {
 function openLogSessionModal(dateKey) {
     document.getElementById('logDateInput').value = dateKey;
     document.getElementById('logNotesInput').value = '';
+    if(document.getElementById('logLinkInput')) document.getElementById('logLinkInput').value = '';
+    document.querySelectorAll('.log-qp-checkbox').forEach(cb => cb.checked = false);
     document.getElementById('logHoursInput').value = '1';
     document.getElementById('logMinutesInput').value = '0';
     document.getElementById('logStartTimeInput').value = '';
@@ -4086,12 +4092,14 @@ function initMocksAndPractice() {
         
         saveData('mocks');
 
-        // Auto-remove matching upcoming mock (by name+course, case-insensitive)
-        const nameLower = name.toLowerCase().trim();
+        // Auto-remove matching upcoming mock (by ID if shortcut used, or by loose name+course match)
+        const nameLower = name.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
         const before = (AppState.upcomingMocks || []).length;
-        AppState.upcomingMocks = (AppState.upcomingMocks || []).filter(m =>
-            !(m.name.toLowerCase().trim() === nameLower && m.course === course)
-        );
+        AppState.upcomingMocks = (AppState.upcomingMocks || []).filter(m => {
+            if (window._linkedUpcomingMockId && m.id === window._linkedUpcomingMockId) return false;
+            return !(m.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '') === nameLower && m.course === course);
+        });
+        window._linkedUpcomingMockId = null;
         if (AppState.upcomingMocks.length < before) {
             saveData('upcomingMocks');
             renderExams(); // refresh dashboard countdown cards
@@ -4454,6 +4462,7 @@ function deleteUpcomingMock(id) {
 }
 
 function logResultForUpcomingMock(id) {
+    window._linkedUpcomingMockId = id;
     const mock = (AppState.upcomingMocks || []).find(m => m.id === id);
     if (!mock) return;
 
@@ -5581,6 +5590,10 @@ window.editAttendance = function(id) {
     document.getElementById('editAttendanceNotes').value = session.notes || '';
     if (document.getElementById('editAttendanceLink')) document.getElementById('editAttendanceLink').value = session.workLink || '';
 
+    document.querySelectorAll('.edit-qp-checkbox').forEach(cb => {
+        cb.checked = session.qpSources && session.qpSources.includes(cb.value);
+    });
+
     if (session.type) {
         document.getElementById('editAttendanceType').value = session.type;
     } else {
@@ -5648,6 +5661,7 @@ window.saveEditAttendance = function() {
     const subj = document.getElementById('editAttendanceSubject').value;
     const notes = document.getElementById('editAttendanceNotes').value;
     const workLink = document.getElementById('editAttendanceLink')?.value || '';
+    const qpSources = Array.from(document.querySelectorAll('.edit-qp-checkbox:checked')).map(cb => cb.value);
     const type = document.getElementById('editAttendanceType').value;
     const h = parseInt(document.getElementById('editAttendanceHours').value, 10) || 0;
     const m = parseInt(document.getElementById('editAttendanceMinutes').value, 10) || 0;
@@ -5658,6 +5672,12 @@ window.saveEditAttendance = function() {
     
     const durSecs = (h * 3600) + (m * 60);
     if (durSecs <= 0) return alert("Duration must be > 0");
+    
+    session.topic = topic;
+    session.notes = notes;
+    session.workLink = workLink;
+    session.qpSources = qpSources;
+    session.type = type;
     
     // Use start/end time inputs if provided
     const startTimeVal = document.getElementById('editStartTimeInput').value;

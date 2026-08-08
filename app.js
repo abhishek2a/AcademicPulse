@@ -1547,7 +1547,7 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, isFocusMode: s.isFocusMode, type: s.type });
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, workLink: s.workLink, isFocusMode: s.isFocusMode, type: s.type });
     });
 
     const typeLabels = {
@@ -1571,6 +1571,7 @@ function renderDayReport(dateKey) {
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: var(--neon-blue);">${d.timeStr}</span>
+                    ${d.workLink ? `<a href="${d.workLink}" target="_blank" rel="noopener noreferrer" style="background:transparent; border:none; color:var(--neon-gold); cursor:pointer; font-size:1.1rem; padding:0; line-height:1; text-decoration:none;" title="Open Work Link">🔗</a>` : ''}
                     <button onclick="editAttendance('${d.id}')" style="background:transparent; border:none; color:var(--neon-blue); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Edit Session">✎</button>
                     <button onclick="deleteSession('${d.id}')" style="background:transparent; border:none; color:var(--neon-red); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Delete Session">×</button>
                 </div>
@@ -2753,6 +2754,7 @@ function initRetrospectiveLogging() {
         const subjectId = document.getElementById('logSubjectInput').value;
         const topic = document.getElementById('logTopicDropdown').value;
         const notes = document.getElementById('logNotesInput').value;
+        const workLink = document.getElementById('logLinkInput')?.value || '';
         const type = document.getElementById('logTypeInput').value;
         const hours = parseInt(document.getElementById('logHoursInput').value, 10) || 0;
         const minutes = parseInt(document.getElementById('logMinutesInput').value, 10) || 0;
@@ -2790,6 +2792,7 @@ function initRetrospectiveLogging() {
             subjectId: subjectId,
             topic: topic,
             notes: notes,
+            workLink: workLink,
             type: type,
             startTime: sessionStart.toISOString(),
             endTime: sessionEnd.toISOString(),
@@ -5576,6 +5579,8 @@ window.editAttendance = function(id) {
     document.getElementById('editAttendanceSubject').value = session.subjectId;
     
     document.getElementById('editAttendanceNotes').value = session.notes || '';
+    if (document.getElementById('editAttendanceLink')) document.getElementById('editAttendanceLink').value = session.workLink || '';
+
     if (session.type) {
         document.getElementById('editAttendanceType').value = session.type;
     } else {
@@ -5642,6 +5647,7 @@ window.saveEditAttendance = function() {
     const date = document.getElementById('editAttendanceDate').value;
     const subj = document.getElementById('editAttendanceSubject').value;
     const notes = document.getElementById('editAttendanceNotes').value;
+    const workLink = document.getElementById('editAttendanceLink')?.value || '';
     const type = document.getElementById('editAttendanceType').value;
     const h = parseInt(document.getElementById('editAttendanceHours').value, 10) || 0;
     const m = parseInt(document.getElementById('editAttendanceMinutes').value, 10) || 0;

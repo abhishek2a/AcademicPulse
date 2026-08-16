@@ -82,7 +82,7 @@ const AppState = {
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
     upcomingMocks: [],
-    currentVersion: 'v1.0.91-beta',
+    currentVersion: 'v1.0.92-beta',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -221,8 +221,12 @@ function loadData() {
     AppState.workoutStats = Storage.get('cseb_workout_stats', { totalDone: 0, totalCorrect: 0 });
     
     const sysState = Storage.get(STORAGE_KEYS.SYSTEM_STATE, { currentVersion: 'v1.0.87', availableUpdate: null, dataVersion: 1 });
-    // Use the version stored in the system state
-    AppState.currentVersion = sysState.currentVersion || 'v1.0.87';
+    
+    // If the code version is newer than the stored version, update the stored version
+    if (sysState.currentVersion !== AppState.currentVersion) {
+        sysState.currentVersion = AppState.currentVersion;
+        Storage.set(STORAGE_KEYS.SYSTEM_STATE, sysState);
+    }
     if (AppState.currentVersion.includes('beta')) {
         localStorage.setItem('academicpulse_beta_opt_in', 'true');
     }
@@ -555,12 +559,12 @@ window.showWhatsNewPopup = async function() {
     let description, features;
 
     if (isBeta) {
-        description = "You're on <b>v1.0.91 Beta</b> \u2014 the Upcoming Mocks update! Thanks for testing bleeding-edge features.";
+        description = "You're on <b>v1.0.92 Beta</b> \u2014 the Reports & Performance update! Thanks for testing bleeding-edge features.";
         features = [
-            "<div style='margin-bottom:8px'><b>\uD83D\uDCC5 Schedule Upcoming Mocks</b></div>Plan out your mock exams! You can now schedule upcoming mock exams, see a countdown on your dashboard, and keep track of them in your Planner.",
-            "<div style='margin-bottom:8px'><b>\u23F0 Log Result Shortcut</b></div>When a mock exam date arrives, you'll be alerted and can log the result with a single tap, pre-filling the mock test form instantly.",
-            "<div style='margin-bottom:8px'><b>\uD83D\uDCDD Smart Text Wrapping</b></div>Extremely long mock exam titles will now beautifully wrap across multiple lines without breaking your dashboard layout.",
-            "<div style='margin-bottom:8px'><b>\uD83E\uDD16 Pulse AI Enhancements</b></div>Continued improvements to the Pulse AI coaching algorithms and background stability."
+            "<div style='margin-bottom:8px'><b>\uD83D\uDCC4 Daily Reports PDF</b></div>Export a beautiful Daily Report PDF showing your total study time, sessions, and daily goals, complete with specific Session Types (e.g. Revision, Class, YouTube).",
+            "<div style='margin-bottom:8px'><b>\uD83D\uDD0D Day ID Search</b></div>Every daily report now includes a unique Day ID (e.g. DAY-20260816). Paste this into the global search bar to instantly see a beautiful dashboard summarizing that exact day!",
+            "<div style='margin-bottom:8px'><b>\u26A1 Blazing Fast Performance</b></div>We squashed major memory leaks and overhauled the rendering engine. Switching tabs and viewing large amounts of study analytics is now incredibly smooth and fast!",
+            "<div style='margin-bottom:8px'><b>\uD83D\uDCC5 Schedule Upcoming Mocks</b></div>Plan out your mock exams! You can now schedule upcoming mock exams, see a countdown on your dashboard, and keep track of them in your Planner."
         ];
     } else {
         description = "Welcome to AcademicPulse v1.0.87 &#x1F44B; The Pulse AI &amp; Stability Update! We've made massive improvements under the hood to ensure your data stays intact.";
@@ -1281,16 +1285,21 @@ function renderAttendance() {
     document.getElementById('attendanceMonthTitle').textContent = now.toLocaleString('default', { month: 'long', year: 'numeric' });
     
     grid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    
     const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     days.forEach(d => {
-        grid.innerHTML += `<div class="day-name">${d}</div>`;
+        const dEl = document.createElement('div');
+        dEl.className = 'day-name';
+        dEl.textContent = d;
+        frag.appendChild(dEl);
     });
 
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
     for (let i = 0; i < firstDay; i++) {
-        grid.innerHTML += `<div></div>`;
+        frag.appendChild(document.createElement('div'));
     }
 
     let presentDays = 0;
@@ -1319,8 +1328,10 @@ function renderAttendance() {
             renderDayReport(dateKey);
         });
 
-        grid.appendChild(cell);
+        frag.appendChild(cell);
     }
+    
+    grid.appendChild(frag);
 
     // Streak Calculation
     let attStreak = 0;
@@ -1547,7 +1558,7 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, workLink: s.workLink, qpSources: s.qpSources, isFocusMode: s.isFocusMode, type: s.type });
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, workLink: s.workLink, qpSources: s.qpSources, classPlatform: s.classPlatform, classLink: s.classLink, isFocusMode: s.isFocusMode, type: s.type });
     });
 
     const typeLabels = {
@@ -1562,6 +1573,8 @@ function renderDayReport(dateKey) {
     let html = sessionDataForRender.map((d, i) => {
         const typeHtml = d.type && typeLabels[d.type] ? `<span style="background:rgba(255,255,255,0.1); color:var(--text-main); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid var(--glass-border);">${typeLabels[d.type]}</span>` : '';
         const qpHtml = (d.qpSources && d.qpSources.length > 0) ? d.qpSources.map(qp => `<span style="background:rgba(10,132,255,0.15); color:var(--neon-blue); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid rgba(10,132,255,0.3);">${qp}</span>`).join('') : '';
+        const platformHtml = d.classPlatform ? `<span style="background:rgba(255,149,0,0.15); color:var(--neon-gold); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid rgba(255,149,0,0.3);">${d.classPlatform}</span>` : '';
+        const classLinkHtml = d.classLink ? `<a href="${d.classLink}" target="_blank" rel="noopener noreferrer" style="background:transparent; border:none; color:var(--neon-gold); cursor:pointer; font-size:1.1rem; padding:0; line-height:1; text-decoration:none;" title="Open Class Link">▶️</a>` : '';
         return `
         <div class="report-session-item" style="border-left: 4px solid ${d.color}">
             <div class="report-session-header">
@@ -1570,10 +1583,12 @@ function renderDayReport(dateKey) {
                     ${d.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">✨ FOCUS</span>` : ''}
                     ${typeHtml}
                     ${qpHtml}
+                    ${platformHtml}
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="color: var(--neon-blue);">${d.timeStr}</span>
                     ${d.workLink ? `<a href="${d.workLink}" target="_blank" rel="noopener noreferrer" style="background:transparent; border:none; color:var(--neon-gold); cursor:pointer; font-size:1.1rem; padding:0; line-height:1; text-decoration:none;" title="Open Work Link">🔗</a>` : ''}
+                    ${classLinkHtml}
                     <button onclick="editAttendance('${d.id}')" style="background:transparent; border:none; color:var(--neon-blue); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Edit Session">✎</button>
                     <button onclick="deleteSession('${d.id}')" style="background:transparent; border:none; color:var(--neon-red); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Delete Session">×</button>
                 </div>
@@ -1755,6 +1770,7 @@ function renderMockExamsChart() {
         const labels = sortedMocks.map(m => new Date(m.date).toLocaleDateString(undefined, {month:'short', day:'numeric'}));
         const data = sortedMocks.map(m => Math.max(0, Math.min(100, Math.round((m.score / (m.maxScore || 1)) * 100))));
         
+        if (mockExamsLineChartInst) mockExamsLineChartInst.destroy();
         mockExamsLineChartInst = new Chart(mockCtx, {
             type: 'line',
             data: {
@@ -2008,12 +2024,12 @@ function renderAnalytics() {
 
         const matrixBody = e('performanceMatrixBody');
         if (matrixBody) {
-            matrixBody.innerHTML = '';
             if (matrixRows.length === 0) {
                 matrixBody.innerHTML = '<tr><td colspan="6" style="padding: 15px; text-align: center; color: var(--text-muted);">No syllabus performance data yet.</td></tr>';
             } else {
+                let matrixHtml = '';
                 matrixRows.sort((a,b) => b.compositeScore - a.compositeScore).forEach(r => {
-                    matrixBody.innerHTML += `
+                    matrixHtml += `
                         <tr style="border-bottom: 1px solid var(--glass-border);">
                             <td style="padding: 10px 5px; font-size: 0.9rem;">${r.area}</td>
                             <td style="padding: 10px 5px; color: var(--text-muted); font-size: 0.85rem;">${r.course}</td>
@@ -2024,6 +2040,7 @@ function renderAnalytics() {
                         </tr>
                     `;
                 });
+                matrixBody.innerHTML = matrixHtml;
             }
         }
 
@@ -2036,15 +2053,15 @@ function renderAnalytics() {
         }
         
         if (weakestContainer) {
-            weakestContainer.innerHTML = '';
             if (weakestAreas.length === 0) {
                 weakestContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem;">No weaknesses detected. Great job!</div>';
             } else {
+                let weakestHtml = '';
                 weakestAreas.forEach(w => {
                     const subjObj = AppState.subjects.find(s => s.name === w.area);
                     const subjId = subjObj ? subjObj.id : '';
                     const scoreText = w.statusText === 'Need Data' ? 'Untested (Needs Data)' : `Avg Score: ${Math.round(w.compositeScore)}%`;
-                    weakestContainer.innerHTML += `
+                    weakestHtml += `
                         <div style="background: var(--glass-hover); padding: 15px; border-radius: 8px; flex: 1; min-width: 150px; border-left: 4px solid ${w.color};">
                             <div style="font-weight: bold; margin-bottom: 5px;">${w.area}</div>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -2054,24 +2071,25 @@ function renderAnalytics() {
                         </div>
                     `;
                 });
+                weakestContainer.innerHTML = weakestHtml;
             }
         }
 
         if (topicRecs) {
-            topicRecs.innerHTML = '';
             if (weakestAreas.length === 0) {
                 topicRecs.innerHTML = '<li style="color: var(--text-muted);">Focus on completing remaining syllabus topics.</li>';
             } else {
+                let recsHtml = '';
                 weakestAreas.forEach(w => {
                     const syllabusObj = w.course === 'CSEB' ? AppState.csebSyllabus : AppState.accaTopics;
                     const topics = syllabusObj[w.area] || [];
                     const hardTopics = topics.filter(t => t.difficulty === 'Hard' && !t.completed).slice(0, 2);
                     const focusTopics = hardTopics.length > 0 ? hardTopics : topics.filter(t => !t.completed).slice(0, 2);
                     focusTopics.forEach(ft => {
-                        topicRecs.innerHTML += `<li><strong style="color: var(--text-main);">${w.area}:</strong> ${ft.name}</li>`;
+                        recsHtml += `<li><strong style="color: var(--text-main);">${w.area}:</strong> ${ft.name}</li>`;
                     });
                 });
-                if(topicRecs.innerHTML === '') topicRecs.innerHTML = '<li style="color: var(--text-muted);">No specific incomplete topics found in weak areas.</li>';
+                topicRecs.innerHTML = recsHtml === '' ? '<li style="color: var(--text-muted);">No specific incomplete topics found in weak areas.</li>' : recsHtml;
             }
         }
 
@@ -2318,6 +2336,7 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
             }
         });
 
+        if (monthlyAttendanceBarChartInst) monthlyAttendanceBarChartInst.destroy();
         monthlyAttendanceBarChartInst = new Chart(attBarCtx, {
             type: 'bar',
             data: {
@@ -2338,6 +2357,8 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
         const labels = subjArr.map(s => { const b=AppState.subjects.find(x=>x.id===s.id); return b?b.name:'-'; });
         const data = subjArr.map(s => s.dur/3600);
         const colors = subjArr.map(s => { const b=AppState.subjects.find(x=>x.id===s.id); return b?b.color:'#555'; });
+        
+        if (subjectPieChartInst) subjectPieChartInst.destroy();
         subjectPieChartInst = new Chart(pieCtx, {
             type: 'doughnut',
             data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
@@ -2759,6 +2780,8 @@ function initRetrospectiveLogging() {
         const workLink = document.getElementById('logLinkInput')?.value || '';
         const qpSources = Array.from(document.querySelectorAll('.log-qp-checkbox:checked')).map(cb => cb.value);
         const type = document.getElementById('logTypeInput').value;
+        const classPlatform = document.getElementById('logPlatformInput')?.value || '';
+        const classLink = document.getElementById('logClassLinkInput')?.value || '';
         const hours = parseInt(document.getElementById('logHoursInput').value, 10) || 0;
         const minutes = parseInt(document.getElementById('logMinutesInput').value, 10) || 0;
         
@@ -2798,6 +2821,8 @@ function initRetrospectiveLogging() {
             workLink: workLink,
             qpSources: qpSources,
             type: type,
+            classPlatform: classPlatform,
+            classLink: classLink,
             startTime: sessionStart.toISOString(),
             endTime: sessionEnd.toISOString(),
             duration: durationSecs,
@@ -2937,6 +2962,10 @@ function openLogSessionModal(dateKey) {
     document.getElementById('logNotesInput').value = '';
     if(document.getElementById('logLinkInput')) document.getElementById('logLinkInput').value = '';
     document.querySelectorAll('.log-qp-checkbox').forEach(cb => cb.checked = false);
+    if(document.getElementById('logPlatformInput')) document.getElementById('logPlatformInput').value = '';
+    if(document.getElementById('logClassLinkInput')) document.getElementById('logClassLinkInput').value = '';
+    const classPlatformSection = document.getElementById('classPlatformSection');
+    if(classPlatformSection) classPlatformSection.style.display = 'none';
     document.getElementById('logHoursInput').value = '1';
     document.getElementById('logMinutesInput').value = '0';
     document.getElementById('logStartTimeInput').value = '';
@@ -4834,6 +4863,78 @@ function renderSearchResults(query) {
         return;
     }
 
+    // Check for Day ID search (e.g. DAY-20260816 or ID: DAY-20260816) - BETA ONLY
+    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    if (isBetaUser) {
+        const dayIdMatch = q.match(/(?:id:\s*)?day\s*-\s*(\d{4})(\d{2})(\d{2})/);
+        if (dayIdMatch) {
+        const y = dayIdMatch[1];
+        const m = dayIdMatch[2];
+        const d = dayIdMatch[3];
+        const targetDateKey = `${y}-${m}-${d}`;
+        
+        const daySessions = AppState.sessions.filter(s => {
+            const dk = typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(new Date(s.startTime)) : new Date(s.startTime).toISOString().split('T')[0];
+            return dk === targetDateKey;
+        });
+        
+        let totalDur = 0;
+        daySessions.forEach(s => totalDur += (s.duration || (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 1000 : 0)));
+        const durH = Math.floor(totalDur / 3600);
+        const durM = Math.floor((totalDur % 3600) / 60);
+
+        const overviewHeader = document.createElement('div');
+        overviewHeader.style.cssText = 'background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--neon-blue); margin-bottom: 20px; box-shadow: 0 4px 20px rgba(10, 132, 255, 0.1);';
+        
+        // Handle invalid dates nicely
+        let displayDate = targetDateKey;
+        try { displayDate = new Date(targetDateKey).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) {}
+
+        overviewHeader.innerHTML = `
+            <h2 style="margin-top: 0; color: var(--text-main); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px; margin-bottom: 15px;">
+                <span>📅 Day Overview: ${displayDate}</span>
+                <span style="font-size: 0.85rem; color: var(--neon-blue); background: rgba(10, 132, 255, 0.1); padding: 6px 12px; border-radius: 20px; font-weight: bold;">DAY-${y}${m}${d}</span>
+            </h2>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 15px 20px; border-radius: 12px; flex: 1; min-width: 150px;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Total Time</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--text-main);">${durH}h ${durM}m</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 15px 20px; border-radius: 12px; flex: 1; min-width: 150px;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Total Sessions</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--text-main);">${daySessions.length}</div>
+                </div>
+            </div>
+        `;
+        container.appendChild(overviewHeader);
+
+        if (daySessions.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.style.cssText = 'color: var(--text-muted); padding: 20px; text-align: center; border: 1px dashed var(--glass-border); border-radius: 12px;';
+            emptyMsg.innerHTML = 'No study sessions logged for this day.';
+            container.appendChild(emptyMsg);
+            return;
+        }
+
+        const sessionsGrid = document.createElement('div');
+        sessionsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;';
+        
+        daySessions.sort((a,b) => new Date(a.startTime) - new Date(b.startTime)).forEach(s => {
+            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const durationHrs = s.duration ? (s.duration / 3600).toFixed(2) : ((new Date(s.endTime) - new Date(s.startTime)) / 3600000).toFixed(2);
+            const subtitle = `⏱️ ${durationHrs} Hours ${s.topic ? `• ${s.topic}` : ''}`;
+            const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
+            const dateStr = new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            
+            const card = createResultCard('session', subj ? subj.name : 'Unknown Subject', subtitle, dateStr, cleanNotes, subj ? subj.color : '#0A84FF');
+            sessionsGrid.appendChild(card);
+        });
+
+        container.appendChild(sessionsGrid);
+        return;
+        }
+    }
+
     // Netflix-style normalization: convert & to and, remove special chars, tokenize
     const normalizeForSearch = (str) => {
         if (!str) return '';
@@ -5593,9 +5694,13 @@ window.editAttendance = function(id) {
     document.querySelectorAll('.edit-qp-checkbox').forEach(cb => {
         cb.checked = session.qpSources && session.qpSources.includes(cb.value);
     });
+    if (document.getElementById('editPlatformInput')) document.getElementById('editPlatformInput').value = session.classPlatform || '';
+    if (document.getElementById('editClassLinkInput')) document.getElementById('editClassLinkInput').value = session.classLink || '';
 
     if (session.type) {
         document.getElementById('editAttendanceType').value = session.type;
+        const editClassPlatformSection = document.getElementById('editClassPlatformSection');
+        if (editClassPlatformSection) editClassPlatformSection.style.display = (session.type === 'class' || session.type === 'pending_topic') ? 'block' : 'none';
     } else {
         document.getElementById('editAttendanceType').value = 'study'; // default
     }
@@ -5663,6 +5768,8 @@ window.saveEditAttendance = function() {
     const workLink = document.getElementById('editAttendanceLink')?.value || '';
     const qpSources = Array.from(document.querySelectorAll('.edit-qp-checkbox:checked')).map(cb => cb.value);
     const type = document.getElementById('editAttendanceType').value;
+    const classPlatform = document.getElementById('editPlatformInput')?.value || '';
+    const classLink = document.getElementById('editClassLinkInput')?.value || '';
     const h = parseInt(document.getElementById('editAttendanceHours').value, 10) || 0;
     const m = parseInt(document.getElementById('editAttendanceMinutes').value, 10) || 0;
     
@@ -5678,6 +5785,8 @@ window.saveEditAttendance = function() {
     session.workLink = workLink;
     session.qpSources = qpSources;
     session.type = type;
+    session.classPlatform = classPlatform;
+    session.classLink = classLink;
     
     // Use start/end time inputs if provided
     const startTimeVal = document.getElementById('editStartTimeInput').value;
@@ -6050,6 +6159,10 @@ function updateScheduleModalFields() {
     if (timeFields) timeFields.style.display = isExamReg ? 'none' : 'flex';
     if (revisionFields) revisionFields.style.display = isRevision ? 'block' : 'none';
     
+    const isClass = type === 'class' || type === 'pending_topic';
+    const classPlatformFields = document.getElementById('scheduleClassPlatformSection');
+    if (classPlatformFields) classPlatformFields.style.display = isClass ? 'block' : 'none';
+    
     // For exam_register, the Date field label changes
     if (dateLabel && dateLabel.tagName === 'LABEL') {
         dateLabel.textContent = isExamReg ? 'Registration Planning Date' : 'Date';
@@ -6277,6 +6390,13 @@ window.openScheduleModal = function(id = null) {
             if (revMethod && item.revisionMethod) revMethod.value = item.revisionMethod;
             if (revIntensity && item.revisionIntensity) revIntensity.value = item.revisionIntensity;
         }
+        
+        if (item.type === 'class' || item.type === 'pending_topic') {
+            const plat = document.getElementById('schedulePlatformInput');
+            const lnk = document.getElementById('scheduleClassLinkInput');
+            if (plat) plat.value = item.classPlatform || '';
+            if (lnk) lnk.value = item.classLink || '';
+        }
 
         document.getElementById('scheduleTitleInput').value = item.title || '';
         document.getElementById('scheduleDateInput').value = item.date;
@@ -6323,6 +6443,10 @@ window.openScheduleModal = function(id = null) {
         const revIntensity = document.getElementById('scheduleRevisionIntensity');
         if (revMethod) revMethod.value = 'past_questions';
         if (revIntensity) revIntensity.value = 'light';
+        const plat = document.getElementById('schedulePlatformInput');
+        const lnk = document.getElementById('scheduleClassLinkInput');
+        if (plat) plat.value = '';
+        if (lnk) lnk.value = '';
     }
     updateScheduleModalFields();
     modal.classList.add('active');
@@ -6385,6 +6509,8 @@ function saveSchedulePlan() {
     const endTime = document.getElementById('scheduleEndTimeInput').value;
     const revisionMethod = document.getElementById('scheduleRevisionMethod')?.value || '';
     const revisionIntensity = document.getElementById('scheduleRevisionIntensity')?.value || '';
+    const classPlatform = document.getElementById('schedulePlatformInput')?.value || '';
+    const classLink = document.getElementById('scheduleClassLinkInput')?.value || '';
     
     if (!subjectId || !date || !startTime || !endTime) {
         return alert('Please fill in all required fields (Subject, Date, Times)');
@@ -6406,6 +6532,10 @@ function saveSchedulePlan() {
                 item.revisionMethod = revisionMethod;
                 item.revisionIntensity = revisionIntensity;
             }
+            if (type === 'class' || type === 'pending_topic') {
+                item.classPlatform = classPlatform;
+                item.classLink = classLink;
+            }
             // Reset status so rescheduled/edited missed items become pending again
             if (item.status === 'missed') item.status = 'pending';
         }
@@ -6423,6 +6553,8 @@ function saveSchedulePlan() {
             endTime,
             revisionMethod: type === 'revision' ? revisionMethod : undefined,
             revisionIntensity: type === 'revision' ? revisionIntensity : undefined,
+            classPlatform: (type === 'class' || type === 'pending_topic') ? classPlatform : undefined,
+            classLink: (type === 'class' || type === 'pending_topic') ? classLink : undefined,
             status: 'pending'
         });
     }
@@ -6628,6 +6760,8 @@ function renderScheduleList() {
                             <div style="font-weight:600; font-size:1.05rem; ${item.status==='completed' ? 'text-decoration:line-through; color:var(--text-muted);' : ''}" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
                             <div style="font-size:0.85rem; color:var(--text-muted);">${formatTimeStr(item.startTime)} - ${formatTimeStr(item.endTime)}</div>
                             ${topicsArr.length > 0 ? `<div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:3px;">${topicDisplay}</div>` : ''}
+                            ${item.classPlatform ? `<span style="background:rgba(255,149,0,0.15); color:var(--neon-gold); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-top:5px; display:inline-block; border:1px solid rgba(255,149,0,0.3);">${escapeHtml(item.classPlatform)}</span>` : ''}
+                            ${item.classLink ? `<a href="${escapeHtml(item.classLink)}" target="_blank" rel="noopener noreferrer" style="background:transparent; border:none; color:var(--neon-gold); cursor:pointer; font-size:1.1rem; padding:0; line-height:1; text-decoration:none; margin-top:5px; margin-left:6px; display:inline-block;" title="Open Class Link">▶️</a>` : ''}
                             ${revisionBadges}
                         </div>
                     </div>

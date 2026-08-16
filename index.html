@@ -672,6 +672,7 @@
             <div class="export-section" style="margin-bottom: 25px; margin-top: 40px;">
                 <h3 style="margin-top: 0; margin-bottom: 15px; color: var(--text-main);">Generate Reports</h3>
                 <div class="export-buttons-grid">
+                    <button class="btn btn-export" id="btnExportDaily">📅 Day Report (PDF)</button>
                     <button class="btn btn-export" id="btnExportStudy">📄 Study Report (PDF)</button>
                     <button class="btn btn-export" id="btnExportMonthly">📅 Monthly Report (PDF)</button>
                     <button class="btn btn-export" id="btnExportAttendance">🗓️ Attendance Report (PDF)</button>
@@ -1347,6 +1348,21 @@
                 </select>
             </div>
 
+            <div id="scheduleClassPlatformSection" style="display: none; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--glass-border);">
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label>Platform (Optional)</label>
+                    <select id="schedulePlatformInput">
+                        <option value="">-- Select Platform --</option>
+                        <option value="YouTube">YouTube</option>
+                        <option value="Instill Learning Hub">Instill Learning Hub</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Class Link (Optional)</label>
+                    <input type="url" id="scheduleClassLinkInput" placeholder="https://...">
+                </div>
+            </div>
+
             <!-- Standard fields (hidden for exam_register) -->
             <div id="scheduleStandardFields">
                 <div style="display: flex; gap: 15px;">
@@ -1559,13 +1575,28 @@
             
             <div class="form-group">
                 <label>Session Type</label>
-                <select id="logTypeInput">
+                <select id="logTypeInput" onchange="document.getElementById('classPlatformSection').style.display = (this.value === 'class' || this.value === 'pending_topic') ? 'block' : 'none'">
                     <option value="study">&#128218; Self Study</option>
                     <option value="revision">&#128260; Revision</option>
                     <option value="class">&#127979; Class</option>
                     <option value="pending_topic">&#128203; Pending Topic</option>
                     <option value="mock_test">&#127919; Mock Test</option>
                 </select>
+            </div>
+            
+            <div id="classPlatformSection" style="display: none; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--glass-border);">
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label>Platform (Optional)</label>
+                    <select id="logPlatformInput">
+                        <option value="">-- Select Platform --</option>
+                        <option value="YouTube">YouTube</option>
+                        <option value="Instill Learning Hub">Instill Learning Hub</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Class Link (Optional)</label>
+                    <input type="url" id="logClassLinkInput" placeholder="https://...">
+                </div>
             </div>
 
             <div class="form-group">
@@ -1662,13 +1693,28 @@
             </div>
             <div class="form-group">
                 <label>Session Type</label>
-                <select id="editAttendanceType">
+                <select id="editAttendanceType" onchange="document.getElementById('editClassPlatformSection').style.display = (this.value === 'class' || this.value === 'pending_topic') ? 'block' : 'none'">
                     <option value="study">&#128218; Self Study</option>
                     <option value="revision">&#128260; Revision</option>
                     <option value="class">&#127979; Class</option>
                     <option value="pending_topic">&#128203; Pending Topic</option>
                     <option value="mock_test">&#127919; Mock Test</option>
                 </select>
+            </div>
+            
+            <div id="editClassPlatformSection" style="display: none; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--glass-border);">
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label>Platform (Optional)</label>
+                    <select id="editPlatformInput">
+                        <option value="">-- Select Platform --</option>
+                        <option value="YouTube">YouTube</option>
+                        <option value="Instill Learning Hub">Instill Learning Hub</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Class Link (Optional)</label>
+                    <input type="url" id="editClassLinkInput" placeholder="https://...">
+                </div>
             </div>
             <div class="form-group">
                 <label>Notes</label>

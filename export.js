@@ -25,10 +25,12 @@ async function loadPdfLibraries() {
 
 window.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
+        const btnDaily = document.getElementById('btnExportDaily');
         const btnStudy = document.getElementById('btnExportStudy');
         const btnMonthly = document.getElementById('btnExportMonthly');
         const btnAttendance = document.getElementById('btnExportAttendance');
 
+        if (btnDaily) btnDaily.addEventListener('click', async () => { await loadPdfLibraries(); generateDailyReport(); });
         if (btnStudy) btnStudy.addEventListener('click', async () => { await loadPdfLibraries(); generateStudyReport(); });
         if (btnMonthly) btnMonthly.addEventListener('click', async () => { await loadPdfLibraries(); generateMonthlyReport(); });
         if (btnAttendance) btnAttendance.addEventListener('click', async () => { await loadPdfLibraries(); generateAttendanceReport(); });
@@ -65,6 +67,273 @@ function addPdfHeader(doc, title, color, subtitle) {
         return 46;
     }
     return 38;
+}
+
+function generateDailyReport() {
+    const doc = setupPDF();
+    const today = new Date();
+    const todayStr = today.toLocaleDateString();
+    const todayKey = typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(today) : today.toISOString().split('T')[0];
+
+    // Filter today's sessions
+    const todaysSessions = AppState.sessions.filter(s => {
+        const dk = typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(new Date(s.startTime)) : new Date(s.startTime).toISOString().split('T')[0];
+        return dk === todayKey;
+    });
+
+    let totalSeconds = 0;
+    let focusSeconds = 0;
+    const subjectStats = {};
+    const hourBlocks = {};
+    const tasksCompleted = [];
+    const coursesStudied = new Set();
+
+    todaysSessions.forEach(s => {
+        const dur = s.duration || (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 1000 : 0);
+        totalSeconds += dur;
+        if (s.isFocusMode) focusSeconds += dur;
+
+        const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+        const subjName = subj ? subj.name : 'Unknown';
+        subjectStats[subjName] = (subjectStats[subjName] || 0) + dur;
+        
+        if (subj && subj.course) coursesStudied.add(subj.course);
+        
+        if (s.topic) {
+            tasksCompleted.push(`${subjName}: ${s.topic}`);
+        } else if (s.topics && s.topics.length > 0) {
+            tasksCompleted.push(`${subjName}: ${s.topics.join(', ')}`);
+        } else if (subjName !== 'Unknown') {
+            if (!tasksCompleted.includes(subjName)) tasksCompleted.push(subjName);
+        }
+
+        const startHour = new Date(s.startTime).getHours();
+        hourBlocks[startHour] = (hourBlocks[startHour] || 0) + dur;
+    });
+
+    const totalHours = Math.floor(totalSeconds / 3600);
+    const totalMins = Math.floor((totalSeconds % 3600) / 60);
+    const timeStr = `${totalHours}h ${totalMins}m`;
+
+    const focusScore = totalSeconds > 0 ? Math.round((focusSeconds / totalSeconds) * 100) : 0;
+    const dailyTarget = AppState.goals?.daily || 6;
+    const goalMet = (totalSeconds / 3600) >= dailyTarget ? 'Yes' : 'No';
+
+    // Peak focus time
+    let peakHour = -1;
+    let maxDur = 0;
+    Object.entries(hourBlocks).forEach(([hr, dur]) => {
+        if (dur > maxDur) {
+            maxDur = dur;
+            peakHour = parseInt(hr);
+        }
+    });
+    
+    const formatAMPM = (hr) => {
+        const ampm = hr >= 12 ? 'PM' : 'AM';
+        const h = hr % 12 || 12;
+        return `${h}:00 ${ampm} - ${h === 11 ? '12:00 PM' : hr === 23 ? '12:00 AM' : (h+1)+':00 '+ampm}`;
+    };
+    const peakTimeStr = peakHour >= 0 ? formatAMPM(peakHour) : 'N/A';
+
+    // Daily streak
+    let streak = 0, cur = 0;
+    const studyDays = new Set(AppState.sessions.map(s => {
+        return typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(new Date(s.startTime)) : new Date(s.startTime).toISOString().split('T')[0];
+    }));
+    
+    // Check backwards from today
+    let checkDate = new Date();
+    for (let i = 0; i < 365; i++) {
+        const dk = typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(checkDate) : checkDate.toISOString().split('T')[0];
+        if (studyDays.has(dk)) { 
+            cur++; 
+            streak = cur; 
+        } else if (i > 0) { 
+            break; 
+        }
+        checkDate.setDate(checkDate.getDate() - 1);
+    }
+
+    // Tomorrow's plan
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowKey = typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(tomorrow) : tomorrow.toISOString().split('T')[0];
+    
+    const tomorrowsPlan = AppState.schedule ? AppState.schedule.filter(s => s.date === tomorrowKey) : [];
+
+    // PDF Generation
+    let y = addPdfHeader(doc, `Daily Report — ${todayStr}`, [0, 0, 0], 'AcademicPulse · Day Analysis');
+    
+    // Add Day ID (BETA ONLY)
+    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
+    if (isBetaUser) {
+        const dayId = `DAY-${todayKey.replace(/-/g, '')}`;
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        // Align right, below the date
+        doc.text(`ID: ${dayId}`, 210 - 14 - (doc.getStringUnitWidth(`ID: ${dayId}`) * 10 / doc.internal.scaleFactor), 30);
+    }
+
+    doc.setFontSize(13);
+    doc.setTextColor(40, 40, 40);
+    doc.text('Core Time Metrics', 14, y + 6);
+    y += 10;
+
+    doc.autoTable({
+        startY: y,
+        head: [['Metric', 'Value']],
+        body: [
+            ['Total Study Time', timeStr],
+            ['Course(s) Studied', coursesStudied.size > 0 ? Array.from(coursesStudied).join(', ') : 'None'],
+            ['Session Count', `${todaysSessions.length}`],
+            ['Efficiency / Focus Score', `${focusScore}% of time in Focus Mode`],
+            ['Peak Productivity Time', peakTimeStr]
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+        styles: { fontSize: 10, cellPadding: 5 },
+        alternateRowStyles: { fillColor: [248, 248, 248] }
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+
+    // Achievements
+    doc.setFontSize(13);
+    doc.setTextColor(40, 40, 40);
+    doc.text('Achievements & Progress', 14, y + 4);
+    y += 8;
+
+    // Word wrap portions studied
+    const portions = tasksCompleted.length > 0 ? tasksCompleted.join(', ') : 'None logged';
+    
+    doc.autoTable({
+        startY: y,
+        head: [['Metric', 'Value']],
+        body: [
+            ['Daily Goal Met', `${goalMet} (Target: ${dailyTarget}h)`],
+            ['Current Streak', `${streak} day${streak !== 1 ? 's' : ''}`],
+            ['Portions Studied Today', portions]
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+        styles: { fontSize: 10, cellPadding: 5 },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
+        columnStyles: { 1: { cellWidth: 130 } }
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+    
+    // Subject Breakdown
+    if (Object.keys(subjectStats).length > 0) {
+        doc.setFontSize(13);
+        doc.setTextColor(40, 40, 40);
+        doc.text('Subject Breakdown', 14, y + 4);
+        y += 8;
+        
+        const subjRows = Object.entries(subjectStats).map(([subj, secs]) => {
+            const h = Math.floor(secs / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            return [subj, `${h}h ${m}m`];
+        });
+        
+        doc.autoTable({
+            startY: y,
+            head: [['Subject', 'Time Spent']],
+            body: subjRows,
+            theme: 'striped',
+            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+            styles: { fontSize: 10, cellPadding: 5 },
+            alternateRowStyles: { fillColor: [248, 248, 248] }
+        });
+        
+        y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // Today's Study Log
+    if (todaysSessions.length > 0) {
+        doc.setFontSize(13);
+        doc.setTextColor(40, 40, 40);
+        doc.text("Today's Study Log", 14, y + 4);
+        y += 8;
+
+        const sortedSessions = [...todaysSessions].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+
+        const logRows = sortedSessions.map(s => {
+            const startD = new Date(s.startTime);
+            const timeStr = `${startD.getHours().toString().padStart(2, '0')}:${startD.getMinutes().toString().padStart(2, '0')}`;
+            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const subjName = subj ? subj.name : 'Unknown';
+            let sessionName = s.topic || (s.topics && s.topics.length ? s.topics.join(', ') : '');
+            if (s.notes) {
+                sessionName += sessionName ? ` - ${s.notes}` : s.notes;
+            }
+            if (!sessionName) sessionName = '-';
+            
+            const typeLabels = {
+                study: 'Self Study',
+                revision: 'Revision',
+                class: 'Class',
+                pending_topic: 'Pending Topic',
+                mock_test: 'Mock Test'
+            };
+            const typeStr = s.type && typeLabels[s.type] ? typeLabels[s.type] : (s.type || 'Self Study');
+            let typePlatformStr = typeStr;
+            if (s.classPlatform) {
+                typePlatformStr += `\n(${s.classPlatform})`;
+            }
+            
+            const dur = s.duration || (s.endTime ? (new Date(s.endTime) - startD) / 1000 : 0);
+            const durH = Math.floor(dur / 3600);
+            const durM = Math.floor((dur % 3600) / 60);
+            const durStr = durH > 0 ? `${durH}h ${durM}m` : `${durM}m`;
+
+            return [timeStr, subjName, sessionName, typePlatformStr, durStr];
+        });
+
+        doc.autoTable({
+            startY: y,
+            head: [['Time', 'Subject', 'Session Name', 'Type / Platform', 'Duration']],
+            body: logRows,
+            theme: 'striped',
+            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+            styles: { fontSize: 9, cellPadding: 5 },
+            alternateRowStyles: { fillColor: [248, 248, 248] }
+        });
+        
+        y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // Tomorrow's Plan
+    doc.setFontSize(13);
+    doc.setTextColor(40, 40, 40);
+    doc.text("What's Planned for Tomorrow", 14, y + 4);
+    y += 8;
+
+    if (tomorrowsPlan.length > 0) {
+        const planRows = tomorrowsPlan.map(p => {
+            const subj = AppState.subjects.find(s => s.id === p.subjectId);
+            const subjName = subj ? subj.name : 'Unknown';
+            const t = p.title || p.topic || (p.topics && p.topics.length ? p.topics.join(', ') : 'Study');
+            return [p.startTime, subjName, t];
+        });
+        
+        doc.autoTable({
+            startY: y,
+            head: [['Time', 'Subject', 'Task']],
+            body: planRows,
+            theme: 'striped',
+            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+            styles: { fontSize: 10, cellPadding: 5 },
+            alternateRowStyles: { fillColor: [248, 248, 248] }
+        });
+    } else {
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text("Nothing scheduled for tomorrow yet.", 14, y + 2);
+    }
+
+    doc.save(`Day_Report_${todayKey}.pdf`);
 }
 
 function generateStudyReport() {

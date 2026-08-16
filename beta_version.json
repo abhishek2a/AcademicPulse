@@ -1,12 +1,12 @@
 {
-  "version": "v1.0.91-beta",
-  "build": "2026.08.08-beta.1",
-  "title": "v1.0.91 Beta — Upcoming Mocks Update",
-  "description": "You're on the bleeding edge! This beta release brings a highly requested feature: the ability to schedule and track Upcoming Mock Exams.",
+  "version": "v1.0.92-beta",
+  "build": "2026.08.16-beta.1",
+  "title": "v1.0.92 Beta — Reports & Performance Update",
+  "description": "You're on the bleeding edge! This beta release brings a highly requested feature: Daily Report PDF exports, the Day ID search system, and massive performance improvements.",
   "features": [
-    "<div style='margin-bottom:8px'><b>📅 Schedule Upcoming Mocks</b></div>Plan out your mock exams! You can now schedule upcoming mock exams, see a countdown on your dashboard, and keep track of them in your Planner.",
-    "<div style='margin-bottom:8px'><b>⏰ Log Result Shortcut</b></div>When a mock exam date arrives, you'll be alerted and can log the result with a single tap, pre-filling the mock test form instantly.",
-    "<div style='margin-bottom:8px'><b>📝 Smart Text Wrapping</b></div>Extremely long mock exam titles will now beautifully wrap across multiple lines without breaking your dashboard layout.",
-    "<div style='margin-bottom:8px'><b>🤖 Pulse AI Enhancements</b></div>Continued improvements to the Pulse AI coaching algorithms and background stability."
+    "<div style='margin-bottom:8px'><b>\uD83D\uDCC4 Daily Reports PDF</b></div>Export a beautiful Daily Report PDF showing your total study time, sessions, and daily goals, complete with specific Session Types (e.g. Revision, Class, YouTube).",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDD0D Day ID Search</b></div>Every daily report now includes a unique Day ID (e.g. DAY-20260816). Paste this into the global search bar to instantly see a beautiful dashboard summarizing that exact day!",
+    "<div style='margin-bottom:8px'><b>\u26A1 Blazing Fast Performance</b></div>We squashed major memory leaks and overhauled the rendering engine. Switching tabs and viewing large amounts of study analytics is now incredibly smooth and fast!",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDCC5 Schedule Upcoming Mocks</b></div>Plan out your mock exams! You can now schedule upcoming mock exams, see a countdown on your dashboard, and keep track of them in your Planner."
   ]
 }

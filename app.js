@@ -5724,8 +5724,8 @@ window.editAttendance = function(id) {
     const editHoursEl   = document.getElementById('editAttendanceHours');
     const editMinsEl    = document.getElementById('editAttendanceMinutes');
 
-    editStartEl.value = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`;
-    editEndEl.value   = endDate && !isNaN(endDate) ? `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}` : '';
+    editStartEl.value = (startDate && !isNaN(startDate)) ? `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}` : '';
+    editEndEl.value   = (endDate && !isNaN(endDate)) ? `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}` : '';
 
     // Instant preview calculation (no setTimeout, no debounce needed — it's trivial math)
     const updateEditPreview = () => {
@@ -5780,7 +5780,7 @@ window.saveEditAttendance = function() {
     const durSecs = (h * 3600) + (m * 60);
     if (durSecs <= 0) return alert("Duration must be > 0");
     
-    session.topic = topic;
+
     session.notes = notes;
     session.workLink = workLink;
     session.qpSources = qpSources;
@@ -5808,6 +5808,12 @@ window.saveEditAttendance = function() {
         sessionEnd = new Date(date + 'T00:00:00');
         sessionEnd.setHours(eh, em, 0, 0);
         if (sessionEnd <= sessionStart) sessionEnd.setDate(sessionEnd.getDate() + 1);
+        
+        // If manual duration disagrees with the time gap, recalculate end time
+        const gapSecs = Math.round((sessionEnd - sessionStart) / 1000);
+        if (Math.abs(gapSecs - durSecs) > 60) {
+            sessionEnd = new Date(sessionStart.getTime() + durSecs * 1000);
+        }
     } else {
         sessionEnd = new Date(sessionStart.getTime() + durSecs * 1000);
     }

@@ -226,6 +226,7 @@ function generateDailyReport() {
     
     // Subject Breakdown
     if (Object.keys(subjectStats).length > 0) {
+        if (y > 250) { doc.addPage(); y = 20; }
         doc.setFontSize(13);
         doc.setTextColor(40, 40, 40);
         doc.text('Subject Breakdown', 14, y + 4);
@@ -252,6 +253,7 @@ function generateDailyReport() {
 
     // Today's Study Log
     if (todaysSessions.length > 0) {
+        if (y > 250) { doc.addPage(); y = 20; }
         doc.setFontSize(13);
         doc.setTextColor(40, 40, 40);
         doc.text("Today's Study Log", 14, y + 4);
@@ -305,6 +307,7 @@ function generateDailyReport() {
     }
 
     // Tomorrow's Plan
+    if (y > 250) { doc.addPage(); y = 20; }
     doc.setFontSize(13);
     doc.setTextColor(40, 40, 40);
     doc.text("What's Planned for Tomorrow", 14, y + 4);

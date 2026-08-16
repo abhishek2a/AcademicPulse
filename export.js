@@ -100,9 +100,11 @@ function generateDailyReport() {
         if (subj && subj.course) coursesStudied.add(subj.course);
         
         if (s.topic) {
-            tasksCompleted.push(`${subjName}: ${s.topic}`);
+            const entry = `${subjName}: ${s.topic}`;
+            if (!tasksCompleted.includes(entry)) tasksCompleted.push(entry);
         } else if (s.topics && s.topics.length > 0) {
-            tasksCompleted.push(`${subjName}: ${s.topics.join(', ')}`);
+            const entry = `${subjName}: ${s.topics.join(', ')}`;
+            if (!tasksCompleted.includes(entry)) tasksCompleted.push(entry);
         } else if (subjName !== 'Unknown') {
             if (!tasksCompleted.includes(subjName)) tasksCompleted.push(subjName);
         }
@@ -300,7 +302,14 @@ function generateDailyReport() {
             theme: 'striped',
             headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
             styles: { fontSize: 9, cellPadding: 5 },
-            alternateRowStyles: { fillColor: [248, 248, 248] }
+            alternateRowStyles: { fillColor: [248, 248, 248] },
+            columnStyles: {
+                0: { cellWidth: 16 },
+                1: { cellWidth: 45 },
+                2: { cellWidth: 'auto' },
+                3: { cellWidth: 35 },
+                4: { cellWidth: 18 }
+            }
         });
         
         y = doc.lastAutoTable.finalY + 10;

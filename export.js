@@ -265,7 +265,11 @@ function generateDailyReport() {
 
         const logRows = sortedSessions.map(s => {
             const startD = new Date(s.startTime);
-            const timeStr = `${startD.getHours().toString().padStart(2, '0')}:${startD.getMinutes().toString().padStart(2, '0')}`;
+            let h = startD.getHours();
+            const m = startD.getMinutes().toString().padStart(2, '0');
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            const timeStr = `${h}:${m} ${ampm}`;
             const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
             const subjName = subj ? subj.name : 'Unknown';
             let sessionName = s.topic || (s.topics && s.topics.length ? s.topics.join(', ') : '');
@@ -304,7 +308,7 @@ function generateDailyReport() {
             styles: { fontSize: 9, cellPadding: 5 },
             alternateRowStyles: { fillColor: [248, 248, 248] },
             columnStyles: {
-                0: { cellWidth: 16 },
+                0: { cellWidth: 22 },
                 1: { cellWidth: 45 },
                 2: { cellWidth: 'auto' },
                 3: { cellWidth: 35 },
@@ -327,7 +331,15 @@ function generateDailyReport() {
             const subj = AppState.subjects.find(s => s.id === p.subjectId);
             const subjName = subj ? subj.name : 'Unknown';
             const t = p.title || p.topic || (p.topics && p.topics.length ? p.topics.join(', ') : 'Study');
-            return [p.startTime, subjName, t];
+            
+            let timeStr = p.startTime;
+            if (timeStr && timeStr.includes(':')) {
+                let [th, tm] = timeStr.split(':').map(Number);
+                const ampm = th >= 12 ? 'PM' : 'AM';
+                th = th % 12 || 12;
+                timeStr = `${th}:${tm.toString().padStart(2, '0')} ${ampm}`;
+            }
+            return [timeStr, subjName, t];
         });
         
         doc.autoTable({
@@ -337,7 +349,12 @@ function generateDailyReport() {
             theme: 'striped',
             headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
             styles: { fontSize: 10, cellPadding: 5 },
-            alternateRowStyles: { fillColor: [248, 248, 248] }
+            alternateRowStyles: { fillColor: [248, 248, 248] },
+            columnStyles: {
+                0: { cellWidth: 22 },
+                1: { cellWidth: 45 },
+                2: { cellWidth: 'auto' }
+            }
         });
     } else {
         doc.setFontSize(10);

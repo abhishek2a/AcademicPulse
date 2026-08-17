@@ -99,14 +99,13 @@ function generateDailyReport() {
         
         if (subj && subj.course) coursesStudied.add(subj.course);
         
-        if (s.topic) {
-            const entry = `${subjName}: ${s.topic}`;
-            if (!tasksCompleted.includes(entry)) tasksCompleted.push(entry);
-        } else if (s.topics && s.topics.length > 0) {
-            const entry = `${subjName}: ${s.topics.join(', ')}`;
+        let displayTopic = (s.topics && s.topics.length > 0) ? s.topics.join(', ') : s.topic;
+        if (displayTopic) {
+            let entry = `${subjName}: ${displayTopic}`;
             if (!tasksCompleted.includes(entry)) tasksCompleted.push(entry);
         } else if (subjName !== 'Unknown') {
-            if (!tasksCompleted.includes(subjName)) tasksCompleted.push(subjName);
+            let entry = subjName;
+            if (!tasksCompleted.includes(entry)) tasksCompleted.push(entry);
         }
 
         const startHour = new Date(s.startTime).getHours();
@@ -165,7 +164,7 @@ function generateDailyReport() {
     const tomorrowsPlan = AppState.schedule ? AppState.schedule.filter(s => s.date === tomorrowKey) : [];
 
     // PDF Generation
-    let y = addPdfHeader(doc, `Daily Report — ${todayStr}`, [0, 0, 0], 'AcademicPulse · Day Analysis');
+    let y = addPdfHeader(doc, `Daily Report - ${todayStr}`, [0, 0, 0], 'AcademicPulse - Day Analysis');
     
     // Add Day ID (BETA ONLY)
     const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
@@ -266,13 +265,19 @@ function generateDailyReport() {
         const logRows = sortedSessions.map(s => {
             const startD = new Date(s.startTime);
             let h = startD.getHours();
-            const m = startD.getMinutes().toString().padStart(2, '0');
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            h = h % 12 || 12;
-            const timeStr = `${h}:${m} ${ampm}`;
+            let timeStr = '-';
+            if (!isNaN(h)) {
+                const m = startD.getMinutes().toString().padStart(2, '0');
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                h = h % 12 || 12;
+                timeStr = `${h}:${m} ${ampm}`;
+            }
             const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
             const subjName = subj ? subj.name : 'Unknown';
-            let sessionName = s.topic || (s.topics && s.topics.length ? s.topics.join(', ') : '');
+            let sessionName = (s.topics && s.topics.length > 0) ? s.topics.join(', ') : (s.topic || '');
+            if (s.isFocusMode) {
+                sessionName = sessionName ? `[Focus Mode] ${sessionName}` : '[Focus Mode]';
+            }
             if (s.notes) {
                 sessionName += sessionName ? ` - ${s.notes}` : s.notes;
             }
@@ -319,48 +324,7 @@ function generateDailyReport() {
         y = doc.lastAutoTable.finalY + 10;
     }
 
-    // Tomorrow's Plan
-    if (y > 250) { doc.addPage(); y = 20; }
-    doc.setFontSize(13);
-    doc.setTextColor(40, 40, 40);
-    doc.text("What's Planned for Tomorrow", 14, y + 4);
-    y += 8;
 
-    if (tomorrowsPlan.length > 0) {
-        const planRows = tomorrowsPlan.map(p => {
-            const subj = AppState.subjects.find(s => s.id === p.subjectId);
-            const subjName = subj ? subj.name : 'Unknown';
-            const t = p.title || p.topic || (p.topics && p.topics.length ? p.topics.join(', ') : 'Study');
-            
-            let timeStr = p.startTime;
-            if (timeStr && timeStr.includes(':')) {
-                let [th, tm] = timeStr.split(':').map(Number);
-                const ampm = th >= 12 ? 'PM' : 'AM';
-                th = th % 12 || 12;
-                timeStr = `${th}:${tm.toString().padStart(2, '0')} ${ampm}`;
-            }
-            return [timeStr, subjName, t];
-        });
-        
-        doc.autoTable({
-            startY: y,
-            head: [['Time', 'Subject', 'Task']],
-            body: planRows,
-            theme: 'striped',
-            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
-            styles: { fontSize: 10, cellPadding: 5 },
-            alternateRowStyles: { fillColor: [248, 248, 248] },
-            columnStyles: {
-                0: { cellWidth: 22 },
-                1: { cellWidth: 45 },
-                2: { cellWidth: 'auto' }
-            }
-        });
-    } else {
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text("Nothing scheduled for tomorrow yet.", 14, y + 2);
-    }
 
     doc.save(`Day_Report_${todayKey}.pdf`);
 }
@@ -433,10 +397,10 @@ function generateStudyReport() {
     const workoutQCount = AppState.workoutQuestions?.length || 0;
     const workoutDone = AppState.workoutStats?.totalDone || 0;
 
-    // ── PDF Header ──────────────────────────────────────────────────
-    let y = addPdfHeader(doc, 'Study Report — Lifetime', [41, 151, 255], 'AcademicPulse · Complete Study Analysis');
+    // PDF Header
+    let y = addPdfHeader(doc, 'Study Report - Lifetime', [41, 151, 255], 'AcademicPulse - Complete Study Analysis');
 
-    // ── Summary Box ─────────────────────────────────────────────────
+    // Summary Box
     doc.setFontSize(13);
     doc.setTextColor(40, 40, 40);
     doc.text('Study Summary', 14, y + 6);
@@ -497,7 +461,7 @@ function generateMonthlyReport() {
     const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
     const monthKey = TimeUtils.getMonthKey(now);
 
-    let y = addPdfHeader(doc, `Monthly Report — ${monthName}`, [10, 132, 255], 'AcademicPulse · Month at a Glance');
+    let y = addPdfHeader(doc, `Monthly Report - ${monthName}`, [10, 132, 255], 'AcademicPulse - Month at a Glance');
 
     // ── Monthly Sessions ────────────────────────────────────────────
     let monthTotal = 0;
@@ -607,7 +571,7 @@ function generateMonthlyReport() {
 function generateAttendanceReport() {
     const doc = setupPDF();
 
-    let y = addPdfHeader(doc, 'Attendance Report', [48, 209, 88], 'AcademicPulse · Full Attendance Analysis');
+    let y = addPdfHeader(doc, 'Attendance Report', [48, 209, 88], 'AcademicPulse - Full Attendance Analysis');
 
     let present = 0, absent = 0, leave = 0;
     const dates = Object.keys(AppState.attendance).sort();

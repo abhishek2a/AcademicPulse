@@ -1558,7 +1558,7 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: s.topic, notes: s.notes, workLink: s.workLink, qpSources: s.qpSources, classPlatform: s.classPlatform, classLink: s.classLink, isFocusMode: s.isFocusMode, type: s.type });
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: (s.topics && s.topics.length > 0) ? s.topics.join(', ') : s.topic, notes: s.notes, workLink: s.workLink, qpSources: s.qpSources, classPlatform: s.classPlatform, classLink: s.classLink, isFocusMode: s.isFocusMode, type: s.type });
     });
 
     const typeLabels = {
@@ -1571,21 +1571,21 @@ function renderDayReport(dateKey) {
 
     // Build HTML with placeholders, then fill in user-supplied text safely via textContent
     let html = sessionDataForRender.map((d, i) => {
-        const typeHtml = d.type && typeLabels[d.type] ? `<span style="background:rgba(255,255,255,0.1); color:var(--text-main); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid var(--glass-border);">${typeLabels[d.type]}</span>` : '';
-        const qpHtml = (d.qpSources && d.qpSources.length > 0) ? d.qpSources.map(qp => `<span style="background:rgba(10,132,255,0.15); color:var(--neon-blue); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid rgba(10,132,255,0.3);">${qp}</span>`).join('') : '';
-        const platformHtml = d.classPlatform ? `<span style="background:rgba(255,149,0,0.15); color:var(--neon-gold); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px; border:1px solid rgba(255,149,0,0.3);">${d.classPlatform}</span>` : '';
+        const typeHtml = d.type && typeLabels[d.type] ? `<span style="background:rgba(255,255,255,0.1); color:var(--text-main); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; border:1px solid var(--glass-border);">${typeLabels[d.type]}</span>` : '';
+        const qpHtml = (d.qpSources && d.qpSources.length > 0) ? d.qpSources.map(qp => `<span style="background:rgba(10,132,255,0.15); color:var(--neon-blue); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; border:1px solid rgba(10,132,255,0.3);">${qp}</span>`).join('') : '';
+        const platformHtml = d.classPlatform ? `<span style="background:rgba(255,149,0,0.15); color:var(--neon-gold); padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; border:1px solid rgba(255,149,0,0.3);">${d.classPlatform}</span>` : '';
         const classLinkHtml = d.classLink ? `<a href="${d.classLink}" target="_blank" rel="noopener noreferrer" style="background:transparent; border:none; color:var(--neon-gold); cursor:pointer; font-size:1.1rem; padding:0; line-height:1; text-decoration:none;" title="Open Class Link">▶️</a>` : '';
         return `
         <div class="report-session-item" style="border-left: 4px solid ${d.color}">
-            <div class="report-session-header">
-                <div>
+            <div class="report-session-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: 1;">
                     <span class="rsi-subj-${i}"></span>
-                    ${d.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; margin-left:6px;">✨ FOCUS</span>` : ''}
+                    ${d.isFocusMode ? `<span style="background:var(--neon-gold); color:#000; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">✨ FOCUS</span>` : ''}
                     ${typeHtml}
                     ${qpHtml}
                     ${platformHtml}
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-shrink: 0; padding-top: 2px;">
                     <span style="color: var(--neon-blue);">${d.timeStr}</span>
                     ${d.workLink ? `<a href="${d.workLink}" target="_blank" rel="noopener noreferrer" style="background:transparent; border:none; color:var(--neon-gold); cursor:pointer; font-size:1.1rem; padding:0; line-height:1; text-decoration:none;" title="Open Work Link">🔗</a>` : ''}
                     ${classLinkHtml}
@@ -2813,10 +2813,16 @@ function initRetrospectiveLogging() {
             sessionEnd = new Date(sessionStart.getTime() + (durationSecs * 1000));
         }
 
+        if (topic && !window._selectedLogTopics.includes(topic)) {
+            window._selectedLogTopics.push(topic);
+        }
+        let topicsArray = [...window._selectedLogTopics];
+
         AppState.sessions.push({
             id: generateId(),
             subjectId: subjectId,
-            topic: topic,
+            topic: topicsArray.length > 0 ? topicsArray[0] : '',
+            topics: topicsArray,
             notes: notes,
             workLink: workLink,
             qpSources: qpSources,
@@ -2837,41 +2843,35 @@ function initRetrospectiveLogging() {
                 schedItem.status = 'completed';
                 saveData('schedule');
                 
-                // Automatically tick off the topic from the syllabus if one was selected
-                if (topic && subjectId) {
+                // Automatically tick off the topics from the syllabus
+                if (topicsArray.length > 0 && subjectId) {
                     const subj = AppState.subjects.find(s => s.id === subjectId);
                     if (subj) {
                         const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
-                        let syllabusType = null;
-                        let syllabusTopics = null;
-                        
                         const courseCode = document.getElementById('logCourseInput').value;
+                        
                         if (courseCode === 'CSEB' && AppState.csebSyllabus) {
                             const key = Object.keys(AppState.csebSyllabus).find(k => {
                                 const cleanK = k.toLowerCase();
                                 return cleanName === cleanK || cleanName.includes(cleanK) || cleanK.includes(cleanName);
                             });
                             if (key) {
-                                syllabusTopics = AppState.csebSyllabus[key];
-                                syllabusType = 'csebSyllabus';
+                                topicsArray.forEach(tName => {
+                                    const targetTopic = AppState.csebSyllabus[key].find(t => (t.name || t.topic || t) === tName);
+                                    if (targetTopic && !targetTopic.completed) targetTopic.completed = true;
+                                });
+                                saveData('csebSyllabus');
                             }
                         } else if (courseCode === 'ACCA' && AppState.accaTopics) {
-                            // Find which area holds this topic
-                            Object.keys(AppState.accaTopics).forEach(area => {
-                                const t = AppState.accaTopics[area].find(x => (x.name || x.topic || x) === topic);
-                                if (t) {
-                                    syllabusTopics = AppState.accaTopics[area];
-                                    syllabusType = 'accaTopics';
-                                }
+                            topicsArray.forEach(tName => {
+                                Object.keys(AppState.accaTopics).forEach(area => {
+                                    const t = AppState.accaTopics[area].find(x => (x.name || x.topic || x) === tName);
+                                    if (t && !t.completed) {
+                                        t.completed = true;
+                                        saveData('accaTopics');
+                                    }
+                                });
                             });
-                        }
-                        
-                        if (syllabusTopics && syllabusType) {
-                            const targetTopic = syllabusTopics.find(t => (t.name || t.topic || t) === topic);
-                            if (targetTopic && !targetTopic.completed) {
-                                targetTopic.completed = true;
-                                saveData(syllabusType);
-                            }
                         }
                     }
                 }
@@ -2957,6 +2957,39 @@ function populateLogTopics(subjId) {
     }
 }
 
+window._selectedLogTopics = [];
+
+window.onLogTopicSelected = function() {
+    const sel = document.getElementById('logTopicDropdown');
+    const val = sel.value;
+    if (val && !window._selectedLogTopics.includes(val)) {
+        window._selectedLogTopics.push(val);
+        renderLogTopicChips();
+    }
+    sel.value = ''; // reset dropdown
+};
+
+function renderLogTopicChips() {
+    const container = document.getElementById('logTopicsContainer');
+    if (!container) return;
+    if (window._selectedLogTopics.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = window._selectedLogTopics.map(t =>
+        `<span style="background:rgba(255,214,10,0.12); color:var(--neon-gold); border:1px solid rgba(255,214,10,0.3); border-radius:12px; padding:4px 10px; font-size:0.8rem; font-weight:600; display:inline-flex; align-items:center; margin-bottom:4px;">
+            ${escapeHtml(t)}
+            <span style="margin-left:6px; cursor:pointer; opacity:0.7;" onclick="window.removeLogTopic(event, '${escapeHtml(t).replace(/'/g, "\\'")}')">&times;</span>
+        </span>`
+    ).join('');
+}
+
+window.removeLogTopic = function(e, topic) {
+    if (e) e.stopPropagation();
+    window._selectedLogTopics = window._selectedLogTopics.filter(t => t !== topic);
+    renderLogTopicChips();
+};
+
 function openLogSessionModal(dateKey) {
     document.getElementById('logDateInput').value = dateKey;
     document.getElementById('logNotesInput').value = '';
@@ -2971,6 +3004,9 @@ function openLogSessionModal(dateKey) {
     document.getElementById('logStartTimeInput').value = '';
     document.getElementById('logEndTimeInput').value = '';
     document.getElementById('logTimeDurationPreview').style.display = 'none';
+    
+    window._selectedLogTopics = [];
+    if (typeof renderLogTopicChips === 'function') renderLogTopicChips();
     
     const courseInput = document.getElementById('logCourseInput');
     courseInput.value = 'CSEB'; // Default
@@ -3186,6 +3222,8 @@ window.initApp = function() {
                 if (el) el.textContent = `${dateStr} • ${timeStr}`;
             }
         }, 30000); // Update every 30 seconds
+
+
 
         setTimeout(() => {
             document.getElementById('loadingOverlay').classList.remove('active');
@@ -5934,6 +5972,20 @@ function initFocusMode() {
     const modeLongBreakBtn = document.getElementById('modeLongBreakBtn');
     const modeStopwatchBtn = document.getElementById('modeStopwatchBtn');
     
+    const savedState = localStorage.getItem('focus_timer_state');
+    if (savedState) {
+        try {
+            const parsed = JSON.parse(savedState);
+            focusMode = parsed.focusMode || 'pomodoro';
+            focusState = parsed.focusState || 'stopped';
+            focusSecondsRemaining = parsed.focusSecondsRemaining ?? (25 * 60);
+            focusStopwatchSeconds = parsed.focusStopwatchSeconds || 0;
+            focusLastTick = parsed.focusLastTick || 0;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     function formatTime(secs) {
         const h = Math.floor(secs / 3600);
         const m = Math.floor((secs % 3600) / 60).toString().padStart(2, '0');
@@ -5948,6 +6000,10 @@ function initFocusMode() {
         } else {
             display.textContent = formatTime(focusSecondsRemaining);
         }
+    }
+
+    function persistFocusState() {
+        localStorage.setItem('focus_timer_state', JSON.stringify({ focusMode, focusState, focusSecondsRemaining, focusStopwatchSeconds, focusLastTick }));
     }
 
     function setMode(mode) {
@@ -5978,6 +6034,7 @@ function initFocusMode() {
         
         logContainer.style.display = 'none';
         updateDisplay();
+        persistFocusState();
     }
 
     durationInput.addEventListener('change', () => {
@@ -5985,6 +6042,7 @@ function initFocusMode() {
             let mins = parseInt(durationInput.value, 10) || 25;
             focusSecondsRemaining = mins * 60;
             updateDisplay();
+            persistFocusState();
         }
     });
 
@@ -6003,6 +6061,7 @@ function initFocusMode() {
         logContainer.style.display = 'none';
         
         focusLastTick = Date.now();
+        persistFocusState();
         focusTimerInterval = setInterval(() => {
             const now = Date.now();
             const diff = Math.floor((now - focusLastTick) / 1000);
@@ -6026,6 +6085,7 @@ function initFocusMode() {
                         showLogOptions();
                     }
                 }
+                persistFocusState();
             }
         }, 500); // 500ms for fast responsiveness, logic handles catch-up
     }
@@ -6036,6 +6096,7 @@ function initFocusMode() {
         focusState = 'paused';
         startBtn.style.display = 'inline-block';
         pauseBtn.style.display = 'none';
+        persistFocusState();
     }
 
     function resetTimer() {
@@ -6059,6 +6120,7 @@ function initFocusMode() {
         }
         updateDisplay();
         logContainer.style.display = 'none';
+        persistFocusState();
     }
 
     function showLogOptions() {
@@ -6076,7 +6138,7 @@ function initFocusMode() {
             document.getElementById('logDateInput').value = TimeUtils.getDateKey(new Date());
             document.getElementById('logHoursInput').value = Math.floor(mins / 60);
             document.getElementById('logMinutesInput').value = mins % 60;
-            document.getElementById('logNotesInput').value = focusMode === 'pomodoro' ? 'Pomodoro Session 🍅' : 'Focus Session 🎯';
+            document.getElementById('logNotesInput').value = focusMode === 'pomodoro' ? 'Pomodoro Session' : 'Focus Session';
             
             // Auto calculate end time = now, start time = now - duration
             const now = new Date();
@@ -6638,7 +6700,15 @@ window.completeScheduleItem = function(id) {
     document.getElementById('logSubjectInput').value = item.subjectId;
     populateLogTopics(item.subjectId);
     
-    if (item.topic) document.getElementById('logTopicDropdown').value = item.topic;
+    if (item.topics && item.topics.length > 0) {
+        window._selectedLogTopics = [...item.topics];
+    } else if (item.topic) {
+        window._selectedLogTopics = [item.topic];
+    } else {
+        window._selectedLogTopics = [];
+    }
+    if (typeof renderLogTopicChips === 'function') renderLogTopicChips();
+    
     document.getElementById('logNotesInput').value = item.title || '';
     
     window._completingScheduleId = id;

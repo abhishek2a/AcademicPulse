@@ -27,7 +27,7 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_GOALS = { daily: 8, weekly: 40, monthly: 160 };
-const CUTOFF_DATE = new Date('2026-09-11T00:00:00');
+const CUTOFF_DATE = new Date() >= new Date('2026-09-11T00:00:00') ? new Date('2026-09-11T00:00:00') : new Date('2026-02-15T00:00:00');
 
 const generateId = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
 

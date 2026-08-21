@@ -27,7 +27,7 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_GOALS = { daily: 8, weekly: 40, monthly: 160 };
-const CUTOFF_DATE = new Date('2026-02-15T00:00:00');
+const CUTOFF_DATE = new Date('2026-09-11T00:00:00');
 
 const generateId = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
 
@@ -495,6 +495,10 @@ function buildDefaultAccaTopics() {
     // Complete ACCA Financial Reporting topic list (23 topics)
     return {
         "Standards": [
+            { name: "IAS 2 (Inventories)",            completed: false, difficulty: "Medium" },
+            { name: "IAS 10 (Events After Reporting)",completed: false, difficulty: "Easy"   },
+            { name: "IAS 27 (Separate FS)",           completed: false, difficulty: "Hard"   },
+            { name: "IAS 41 (Agriculture)",           completed: false, difficulty: "Medium" },
             { name: "IFRS 13 (Fair Value)",           completed: false, difficulty: "Hard"   },
             { name: "IFRS 5 (Non-current Assets)",    completed: false, difficulty: "Medium" },
             { name: "IFRS 18 (Presentation)",         completed: false, difficulty: "Medium" },
@@ -3104,6 +3108,9 @@ function rebuildAnalyticsCache(force = false) {
         const wKey = TimeUtils.getWeekKey(startDate);
         const mKey = TimeUtils.getMonthKey(startDate);
 
+        // PHASE 2 FILTER: Ignore sessions before cutoff
+        if (startDate < CUTOFF_DATE) return;
+
         // Fortified duration parsing to strictly prevent NaN/Infinity
         let dur = parseFloat(s.duration);
         if (isNaN(dur) || dur <= 0) {
@@ -3185,6 +3192,32 @@ function migrateData() {
         }
 
         AppState.dataVersion = 2;
+        saveData('system');
+    }
+    
+    if (AppState.dataVersion < 3) {
+        // Inject missing IAS standards for existing users
+        if (AppState.accaTopics) {
+            const targetCategory = AppState.accaTopics['Standards'] ? 'Standards' : (AppState.accaTopics['IAS Standards'] ? 'IAS Standards' : null);
+            
+            if (targetCategory) {
+                const missing = [
+                    { name: "IAS 2 (Inventories)", completed: false, difficulty: "Medium" },
+                    { name: "IAS 10 (Events After Reporting)", completed: false, difficulty: "Easy" },
+                    { name: "IAS 27 (Separate FS)", completed: false, difficulty: "Hard" },
+                    { name: "IAS 41 (Agriculture)", completed: false, difficulty: "Medium" }
+                ];
+                
+                missing.forEach(m => {
+                    if (!AppState.accaTopics[targetCategory].find(t => t.name.includes(m.name.split(' ')[0] + ' ' + m.name.split(' ')[1]))) {
+                        AppState.accaTopics[targetCategory].unshift(m); // push to top
+                    }
+                });
+                saveData('accaTopics');
+            }
+        }
+        
+        AppState.dataVersion = 3;
         saveData('system');
     }
 }
@@ -5726,6 +5759,9 @@ window.editAttendance = function(id) {
     });
     document.getElementById('editAttendanceSubject').value = session.subjectId;
     
+    if (document.getElementById('editAttendanceTopic')) {
+        document.getElementById('editAttendanceTopic').value = (session.topics && session.topics.length > 0) ? session.topics.join(', ') : (session.topic || '');
+    }
     document.getElementById('editAttendanceNotes').value = session.notes || '';
     if (document.getElementById('editAttendanceLink')) document.getElementById('editAttendanceLink').value = session.workLink || '';
 
@@ -5802,6 +5838,7 @@ window.saveEditAttendance = function() {
     const id = document.getElementById('editAttendanceId').value;
     const date = document.getElementById('editAttendanceDate').value;
     const subj = document.getElementById('editAttendanceSubject').value;
+    const topicStr = document.getElementById('editAttendanceTopic')?.value.trim() || '';
     const notes = document.getElementById('editAttendanceNotes').value;
     const workLink = document.getElementById('editAttendanceLink')?.value || '';
     const qpSources = Array.from(document.querySelectorAll('.edit-qp-checkbox:checked')).map(cb => cb.value);
@@ -5818,6 +5855,9 @@ window.saveEditAttendance = function() {
     const durSecs = (h * 3600) + (m * 60);
     if (durSecs <= 0) return alert("Duration must be > 0");
     
+    const topicsArr = topicStr ? topicStr.split(',').map(t => t.trim()).filter(Boolean) : [];
+    session.topic = topicsArr.length > 0 ? topicsArr[0] : '';
+    session.topics = topicsArr;
 
     session.notes = notes;
     session.workLink = workLink;

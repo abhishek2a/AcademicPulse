@@ -332,14 +332,18 @@ function generateDailyReport() {
 function generateStudyReport() {
     const doc = setupPDF();
 
-    // ── Summary stats ────────────────────────────────────────────────
+    // ── Data Aggregation ─────────────────────────────────────────────
     let totalSeconds = 0;
+    let focusSeconds = 0;
     const subjectStats = {};
+    const topicsStudied = new Set();
+    const coursesStudied = new Set();
+    const hourBlocks = {};
+
     AppState.subjects.forEach(s => {
         subjectStats[s.id] = {
-            name: s.name, course: s.course, priority: s.priority,
-            totalSeconds: 0, weekSeconds: 0, targetHours: s.targetHours,
-            sessions: 0, lastStudied: null
+            name: s.name, course: s.course || 'CSEB', priority: s.priority,
+            totalSeconds: 0, sessions: 0, lastStudied: null
         };
     });
 
@@ -348,62 +352,81 @@ function generateStudyReport() {
     currentWeekStart.setHours(0,0,0,0);
     currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
 
+    let weekSeconds = 0;
+    let weekSessions = 0;
+    const weekDays = new Set();
+
     AppState.sessions.forEach(s => {
         const dur = s.duration || (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 1000 : 0);
         totalSeconds += dur;
+        if (s.isFocusMode) focusSeconds += dur;
+
+        const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+        if (subj && subj.course) coursesStudied.add(subj.course);
+
         if (subjectStats[s.subjectId]) {
             subjectStats[s.subjectId].totalSeconds += dur;
-            
-            const d = new Date(s.startTime || s.date);
-            if (d >= currentWeekStart) {
-                subjectStats[s.subjectId].weekSeconds += dur;
-            }
-            
             subjectStats[s.subjectId].sessions++;
+            const d = new Date(s.startTime || s.date);
             if (!subjectStats[s.subjectId].lastStudied || d > subjectStats[s.subjectId].lastStudied)
                 subjectStats[s.subjectId].lastStudied = d;
+
+            if (d >= currentWeekStart) {
+                weekSeconds += dur;
+                weekSessions++;
+                weekDays.add(d.toDateString());
+            }
         }
+
+        // Collect topics
+        const subjName = subj ? subj.name : 'Unknown';
+        let displayTopic = (s.topics && s.topics.length > 0) ? s.topics.join(', ') : s.topic;
+        if (displayTopic) {
+            topicsStudied.add(`${subjName}: ${displayTopic}`);
+        }
+
+        // Peak hour
+        const startHour = new Date(s.startTime).getHours();
+        hourBlocks[startHour] = (hourBlocks[startHour] || 0) + dur;
     });
 
     const totalHours = (totalSeconds / 3600).toFixed(1);
     const totalSessions = AppState.sessions.length;
+    const focusScore = totalSeconds > 0 ? Math.round((focusSeconds / totalSeconds) * 100) : 0;
+
+    // Peak study time
+    let peakHour = -1, maxDur = 0;
+    Object.entries(hourBlocks).forEach(([hr, dur]) => {
+        if (dur > maxDur) { maxDur = dur; peakHour = parseInt(hr); }
+    });
+    const formatAMPM = (hr) => {
+        const ampm = hr >= 12 ? 'PM' : 'AM';
+        const h = hr % 12 || 12;
+        return `${h}:00 ${ampm}`;
+    };
+    const peakTimeStr = peakHour >= 0 ? formatAMPM(peakHour) : 'N/A';
 
     // Study streak
     let streak = 0, maxStreak = 0, cur = 0;
     const today = new Date(); today.setHours(0,0,0,0);
-    const studyDays = new Set(AppState.sessions.map(s => new Date(s.startTime).toDateString()));
+    const studyDays = new Set(AppState.sessions.map(s => {
+        return typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(new Date(s.startTime)) : new Date(s.startTime).toISOString().split('T')[0];
+    }));
+    let checkDate = new Date(today);
     for (let i = 0; i < 365; i++) {
-        const d = new Date(today); d.setDate(d.getDate() - i);
-        if (studyDays.has(d.toDateString())) { cur++; if (i === 0 || i === 1) streak = cur; maxStreak = Math.max(maxStreak, cur); }
-        else { if (i > 0) cur = 0; }
+        const dk = typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(checkDate) : checkDate.toISOString().split('T')[0];
+        if (studyDays.has(dk)) { cur++; if (i === 0 || cur > streak) streak = cur; maxStreak = Math.max(maxStreak, cur); }
+        else { if (i > 0) { cur = 0; } }
+        checkDate.setDate(checkDate.getDate() - 1);
     }
 
-    // Mock stats
-    const mockCount = AppState.mockTests.length;
-    const mockAvg = mockCount > 0
-        ? (AppState.mockTests.reduce((a, m) => a + (m.score / (m.maxScore || 100)) * 100, 0) / mockCount).toFixed(1)
-        : 'N/A';
-    const mockBest = mockCount > 0
-        ? Math.max(...AppState.mockTests.map(m => Math.round((m.score / (m.maxScore || 100)) * 100))) + '%'
-        : 'N/A';
+    // ── PDF Generation ───────────────────────────────────────────────
+    let y = addPdfHeader(doc, 'Study Report - Lifetime', [0, 0, 0], 'AcademicPulse - Complete Study Analysis');
 
-    // Practice stats
-    const pArr = Array.isArray(AppState.questionPractice) ? AppState.questionPractice : [];
-    const practiceAttempted = pArr.reduce((a, p) => a + (p.attempted || 0), 0);
-    const practiceCorrect = pArr.reduce((a, p) => a + (p.correct || 0), 0);
-    const practiceAccuracy = practiceAttempted > 0 ? Math.round((practiceCorrect / practiceAttempted) * 100) + '%' : 'N/A';
-
-    // Workout stats
-    const workoutQCount = AppState.workoutQuestions?.length || 0;
-    const workoutDone = AppState.workoutStats?.totalDone || 0;
-
-    // PDF Header
-    let y = addPdfHeader(doc, 'Study Report - Lifetime', [41, 151, 255], 'AcademicPulse - Complete Study Analysis');
-
-    // Summary Box
+    // ── 1. Core Metrics ──────────────────────────────────────────────
     doc.setFontSize(13);
     doc.setTextColor(40, 40, 40);
-    doc.text('Study Summary', 14, y + 6);
+    doc.text('Core Study Metrics', 14, y + 6);
     y += 10;
 
     doc.autoTable({
@@ -412,44 +435,108 @@ function generateStudyReport() {
         body: [
             ['Total Lifetime Study Hours', `${totalHours}h`],
             ['Total Study Sessions', `${totalSessions}`],
+            ['Course(s) Studied', coursesStudied.size > 0 ? Array.from(coursesStudied).join(', ') : 'None'],
+            ['Focus Score', `${focusScore}% of time in Focus Mode`],
+            ['Peak Study Time', peakTimeStr],
             ['Current Study Streak', `${streak} day${streak !== 1 ? 's' : ''}`],
             ['Longest Streak', `${maxStreak} day${maxStreak !== 1 ? 's' : ''}`],
-            ['Mock Tests Taken', `${mockCount}`],
-            ['Mock Exam Avg Score', `${mockAvg}${typeof mockAvg === 'string' && mockAvg !== 'N/A' ? '%' : ''}`],
-            ['Mock Exam Best Score', `${mockBest}`],
-            ['Question Practice Sessions', `${practiceAttempted} attempted, ${practiceAccuracy} accuracy`],
-            ['Workout Bank Questions', `${workoutQCount} questions, ${workoutDone} workouts done`],
         ],
-        theme: 'grid',
-        headStyles: { fillColor: [41, 151, 255] },
-        styles: { fontSize: 10 }
+        theme: 'striped',
+        headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+        styles: { fontSize: 10, cellPadding: 5 },
+        alternateRowStyles: { fillColor: [248, 248, 248] }
     });
 
     y = doc.lastAutoTable.finalY + 10;
 
-    // ── Subject Breakdown ────────────────────────────────────────────
+    // ── 2. This Week's Highlights ────────────────────────────────────
     doc.setFontSize(13);
     doc.setTextColor(40, 40, 40);
-    doc.text('Subject Breakdown', 14, y + 4);
-    y += 8;
+    doc.text("This Week's Highlights", 14, y + 6);
+    y += 10;
 
-    const tableBody = Object.values(subjectStats).map(s => {
-        const hrs = parseFloat((s.totalSeconds / 3600).toFixed(1));
-        const weekHrs = s.weekSeconds / 3600;
-        const target = s.targetHours || 0;
-        const progress = target > 0 ? Math.min(100, Math.round((weekHrs / target) * 100)) + '%' : 'N/A';
-        const last = s.lastStudied ? s.lastStudied.toLocaleDateString() : 'Never';
-        return [s.name, s.course || 'CSEB', s.priority, `${hrs}h`, `${target}h/wk`, progress, `${s.sessions}`, last];
-    });
+    const weekHours = (weekSeconds / 3600).toFixed(1);
+    const weekAvg = weekDays.size > 0 ? (weekSeconds / 3600 / weekDays.size).toFixed(1) : '0';
+    const weeklyTarget = AppState.goals?.weekly || 40;
+    const weekProgress = `${weekHours}h / ${weeklyTarget}h (${Math.min(100, Math.round((weekSeconds / 3600 / weeklyTarget) * 100))}%)`;
 
     doc.autoTable({
         startY: y,
-        head: [['Subject', 'Course', 'Priority', 'Total Hours', 'Weekly Target', 'Progress', 'Sessions', 'Last Studied']],
-        body: tableBody,
+        head: [['Metric', 'Value']],
+        body: [
+            ['Hours This Week', `${weekHours}h`],
+            ['Sessions This Week', `${weekSessions}`],
+            ['Study Days This Week', `${weekDays.size}`],
+            ['Avg Hours / Study Day', `${weekAvg}h`],
+            ['Weekly Goal Progress', weekProgress],
+        ],
         theme: 'striped',
-        headStyles: { fillColor: [41, 151, 255] },
-        styles: { fontSize: 8.5 }
+        headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+        styles: { fontSize: 10, cellPadding: 5 },
+        alternateRowStyles: { fillColor: [248, 248, 248] }
     });
+
+    y = doc.lastAutoTable.finalY + 10;
+
+    // ── 3. Subject Breakdown ─────────────────────────────────────────
+    if (y > 240) { doc.addPage(); y = 20; }
+    doc.setFontSize(13);
+    doc.setTextColor(40, 40, 40);
+    doc.text('Subject Breakdown', 14, y + 6);
+    y += 10;
+
+    const tableBody = Object.values(subjectStats)
+        .filter(s => s.sessions > 0)
+        .sort((a, b) => b.totalSeconds - a.totalSeconds)
+        .map(s => {
+            const hrs = parseFloat((s.totalSeconds / 3600).toFixed(1));
+            const pct = totalSeconds > 0 ? Math.round((s.totalSeconds / totalSeconds) * 100) + '%' : '0%';
+            const last = s.lastStudied ? s.lastStudied.toLocaleDateString() : 'Never';
+            return [s.name, s.course, `${hrs}h`, pct, `${s.sessions}`, last];
+        });
+
+    if (tableBody.length > 0) {
+        doc.autoTable({
+            startY: y,
+            head: [['Subject', 'Course', 'Total Hours', '% of Total', 'Sessions', 'Last Studied']],
+            body: tableBody,
+            theme: 'striped',
+            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+            styles: { fontSize: 9, cellPadding: 5 },
+            alternateRowStyles: { fillColor: [248, 248, 248] },
+            columnStyles: {
+                0: { cellWidth: 50 },
+                1: { cellWidth: 22 },
+                2: { cellWidth: 25 },
+                3: { cellWidth: 22 },
+                4: { cellWidth: 22 },
+                5: { cellWidth: 30 }
+            }
+        });
+        y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // ── 4. Topics Covered ────────────────────────────────────────────
+    if (topicsStudied.size > 0) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        doc.setFontSize(13);
+        doc.setTextColor(40, 40, 40);
+        doc.text('Topics Covered', 14, y + 6);
+        y += 10;
+
+        const topicRows = Array.from(topicsStudied).map((t, i) => [`${i + 1}`, t]);
+
+        doc.autoTable({
+            startY: y,
+            head: [['#', 'Topic']],
+            body: topicRows,
+            theme: 'striped',
+            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+            styles: { fontSize: 9, cellPadding: 5 },
+            alternateRowStyles: { fillColor: [248, 248, 248] },
+            columnStyles: { 0: { cellWidth: 12 } }
+        });
+    }
 
     doc.save('Study_Report.pdf');
 }
@@ -461,29 +548,53 @@ function generateMonthlyReport() {
     const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
     const monthKey = TimeUtils.getMonthKey(now);
 
-    let y = addPdfHeader(doc, `Monthly Report - ${monthName}`, [10, 132, 255], 'AcademicPulse - Month at a Glance');
+    let y = addPdfHeader(doc, `Monthly Report - ${monthName}`, [0, 0, 0], 'AcademicPulse - Month at a Glance');
 
-    // ── Monthly Sessions ────────────────────────────────────────────
+    // ── Data Aggregation ─────────────────────────────────────────────
     let monthTotal = 0;
+    let monthFocusSeconds = 0;
     const daysMap = {};
+    const daySessionCount = {};
     const subjectMonthMap = {};
+    const topicsThisMonth = new Set();
+    const coursesThisMonth = new Set();
+    const dailyTarget = AppState.goals?.daily || 8;
+    let goalMetDays = 0;
 
     AppState.sessions.forEach(s => {
         const d = new Date(s.startTime);
         if (TimeUtils.getMonthKey(d) === monthKey) {
             const dur = s.duration || (s.endTime ? (new Date(s.endTime) - d) / 1000 : 0);
             monthTotal += dur;
-            const dateStr = d.toLocaleDateString();
-            daysMap[dateStr] = (daysMap[dateStr] || 0) + dur;
+            if (s.isFocusMode) monthFocusSeconds += dur;
+
+            const dk = TimeUtils.getDateKey(d);
+            daysMap[dk] = (daysMap[dk] || 0) + dur;
+            daySessionCount[dk] = (daySessionCount[dk] || 0) + 1;
+
             const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
             const subjName = subj ? subj.name : 'Unknown';
             subjectMonthMap[subjName] = (subjectMonthMap[subjName] || 0) + dur;
+
+            if (subj && subj.course) coursesThisMonth.add(subj.course);
+
+            // Collect topics
+            let displayTopic = (s.topics && s.topics.length > 0) ? s.topics.join(', ') : s.topic;
+            if (displayTopic) {
+                topicsThisMonth.add(`${subjName}: ${displayTopic}`);
+            }
         }
+    });
+
+    // Count goal met days
+    Object.values(daysMap).forEach(secs => {
+        if (secs / 3600 >= dailyTarget) goalMetDays++;
     });
 
     const monthHours = (monthTotal / 3600).toFixed(1);
     const studyDaysCount = Object.keys(daysMap).length;
     const avgPerDay = studyDaysCount > 0 ? ((monthTotal / 3600) / studyDaysCount).toFixed(1) : '0';
+    const focusScore = monthTotal > 0 ? Math.round((monthFocusSeconds / monthTotal) * 100) : 0;
 
     // Attendance for this month
     let mPresent = 0, mAbsent = 0, mLeave = 0;
@@ -497,7 +608,16 @@ function generateMonthlyReport() {
     const mTotal = mPresent + mAbsent + mLeave;
     const mPct = mTotal > 0 ? Math.round((mPresent / mTotal) * 100) : 0;
 
-    // ── Summary ─────────────────────────────────────────────────────
+    // Monthly goal
+    const monthlyTarget = AppState.goals?.monthly || 160;
+    const monthProgress = `${monthHours}h / ${monthlyTarget}h (${Math.min(100, Math.round((monthTotal / 3600 / monthlyTarget) * 100))}%)`;
+
+    // ── 1. Core Metrics ──────────────────────────────────────────────
+    doc.setFontSize(13);
+    doc.setTextColor(40, 40, 40);
+    doc.text('Core Month Metrics', 14, y + 6);
+    y += 10;
+
     doc.autoTable({
         startY: y,
         head: [['Metric', 'Value']],
@@ -505,21 +625,50 @@ function generateMonthlyReport() {
             ['Total Hours This Month', `${monthHours}h`],
             ['Study Days', `${studyDaysCount}`],
             ['Avg Hours / Study Day', `${avgPerDay}h`],
-            ['Attendance', `${mPct}% (Present: ${mPresent}, Absent: ${mAbsent}, Leave: ${mLeave})`],
+            ['Course(s) Studied', coursesThisMonth.size > 0 ? Array.from(coursesThisMonth).join(', ') : 'None'],
+            ['Focus Score', `${focusScore}% of time in Focus Mode`],
+            ['Monthly Goal Progress', monthProgress],
+            ['Daily Goal Met', `${goalMetDays} / ${studyDaysCount} study days (target: ${dailyTarget}h/day)`],
         ],
-        theme: 'grid',
-        headStyles: { fillColor: [10, 132, 255] },
-        styles: { fontSize: 10 }
+        theme: 'striped',
+        headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+        styles: { fontSize: 10, cellPadding: 5 },
+        alternateRowStyles: { fillColor: [248, 248, 248] }
     });
 
     y = doc.lastAutoTable.finalY + 10;
 
-    // ── Per-Subject Hours this Month ────────────────────────────────
+    // ── 2. Attendance Summary ────────────────────────────────────────
+    doc.setFontSize(13);
+    doc.setTextColor(40, 40, 40);
+    doc.text('Attendance Summary', 14, y + 6);
+    y += 10;
+
+    doc.autoTable({
+        startY: y,
+        head: [['Metric', 'Value']],
+        body: [
+            ['Attendance Rate', `${mPct}%`],
+            ['Present Days', `${mPresent}`],
+            ['Absent Days', `${mAbsent}`],
+            ['Leave Days', `${mLeave}`],
+            ['Total Marked Days', `${mTotal}`],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+        styles: { fontSize: 10, cellPadding: 5 },
+        alternateRowStyles: { fillColor: [248, 248, 248] }
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+
+    // ── 3. Hours by Subject ──────────────────────────────────────────
     if (Object.keys(subjectMonthMap).length > 0) {
-        doc.setFontSize(12);
+        if (y > 240) { doc.addPage(); y = 20; }
+        doc.setFontSize(13);
         doc.setTextColor(40, 40, 40);
-        doc.text('Hours by Subject this Month', 14, y + 4);
-        y += 8;
+        doc.text('Hours by Subject', 14, y + 6);
+        y += 10;
 
         const subjRows = Object.entries(subjectMonthMap)
             .sort((a, b) => b[1] - a[1])
@@ -534,34 +683,74 @@ function generateMonthlyReport() {
             head: [['Subject', 'Hours', '% of Month']],
             body: subjRows,
             theme: 'striped',
-            headStyles: { fillColor: [10, 132, 255] },
-            styles: { fontSize: 10 }
+            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+            styles: { fontSize: 10, cellPadding: 5 },
+            alternateRowStyles: { fillColor: [248, 248, 248] }
         });
 
         y = doc.lastAutoTable.finalY + 10;
     }
 
-    // ── Daily Breakdown ─────────────────────────────────────────────
-    const sortedDays = Object.keys(daysMap).sort((a, b) => new Date(a) - new Date(b));
-    if (sortedDays.length > 0) {
-        doc.setFontSize(12);
+    // ── 4. Topics Covered This Month ─────────────────────────────────
+    if (topicsThisMonth.size > 0) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        doc.setFontSize(13);
         doc.setTextColor(40, 40, 40);
-        doc.text('Daily Breakdown', 14, y + 4);
-        y += 8;
+        doc.text('Topics Covered This Month', 14, y + 6);
+        y += 10;
+
+        const topicRows = Array.from(topicsThisMonth).map((t, i) => [`${i + 1}`, t]);
 
         doc.autoTable({
             startY: y,
-            head: [['Date', 'Time Studied', 'Attendance']],
-            body: sortedDays.map(dateStr => {
-                const hrs = Math.floor(daysMap[dateStr] / 3600);
-                const mins = Math.floor((daysMap[dateStr] % 3600) / 60);
-                const dk = dateStr.split('/').reverse().join('-').replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, (_, y, m, d) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
+            head: [['#', 'Topic']],
+            body: topicRows,
+            theme: 'striped',
+            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+            styles: { fontSize: 9, cellPadding: 5 },
+            alternateRowStyles: { fillColor: [248, 248, 248] },
+            columnStyles: { 0: { cellWidth: 12 } }
+        });
+
+        y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // ── 5. Daily Breakdown ───────────────────────────────────────────
+    const sortedDays = Object.keys(daysMap).sort();
+    if (sortedDays.length > 0) {
+        if (y > 220) { doc.addPage(); y = 20; }
+        doc.setFontSize(13);
+        doc.setTextColor(40, 40, 40);
+        doc.text('Daily Breakdown', 14, y + 6);
+        y += 10;
+
+        doc.autoTable({
+            startY: y,
+            head: [['Date', 'Time Studied', 'Sessions', 'Goal Met', 'Attendance']],
+            body: sortedDays.map(dk => {
+                const hrs = Math.floor(daysMap[dk] / 3600);
+                const mins = Math.floor((daysMap[dk] % 3600) / 60);
+                const sessCount = daySessionCount[dk] || 0;
+                const goalMet = (daysMap[dk] / 3600) >= dailyTarget ? '✓' : '✗';
                 const att = AppState.attendance[dk] || 'Not Marked';
-                return [dateStr, `${hrs}h ${mins}m`, att.charAt(0).toUpperCase() + att.slice(1)];
+                const attDisplay = att.charAt(0).toUpperCase() + att.slice(1);
+                return [dk, `${hrs}h ${mins}m`, `${sessCount}`, goalMet, attDisplay];
             }),
-            theme: 'grid',
-            headStyles: { fillColor: [10, 132, 255] },
-            styles: { fontSize: 9 }
+            theme: 'striped',
+            headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+            styles: { fontSize: 9, cellPadding: 5 },
+            alternateRowStyles: { fillColor: [248, 248, 248] },
+            didParseCell: function(data) {
+                if (data.section === 'body' && data.column.index === 3) {
+                    if (data.cell.raw === '✓') data.cell.styles.textColor = [48, 209, 88];
+                    if (data.cell.raw === '✗') data.cell.styles.textColor = [255, 69, 58];
+                }
+                if (data.section === 'body' && data.column.index === 4) {
+                    if (data.cell.raw === 'Present') data.cell.styles.textColor = [48, 209, 88];
+                    if (data.cell.raw === 'Absent') data.cell.styles.textColor = [255, 69, 58];
+                    if (data.cell.raw === 'Leave') data.cell.styles.textColor = [255, 159, 10];
+                }
+            }
         });
     }
 

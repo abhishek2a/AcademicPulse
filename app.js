@@ -1278,15 +1278,33 @@ function renderOverview() {
 // ==========================================
 // ATTENDANCE
 // ==========================================
+let _attendanceViewYear = new Date().getFullYear();
+let _attendanceViewMonth = new Date().getMonth();
+
+window.changeAttendanceMonth = function(delta) {
+    if (delta === 0) {
+        // "Today" button
+        const now = new Date();
+        _attendanceViewYear = now.getFullYear();
+        _attendanceViewMonth = now.getMonth();
+    } else {
+        _attendanceViewMonth += delta;
+        if (_attendanceViewMonth > 11) { _attendanceViewMonth = 0; _attendanceViewYear++; }
+        if (_attendanceViewMonth < 0) { _attendanceViewMonth = 11; _attendanceViewYear--; }
+    }
+    renderAttendance();
+};
+
 function renderAttendance() {
     const grid = document.getElementById('attendanceCalendarGrid');
     if (!grid) return;
 
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+    const year = _attendanceViewYear;
+    const month = _attendanceViewMonth;
     
-    document.getElementById('attendanceMonthTitle').textContent = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const viewDate = new Date(year, month, 1);
+    document.getElementById('attendanceMonthTitle').textContent = viewDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     
     grid.innerHTML = '';
     const frag = document.createDocumentFragment();
@@ -1307,25 +1325,28 @@ function renderAttendance() {
     }
 
     let presentDays = 0;
+    let absentDays = 0;
     let totalMarked = 0;
+    const todayKey = TimeUtils.getDateKey(now);
+    const isCurrentMonth = (year === now.getFullYear() && month === now.getMonth());
 
     for (let day = 1; day <= daysInMonth; day++) {
         const dateKey = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-        const status = AppState.attendance[dateKey]; // 'present', 'absent', 'leave'
+        const status = AppState.attendance[dateKey];
         
         if (status) totalMarked++;
         if (status === 'present') presentDays++;
+        if (status === 'absent') absentDays++;
 
         const cell = document.createElement('div');
         cell.className = 'day-cell';
         if (status) cell.classList.add(`status-${status}`);
-        if (day === now.getDate()) {
+        if (isCurrentMonth && day === now.getDate()) {
             cell.style.border = '2px solid white';
             cell.classList.add('selected');
         }
         
         cell.innerHTML = `<div class="day-num">${day}</div>`;
-        // Click to select day and show report
         cell.addEventListener('click', () => {
             document.querySelectorAll('.day-cell').forEach(c => c.classList.remove('selected'));
             cell.classList.add('selected');
@@ -1337,7 +1358,7 @@ function renderAttendance() {
     
     grid.appendChild(frag);
 
-    // Streak Calculation
+    // Streak Calculation (DST-safe with Math.round)
     let attStreak = 0;
     const sortedDates = Object.keys(AppState.attendance)
         .filter(k => AppState.attendance[k] === 'present')
@@ -1345,7 +1366,6 @@ function renderAttendance() {
     
     if (sortedDates.length > 0) {
         const todayStr = TimeUtils.getDateKey(now);
-        // FIX: create a new Date to avoid mutating `now` (which is reused below)
         const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
         const yestStr = TimeUtils.getDateKey(yesterday);
         
@@ -1354,7 +1374,7 @@ function renderAttendance() {
             for(let i=0; i<sortedDates.length-1; i++){
                 const d1 = new Date(sortedDates[i]);
                 const d2 = new Date(sortedDates[i+1]);
-                if ((d1-d2)/(1000*60*60*24) === 1) attStreak++;
+                if (Math.round((d1-d2)/(1000*60*60*24)) === 1) attStreak++;
                 else break;
             }
         }
@@ -1362,15 +1382,36 @@ function renderAttendance() {
 
     document.getElementById('attendanceStreakVal').textContent = attStreak;
     const pct = totalMarked > 0 ? Math.round((presentDays / totalMarked) * 100) : 0;
+    document.getElementById('attendancePercentVal').textContent = `${pct}%`;
     
-    let attHtml = `${pct}%`;
-    if (pct < 80 && totalMarked > 5) {
-        attHtml += `<div style="margin-top:10px;"><button onclick="navigateTo('view-schedule')" style="background:var(--neon-purple); color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer; width: 100%;">Plan Recovery</button></div>`;
+    // Extra stat cards
+    const presentEl = document.getElementById('attendancePresentVal');
+    if (presentEl) presentEl.textContent = presentDays;
+    const absentEl = document.getElementById('attendanceAbsentVal');
+    if (absentEl) absentEl.textContent = absentDays;
+    
+    // Calculate study hours for the viewed month
+    const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
+    let monthStudySecs = 0;
+    AppState.sessions.forEach(s => {
+        const dk = TimeUtils.getDateKey(new Date(s.startTime));
+        if (dk.startsWith(monthKey)) {
+            monthStudySecs += s.duration || (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 1000 : 0);
+        }
+    });
+    const studyHoursEl = document.getElementById('attendanceStudyHoursVal');
+    if (studyHoursEl) {
+        const h = Math.floor(monthStudySecs / 3600);
+        const m = Math.floor((monthStudySecs % 3600) / 60);
+        studyHoursEl.textContent = m > 0 ? `${h}h ${m}m` : `${h}h`;
     }
-    document.getElementById('attendancePercentVal').innerHTML = attHtml;
     
-    // Default to showing today's report
-    renderDayReport(TimeUtils.getDateKey(now));
+    // Default to showing today's report (or first of viewed month)
+    if (isCurrentMonth) {
+        renderDayReport(todayKey);
+    } else {
+        renderDayReport(`${year}-${String(month+1).padStart(2,'0')}-01`);
+    }
 }
 
 function renderExams() {
@@ -1453,8 +1494,10 @@ function renderExams() {
 
 
 function renderDayReport(dateKey) {
-    const d = new Date(dateKey);
-    const title = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    // Fix: parse dateKey manually to avoid UTC midnight offset bug
+    const [dy, dm, dd] = dateKey.split('-').map(Number);
+    const d = new Date(dy, dm - 1, dd);
+    const title = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     document.getElementById('dayReportTitle').textContent = title;
     
     const btn = document.getElementById('openLogModalFromReportBtn');
@@ -1495,8 +1538,6 @@ function renderDayReport(dateKey) {
     };
     
     pendingSchedule.forEach(item => {
-        // Only show today's pending items (not future ones for past day views)
-        if (dateKey > todayKey) return;
 
         const isExamRegItem = item.type === 'exam_register';
         const subj = isExamRegItem ? null : (AppState.subjects.find(sub => sub.id === item.subjectId) || null);
@@ -1562,7 +1603,25 @@ function renderDayReport(dateKey) {
         if (hrs > 0) timeStr += `${hrs}h `;
         timeStr += `${mins}m`;
 
-        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, topic: (s.topics && s.topics.length > 0) ? s.topics.join(', ') : s.topic, notes: s.notes, workLink: s.workLink, qpSources: s.qpSources, classPlatform: s.classPlatform, classLink: s.classLink, isFocusMode: s.isFocusMode, type: s.type });
+        let timeRangeStr = '';
+        if (s.startTime && s.endTime) {
+            const formatTime = t => {
+                const dt = new Date(t);
+                if (isNaN(dt.getTime())) return '';
+                let h = dt.getHours();
+                let m = dt.getMinutes();
+                let ampm = h >= 12 ? 'PM' : 'AM';
+                h = h % 12 || 12;
+                return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+            };
+            const sTime = formatTime(s.startTime);
+            const eTime = formatTime(s.endTime);
+            if (sTime && eTime) {
+                timeRangeStr = `${sTime} - ${eTime}`;
+            }
+        }
+
+        sessionDataForRender.push({ id: s.id, color: subj.color, subjName: subj.name, timeStr, timeRangeStr, topic: (s.topics && s.topics.length > 0) ? s.topics.join(', ') : s.topic, notes: s.notes, workLink: s.workLink, qpSources: s.qpSources, classPlatform: s.classPlatform, classLink: s.classLink, isFocusMode: s.isFocusMode, type: s.type });
     });
 
     const typeLabels = {
@@ -1590,7 +1649,10 @@ function renderDayReport(dateKey) {
                     ${platformHtml}
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-shrink: 0; padding-top: 2px;">
-                    <span style="color: var(--neon-blue);">${d.timeStr}</span>
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+                        <span style="color: var(--neon-blue); font-weight: 600;">${d.timeStr}</span>
+                        ${d.timeRangeStr ? `<span style="font-size: 0.75rem; color: var(--text-muted);">${d.timeRangeStr}</span>` : ''}
+                    </div>
                     ${d.workLink ? `<a href="${d.workLink}" target="_blank" rel="noopener noreferrer" style="background:transparent; border:none; color:var(--neon-gold); cursor:pointer; font-size:1.1rem; padding:0; line-height:1; text-decoration:none;" title="Open Work Link">🔗</a>` : ''}
                     ${classLinkHtml}
                     <button onclick="editAttendance('${d.id}')" style="background:transparent; border:none; color:var(--neon-blue); cursor:pointer; font-size:1.1rem; padding:0; line-height:1;" title="Edit Session">✎</button>
@@ -1812,8 +1874,8 @@ function renderAnalytics() {
     const cache = appCache.analytics.data;
     
     // Smart insights runs independently - don't let it crash the main render
-    try { generateSmartInsights(); } catch(e) { console.warn('generateSmartInsights error:', e); }
-    try { generateAICoachAnalysis('general'); } catch(e) { console.warn('generateAICoachAnalysis error:', e); }
+    // UI elements for AICoach and SmartInsights have been removed,
+    // so we no longer call generateAICoachAnalysis() or generateSmartInsights()
     
     // Core aggregates
     const { totalSecs, todaySecs, weekSecs, monthSecs, subjTotals, dailyData, monthlyData } = cache;
@@ -2417,207 +2479,7 @@ function renderConsistencyHeatmap() {
 }
 
 function generateAICoachAnalysis(type) {
-    const el = document.getElementById('aiCoachContent');
-    if (!el) return;
-
-    if (!AppState.sessions || AppState.sessions.length === 0) {
-        el.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Start logging sessions to get AI coaching.</div>';
-        return;
-    }
-
-    el.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Analyzing your data...</div>';
-
-    // Removed artificial delay for instant responsiveness
-    requestAnimationFrame(() => {
-        let insight = "";
-        
-        // 1. Analyze Subjects & Topics
-        if (!appCache.analytics || !appCache.analytics.data) rebuildAnalyticsCache();
-        const subjTotals = appCache.analytics.data.subjTotals;
-        
-        const topicSet = new Set();
-        AppState.sessions.forEach(s => {
-            if (s.topic) topicSet.add(s.topic.toLowerCase());
-        });
-        
-        let bestSubj = null; let bestTime = 0;
-        let worstSubj = null; let worstTime = Infinity;
-        Object.keys(subjTotals).forEach(id => {
-            if(subjTotals[id] > bestTime) { bestTime = subjTotals[id]; bestSubj = id; }
-            if(subjTotals[id] < worstTime) { worstTime = subjTotals[id]; worstSubj = id; }
-        });
-        const bName = bestSubj ? (AppState.subjects.find(s=>s.id===bestSubj)?.name || 'Unknown') : '';
-        const wName = worstSubj ? (AppState.subjects.find(s=>s.id===worstSubj)?.name || 'Unknown') : '';
-
-        // 2. Analyze Attendance (Last 30 Days)
-        const now = new Date();
-        let presentDays = 0; let totalRecordedDays = 0;
-        for (let i = 0; i < 30; i++) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
-            const k = TimeUtils.getDateKey(d);
-            if (AppState.attendance[k]) {
-                totalRecordedDays++;
-                if (AppState.attendance[k] === 'present') presentDays++;
-            }
-        }
-        const attendanceRate = totalRecordedDays > 0 ? (presentDays / totalRecordedDays) * 100 : 0;
-
-        // 3. Analyze Mock Tests
-        let avgMockScore = 0;
-        if (AppState.mockTests && AppState.mockTests.length > 0) {
-            const recentMocks = AppState.mockTests.slice(-3);
-            const totalScore = recentMocks.reduce((acc, m) => acc + (m.score / (m.maxScore || 1)), 0);
-            avgMockScore = (totalScore / recentMocks.length) * 100;
-        }
-
-        // 4. Analyze Schedule (Last 7 Days)
-        let scheduleCompletes = 0; let scheduleTotal = 0;
-        if (AppState.schedule) {
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            sevenDaysAgo.setHours(0, 0, 0, 0);
-            const endOfToday = new Date();
-            endOfToday.setHours(23, 59, 59, 999);
-            AppState.schedule.forEach(s => {
-                const sDate = new Date(s.date);
-                if (sDate >= sevenDaysAgo && sDate <= endOfToday) {
-                    if (s.status !== 'missed') scheduleTotal++;
-                    if (s.status === 'completed') scheduleCompletes++;
-                }
-            });
-        }
-        const scheduleRate = scheduleTotal > 0 ? (scheduleCompletes / scheduleTotal) * 100 : 0;
-
-        // Streaks
-        const streaks = calculateStreaks();
-
-        if (type === 'general') {
-            insight = `
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: var(--neon-blue); margin-bottom: 10px; font-size: 1.2rem;">Pulse AI Insights</h3>
-                    <p style="color: var(--text-main); line-height: 1.5; font-size: 0.95rem;">Here is a breakdown of your recent performance based on the data you've logged.</p>
-                </div>
-                
-                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-green);">Streak Momentum:</b><br/>
-                    You are currently on a <b>${streaks.current}-day streak</b>! ${streaks.current > 3 ? "Fantastic consistency! Keep this momentum going." : "Every grand journey begins with a single step. Keep going!"}
-                </div>
-
-                <div class="ai-insight-card" style="background: rgba(10,132,255,0.1); border-left: 4px solid var(--neon-blue); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-blue);">Study Focus:</b><br/>
-                    You've tackled <b>${topicSet.size} unique topics</b> recently. ${bestSubj ? `Your most studied subject is <b>${bName}</b>.` : ''} ${worstSubj ? `Consider spending more time on <b>${wName}</b> to ensure balanced preparation.` : ''}
-                </div>
-                
-                <div class="ai-insight-card" style="background: rgba(255,159,10,0.1); border-left: 4px solid var(--neon-gold); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-gold);">Practice Readiness:</b><br/>
-                    ${avgMockScore > 0 ? `Your mock exams average is <b>${avgMockScore.toFixed(0)}%</b>. ${avgMockScore >= 80 ? 'You are highly prepared for the real exam!' : 'Target specific weak areas to push your score above 80%.'}` : 'You haven\'t logged any mock tests recently. Regular practice under exam conditions is highly recommended.'}
-                </div>
-                
-                <div class="ai-insight-card" style="background: rgba(191,90,242,0.1); border-left: 4px solid var(--neon-purple); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-purple);">Schedule Adherence:</b><br/>
-                    Your task completion rate this week is <b>${scheduleRate.toFixed(0)}%</b>. ${scheduleRate > 75 ? 'Excellent discipline following your plan!' : 'Try breaking tasks down into smaller steps if you find yourself falling behind.'}
-                </div>
-            `;
-        } else if (type === 'strengths') {
-            insight = `
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: var(--neon-green); margin-bottom: 10px; font-size: 1.2rem;">Your Superpowers</h3>
-                    <p style="color: var(--text-main); line-height: 1.5; font-size: 0.95rem;">These are the areas where you are excelling and outperforming your goals.</p>
-                </div>
-            `;
-            
-            if (bName) {
-                insight += `
-                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-green);">Deep Focus:</b><br/>
-                    You have incredible dedication when studying <b>${bName}</b> (${(bestTime/3600).toFixed(1)} hours). It is clearly your strongest domain.
-                </div>`;
-            }
-            
-            if (scheduleTotal > 0 && scheduleRate >= 75) {
-                insight += `
-                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-green);">Exceptional Planner:</b><br/>
-                    You completed <b>${scheduleRate.toFixed(0)}%</b> of your scheduled tasks this week. Your time management is top-tier!
-                </div>`;
-            }
-            
-            if (avgMockScore >= 75) {
-                insight += `
-                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-green);">Exam Readiness:</b><br/>
-                    With a recent mock average of <b>${avgMockScore.toFixed(0)}%</b>, you are proving that you can perform under pressure.
-                </div>`;
-            } else if (streaks.best > 3) {
-                insight += `
-                <div class="ai-insight-card" style="background: rgba(48,209,88,0.1); border-left: 4px solid var(--neon-green); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-green);">Grit & Discipline:</b><br/>
-                    You've proven you can maintain focus with a personal best streak of <b>${streaks.best} days</b>.
-                </div>`;
-            }
-            
-            if (insight.indexOf('ai-insight-card') === -1) {
-                insight += `<div style="color: var(--text-muted); text-align: center; padding: 20px;">Keep logging your study sessions and tests to reveal your superpowers!</div>`;
-            }
-
-        } else if (type === 'weaknesses') {
-            insight = `
-                <div style="margin-bottom: 20px;">
-                    <h3 style="color: var(--neon-red); margin-bottom: 10px; font-size: 1.2rem;">Areas for Growth</h3>
-                    <p style="color: var(--text-main); line-height: 1.5; font-size: 0.95rem;">Identify your weak spots and turn them into strengths.</p>
-                </div>
-            `;
-            
-            if (wName && wName !== bName) {
-                insight += `
-                <div class="ai-insight-card" style="background: rgba(255,69,58,0.1); border-left: 4px solid var(--neon-red); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-red);">Procrastination Alert:</b><br/>
-                    You are heavily avoiding <b>${wName}</b> (only ${(worstTime/3600).toFixed(1)} hours). Procrastination often hides behind the subjects we find most difficult. Tackle this subject first thing tomorrow morning!
-                </div>`;
-            }
-            
-            if (scheduleTotal > 0 && scheduleRate < 50) {
-                insight += `
-                <div class="ai-insight-card" style="background: rgba(255,69,58,0.1); border-left: 4px solid var(--neon-red); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-red);">Planning Fallacy:</b><br/>
-                    You only completed <b>${scheduleRate.toFixed(0)}%</b> of your scheduled tasks this week. You might be scheduling too much at once. Try scheduling fewer, highly-focused blocks instead.
-                </div>`;
-            }
-            
-            if (topicSet.size > 0 && topicSet.size <= 3 && Object.keys(subjTotals).length > 1) {
-                insight += `
-                <div class="ai-insight-card" style="background: rgba(255,69,58,0.1); border-left: 4px solid var(--neon-red); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-red);">Tunnel Vision:</b><br/>
-                    You've spent a lot of time recently but only covered <b>${topicSet.size} topics</b>. Make sure you aren't ignoring the rest of your syllabus!
-                </div>`;
-            }
-            
-            if (totalRecordedDays > 5 && attendanceRate < 60) {
-                insight += `
-                <div class="ai-insight-card" style="background: rgba(255,69,58,0.1); border-left: 4px solid var(--neon-red); padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: left;">
-                    <b style="color: var(--neon-red);">📉 Inconsistent Routine:</b><br/>
-                    Your attendance rate is dropping (<b>${attendanceRate.toFixed(0)}%</b>). Remember, studying 2 hours every day is far better than studying 10 hours on one day!
-                </div>`;
-            }
-            
-            if (insight.indexOf('ai-insight-card') === -1) {
-                insight += `<div style="color: var(--text-muted); text-align: center; padding: 20px;">You are doing fantastic! We couldn't find any major weak spots right now.</div>`;
-            }
-        }
-
-        el.innerHTML = insight;
-        
-        // Highlight active button using CSS classes
-        const buttons = document.querySelectorAll('.ai-coach-btn');
-        buttons.forEach(b => {
-            if (b.getAttribute('data-type') === type) {
-                b.classList.add('active-prompt');
-            } else {
-                b.classList.remove('active-prompt');
-            }
-        });
-    });
+    // Stub - UI removed
 }
 
 function generateSmartInsights() {
@@ -2705,33 +2567,6 @@ function generateSmartInsights() {
     if (streaks.current >= 3) {
         html += `<div class="insight-box" style="border-left-color: var(--neon-gold);"><strong>Strong Momentum:</strong> You've logged sessions for ${streaks.current} consecutive days. Keep it up!</div>`;
     }
-
-    // 4. Time of Day Analysis
-    const totalTimeOfDay = morning + afternoon + night;
-    if (totalTimeOfDay > 0) {
-        const maxTime = Math.max(morning, afternoon, night);
-        if (maxTime === night && (night / totalTimeOfDay) > 0.5) {
-            html += `<div class="insight-box" style="border-left-color: #BF5AF2;"><strong>Night Owl:</strong> Over 50% of your deep work happens after 5 PM.</div>`;
-        } else if (maxTime === morning && (morning / totalTimeOfDay) > 0.5) {
-            html += `<div class="insight-box" style="border-left-color: #FFD60A;"><strong>Morning Focus:</strong> You are most productive before noon!</div>`;
-        } else if (maxTime === afternoon && (afternoon / totalTimeOfDay) > 0.5) {
-            html += `<div class="insight-box" style="border-left-color: #FF9F0A;"><strong>Afternoon Grind:</strong> Most of your studying happens in the afternoon.</div>`;
-        }
-    }
-
-    // 5. Subject Neglect Warning
-    let neglectCount = 0;
-    AppState.subjects.forEach(subj => {
-        if (neglectCount >= 2) return; // limit to 2 warnings
-        const lastSeen = subjLastSeen[subj.id];
-        if (lastSeen) {
-            const daysSince = Math.floor((now - lastSeen) / (1000 * 3600 * 24));
-            if (daysSince >= 5 && subj.priority === 'High') {
-                html += `<div class="insight-box" style="border-left-color: var(--neon-red);"><strong>Review Needed:</strong> You haven't studied High Priority subject '${escapeHtml(subj.name)}' in ${daysSince} days.</div>`;
-                neglectCount++;
-            }
-        }
-    });
 
     if (html === '') {
         html = '<div class="insight-box" style="color:var(--text-muted); border-left-color: var(--text-muted);">Log more sessions to generate smart insights!</div>';
@@ -2996,6 +2831,7 @@ window.removeLogTopic = function(e, topic) {
 
 function openLogSessionModal(dateKey) {
     document.getElementById('logDateInput').value = dateKey;
+    document.getElementById('logTypeInput').value = 'study';
     document.getElementById('logNotesInput').value = '';
     if(document.getElementById('logLinkInput')) document.getElementById('logLinkInput').value = '';
     document.querySelectorAll('.log-qp-checkbox').forEach(cb => cb.checked = false);
@@ -3068,7 +2904,13 @@ function initTheme() {
 // INITIALIZATION
 // ==========================================
 function rebuildAnalyticsCache(force = false) {
-    const currentHash = AppState.sessions.length + "-" + (AppState.sessions.length > 0 ? AppState.sessions[AppState.sessions.length - 1].id : "empty");
+    // Robust hash: includes length, last ID, and a checksum of durations/timestamps
+    let hashSum = 0;
+    for (let i = 0; i < AppState.sessions.length; i++) {
+        const s = AppState.sessions[i];
+        hashSum += (s.duration || 0) + (s.startTime ? new Date(s.startTime).getTime() % 100000 : 0);
+    }
+    const currentHash = AppState.sessions.length + "-" + hashSum + "-" + (AppState.sessions.length > 0 ? AppState.sessions[AppState.sessions.length - 1].id : "empty");
     
     // Memory Cache hit check
     if (!force && appCache.analytics && appCache.analytics.version === appCache.analyticsVersion && appCache.sessionsHash === currentHash) {
@@ -3130,7 +2972,7 @@ function rebuildAnalyticsCache(force = false) {
         cacheData.dailyData[dKey] = (cacheData.dailyData[dKey] || 0) + dur;
         cacheData.monthlyData[mKey] = (cacheData.monthlyData[mKey] || 0) + dur;
 
-        if (/\(live class\)/i.test(s.notes || '')) {
+        if (/\(live class\)/i.test(s.notes || '') || s.type === 'class') {
             const lc = cacheData.liveClass;
             lc.totalCount++;
             lc.totalSecs += dur;

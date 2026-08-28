@@ -200,20 +200,37 @@
             <div class="header">
                 <h1>Attendance & Day Report</h1>
             </div>
-            <div class="stats-grid" style="margin-bottom: 20px;">
-                <div class="stat-card" style="padding: 20px;">
-                    <div class="stat-label">Attendance Streak</div>
-                    <div class="stat-value text-purple" id="attendanceStreakVal" style="font-size: 2rem;">0</div>
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); margin-bottom: 20px;">
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">Streak</div>
+                    <div class="stat-value text-purple" id="attendanceStreakVal" style="font-size: 1.8rem;">0</div>
                 </div>
-                <div class="stat-card" style="padding: 20px;">
-                    <div class="stat-label">Monthly Attendance</div>
-                    <div class="stat-value" id="attendancePercentVal" style="font-size: 2rem;">0%</div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">Attendance</div>
+                    <div class="stat-value" id="attendancePercentVal" style="font-size: 1.8rem;">0%</div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">Present</div>
+                    <div class="stat-value text-green" id="attendancePresentVal" style="font-size: 1.8rem;">0</div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">Absent</div>
+                    <div class="stat-value text-red" id="attendanceAbsentVal" style="font-size: 1.8rem;">0</div>
+                </div>
+                <div class="stat-card" style="padding: 15px;">
+                    <div class="stat-label">Study Hours</div>
+                    <div class="stat-value text-blue" id="attendanceStudyHoursVal" style="font-size: 1.8rem;">0h</div>
                 </div>
             </div>
             <div class="attendance-split">
                 <div class="chart-card calendar-panel">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <button class="btn btn-outline" style="padding: 4px 10px; font-size: 0.85rem;" onclick="changeAttendanceMonth(-1)">◀</button>
                         <h3 id="attendanceMonthTitle" style="margin: 0; font-size: 1.2rem;">Month</h3>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" onclick="changeAttendanceMonth(0)">Today</button>
+                            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 0.85rem;" onclick="changeAttendanceMonth(1)">▶</button>
+                        </div>
                     </div>
                     <div class="calendar-grid" id="attendanceCalendarGrid"></div>
                     <div class="calendar-legend">

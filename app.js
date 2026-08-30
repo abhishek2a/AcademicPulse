@@ -1394,9 +1394,11 @@ function renderAttendance() {
     const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
     let monthStudySecs = 0;
     AppState.sessions.forEach(s => {
-        const dk = TimeUtils.getDateKey(new Date(s.startTime));
+        const rawDate = s.startTime || s.date;
+        if (!rawDate) return;
+        const dk = TimeUtils.getDateKey(new Date(rawDate));
         if (dk.startsWith(monthKey)) {
-            monthStudySecs += s.duration || (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 1000 : 0);
+            monthStudySecs += s.duration || (s.endTime && s.startTime ? (new Date(s.endTime) - new Date(s.startTime)) / 1000 : 0);
         }
     });
     const studyHoursEl = document.getElementById('attendanceStudyHoursVal');
@@ -1504,7 +1506,11 @@ function renderDayReport(dateKey) {
     btn.style.display = 'block';
     btn.onclick = () => openLogSessionModal(dateKey);
 
-    const daySessions = AppState.sessions.filter(s => TimeUtils.getDateKey(new Date(s.startTime)) === dateKey);
+    const daySessions = AppState.sessions.filter(s => {
+        const rawDate = s.startTime || s.date;
+        if (!rawDate) return false;
+        return TimeUtils.getDateKey(new Date(rawDate)) === dateKey;
+    });
     const content = document.getElementById('dayReportContent');
     const totalDiv = document.getElementById('dayReportTotal');
     

@@ -1409,10 +1409,14 @@ function renderAttendance() {
     }
     
     // Default to showing today's report (or first of viewed month)
-    if (isCurrentMonth) {
-        renderDayReport(todayKey);
-    } else {
-        renderDayReport(`${year}-${String(month+1).padStart(2,'0')}-01`);
+    try {
+        if (isCurrentMonth) {
+            renderDayReport(todayKey);
+        } else {
+            renderDayReport(`${year}-${String(month+1).padStart(2,'0')}-01`);
+        }
+    } catch(e) {
+        console.warn('renderDayReport error in renderAttendance:', e);
     }
 }
 
@@ -1496,6 +1500,7 @@ function renderExams() {
 
 
 function renderDayReport(dateKey) {
+  try {
     // Fix: parse dateKey manually to avoid UTC midnight offset bug
     const [dy, dm, dd] = dateKey.split('-').map(Number);
     const d = new Date(dy, dm - 1, dd);
@@ -1532,7 +1537,7 @@ function renderDayReport(dateKey) {
     const todayKey = TimeUtils.getDateKey(now);
     const nowTimeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
     
-    const pendingSchedule = AppState.schedule.filter(s => s.date === dateKey && s.status === 'pending');
+    const pendingSchedule = (AppState.schedule || []).filter(s => s.date === dateKey && s.status === 'pending');
     let pendingHtml = '';
     
     const formatTimeStr = (t) => {
@@ -1589,10 +1594,19 @@ function renderDayReport(dateKey) {
     const sessionDataForRender = [];
 
     daySessions.forEach(s => {
-        totalDuration += (s.durationMinutes || ((new Date(s.endTime) - new Date(s.startTime)) / 60000) || 0);
+        let sessionMins = 0;
+        if (s.durationMinutes !== undefined) {
+            sessionMins = s.durationMinutes;
+        } else if (s.duration) {
+            sessionMins = Math.floor(s.duration / 60);
+        } else if (s.startTime && s.endTime) {
+            const diff = (new Date(s.endTime) - new Date(s.startTime)) / 60000;
+            if (isFinite(diff) && diff > 0) sessionMins = diff;
+        }
+        totalDuration += sessionMins;
         const subj = AppState.subjects.find(sub => sub.id === s.subjectId) || { name: 'Unknown', color: 'var(--text-main)' };
         
-        let hrs = Math.floor(s.durationMinutes / 60) || Math.floor(totalDuration / 60); // handle old duration sec logic roughly
+        let hrs = 0;
         if(s.durationMinutes !== undefined) {
              hrs = Math.floor(s.durationMinutes / 60);
         } else if(s.duration) {
@@ -1712,6 +1726,9 @@ function renderDayReport(dateKey) {
             }
         }
     });
+  } catch(e) {
+    console.warn('renderDayReport error:', e);
+  }
 }
 
 
@@ -1735,8 +1752,12 @@ window.deleteSession = function(sessionId) {
         AppState.sessions = AppState.sessions.filter(s => s.id !== sessionId);
         saveData('sessions');
         
-        const dateKey = TimeUtils.getDateKey(new Date(session.startTime));
-        const remainingSessions = AppState.sessions.filter(s => TimeUtils.getDateKey(new Date(s.startTime)) === dateKey);
+        const rawDate = session.startTime || session.date;
+        const dateKey = rawDate ? TimeUtils.getDateKey(new Date(rawDate)) : null;
+        const remainingSessions = dateKey ? AppState.sessions.filter(s => {
+            const rd = s.startTime || s.date;
+            return rd && TimeUtils.getDateKey(new Date(rd)) === dateKey;
+        }) : [];
         if (remainingSessions.length === 0) {
             delete AppState.attendance[dateKey];
             saveData('attendance');
@@ -1747,7 +1768,7 @@ window.deleteSession = function(sessionId) {
         debouncedRenderAnalytics();
         
         // Re-render the currently open day report
-        renderDayReport(dateKey);
+        if (dateKey) renderDayReport(dateKey);
     }
 }
 
@@ -5579,7 +5600,8 @@ window.deleteAttendance = function(id) {
     if (!confirm("Are you sure you want to delete this session?")) return;
     const session = AppState.sessions.find(s => s.id === id);
     if (!session) return;
-    const dateKey = session.startTime ? TimeUtils.getDateKey(new Date(session.startTime)) : null;
+    const rawDate = session.startTime || session.date;
+    const dateKey = rawDate ? TimeUtils.getDateKey(new Date(rawDate)) : null;
     AppState.sessions = AppState.sessions.filter(s => s.id !== id);
     saveData('sessions');
     debouncedRenderOverview();
@@ -5594,7 +5616,8 @@ window.editAttendance = function(id) {
     
     document.getElementById('editAttendanceId').value = id;
     let dateStr = '';
-    if (session.startTime) dateStr = TimeUtils.getDateKey(new Date(session.startTime));
+    const rawDate = session.startTime || session.date;
+    if (rawDate) dateStr = TimeUtils.getDateKey(new Date(rawDate));
     document.getElementById('editAttendanceDate').value = dateStr;
     
     const subjectSelect = document.getElementById('editAttendanceSubject');

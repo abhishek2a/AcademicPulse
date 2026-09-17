@@ -906,17 +906,7 @@
                     <button onclick="showWhatsNewPopup()" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.9rem; color: var(--neon-blue); border-color: var(--neon-blue);">What's New</button>
                 </div>
                 
-                <!-- Beta Updates Settings -->
-                <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h3 style="margin-top: 0; margin-bottom: 5px; font-size: 0.95rem; color: var(--text-main);">Beta Updates</h3>
-                        <span style="font-size: 0.85rem; color: var(--text-muted);">Receive early access to experimental features</span>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="betaUpdatesToggle" onchange="window.toggleBetaUpdates(this.checked)">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
+
                 
                 <!-- Subscriptions -->
                 <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px;">
@@ -927,8 +917,9 @@
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-weight: 600; color: var(--text-main);">ACCA FR</span>
-                        <span style="color: var(--neon-gold); font-size: 0.9rem; font-weight: 500;">Valid till 10 Sep 2026</span>
+                        <span style="color: var(--neon-gold); font-size: 0.9rem; font-weight: 500;">Valid till 10 Dec 2026</span>
                     </div>
+
                 </div>
 
                 <form id="updateProfileForm" style="margin-bottom: 25px;">
@@ -952,7 +943,7 @@
                 <div style="text-align: center; margin-top: 40px;">
                     <button id="btnBackupData" class="btn btn-outline" style="width: 100%; margin-bottom: 12px; border-color: var(--neon-gold); color: var(--neon-gold);">Export / Backup Data</button>
                     <button id="profileUpdateBtnDynamic" class="btn btn-outline" onclick="document.querySelector('.nav-item[data-target=\'view-update\']')?.click()" style="width:100%; margin-bottom:20px; border-color:var(--neon-blue); color:var(--neon-blue);">🔍 Software Update</button>
-                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom:4px;">App Version <span id="appVersionTextProfile">...</span> <span id="betaBadgeProfile" style="display:none; background: var(--neon-purple); color: #fff; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 5px; text-transform: uppercase;">Beta</span></p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom:4px;">App Version <span id="appVersionTextProfile">...</span></p>
                     <button id="btnLogout" class="btn" style="background: var(--neon-red); color: var(--text-main); margin-top: 10px; border: none; width: 100%;">Logout</button>
                 </div>
             </div>

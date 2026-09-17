@@ -63,7 +63,6 @@ const DEFAULT_SUBJECTS = [
 ];
 
 const EXAMS = [
-    { category: 'ACCA · SYLLABUS TARGET', date: '2026-09-10T00:00:00', title: 'FR Full Portion Completion', subtext: 'Complete All Chapters & Topics' },
     { category: 'ACCA · FINAL EXAM', date: '2026-12-10T00:00:00', title: 'Financial Reporting (FR)', subtext: 'Dec 2026 Exam Session' }
 ];
 
@@ -82,7 +81,7 @@ const AppState = {
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
     upcomingMocks: [],
-    currentVersion: 'v1.0.92-beta',
+    currentVersion: 'v1.0.92',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -528,57 +527,14 @@ function buildDefaultAccaTopics() {
     };
 }
 
-window.toggleBetaUpdates = function(optIn) {
-    localStorage.setItem('academicpulse_beta_opt_in', optIn ? 'true' : 'false');
-    const badge = document.getElementById('betaBadgeProfile');
-    if (badge) badge.style.display = optIn ? 'inline-block' : 'none';
-    
-    if (!optIn) {
-        // Only force version downgrade when opting out
-        AppState.currentVersion = 'v1.0.87';
-    }
-    saveData('system');
-    
-    const profileV = document.getElementById('appVersionTextProfile');
-    if (profileV) profileV.textContent = AppState.currentVersion;
-
-    const msg = optIn 
-        ? "You have successfully opted into the Beta channel! The app will now restart. Please check for updates in the Software Update tab to install the latest beta." 
-        : "You have opted out of the Beta channel. Your version is being reverted to stable... The app will now restart.";
-    
-    alert(msg);
-
-    if (window.firebaseAuth && window.firebaseAuth.currentUser && typeof syncDataToCloud === 'function') {
-        syncDataToCloud(window.firebaseAuth.currentUser.uid)
-            .then(() => window.location.reload())
-            .catch(() => window.location.reload());
-    } else {
-        window.location.reload();
-    }
-};
-
 window.showWhatsNewPopup = async function() {
-    const isBeta = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-
-    let description, features;
-
-    if (isBeta) {
-        description = "You're on <b>v1.0.92 Beta</b> \u2014 the Reports & Performance update! Thanks for testing bleeding-edge features.";
-        features = [
-            "<div style='margin-bottom:8px'><b>\uD83D\uDCC4 Daily Reports PDF</b></div>Export a beautiful Daily Report PDF showing your total study time, sessions, and daily goals, complete with specific Session Types (e.g. Revision, Class, YouTube).",
-            "<div style='margin-bottom:8px'><b>\uD83D\uDD0D Day ID Search</b></div>Every daily report now includes a unique Day ID (e.g. DAY-20260816). Paste this into the global search bar to instantly see a beautiful dashboard summarizing that exact day!",
-            "<div style='margin-bottom:8px'><b>\u26A1 Blazing Fast Performance</b></div>We squashed major memory leaks and overhauled the rendering engine. Switching tabs and viewing large amounts of study analytics is now incredibly smooth and fast!",
-            "<div style='margin-bottom:8px'><b>\uD83D\uDCC5 Schedule Upcoming Mocks</b></div>Plan out your mock exams! You can now schedule upcoming mock exams, see a countdown on your dashboard, and keep track of them in your Planner."
-        ];
-    } else {
-        description = "Welcome to AcademicPulse v1.0.87 &#x1F44B; The Pulse AI &amp; Stability Update! We've made massive improvements under the hood to ensure your data stays intact.";
-        features = [
-            "<div style='margin-bottom:8px'><b>&#129302; Pulse AI Overhaul</b></div>The Pulse AI coach has been completely redesigned with a cleaner UI and smarter insights to help you track your streaks, study focus, and mock test readiness.",
-            "<div style='margin-bottom:8px'><b>&#128737;&#65039; Uncompromised Stability</b></div>We've rewritten our data syncing algorithms and squashed bugs that caused dashboard freezes, ensuring your data is always safe and correctly rendered.",
-            "<div style='margin-bottom:8px'><b>&#9729;&#65039; Bulletproof Cloud Sync</b></div>Cloud syncing now safely waits for completion before any app updates, guaranteeing that your latest changes are backed up.",
-            "<div style='margin-bottom:8px'><b>&#129489;&#8205;&#128187; Beta Channel Access</b></div>Opt in from the Profile tab to test bleeding-edge features before they hit the main release!"
-        ];
-    }
+    let description = "You're on <b>v1.0.92</b> \u2014 the Reports & Performance update!";
+    let features = [
+        "<div style='margin-bottom:8px'><b>\uD83D\uDCC4 Daily Reports PDF</b></div>Export a beautiful Daily Report PDF showing your total study time, sessions, and daily goals, complete with specific Session Types (e.g. Revision, Class, YouTube).",
+        "<div style='margin-bottom:8px'><b>\uD83D\uDD0D Day ID Search</b></div>Every daily report now includes a unique Day ID (e.g. DAY-20260816). Paste this into the global search bar to instantly see a beautiful dashboard summarizing that exact day!",
+        "<div style='margin-bottom:8px'><b>\u26A1 Blazing Fast Performance</b></div>We squashed major memory leaks and overhauled the rendering engine. Switching tabs and viewing large amounts of study analytics is now incredibly smooth and fast!",
+        "<div style='margin-bottom:8px'><b>\uD83D\uDCC5 Schedule Upcoming Mocks</b></div>Plan out your mock exams! You can now schedule upcoming mock exams, see a countdown on your dashboard, and keep track of them in your Planner."
+    ];
 
     const contentDiv = document.getElementById('whatsNewModalContent');
     if(contentDiv) {
@@ -1452,8 +1408,7 @@ function renderExams() {
         container.appendChild(card);
     });
 
-    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-    if (!isBetaUser) return;
+
 
     // Render upcoming scheduled mock exams from AppState
     const sortedUpcoming = [...(AppState.upcomingMocks || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -4192,8 +4147,7 @@ function renderMocksHistory() {
  * that has already passed (so user is reminded to log the result).
  */
 function checkAndAlertPastDueUpcomingMocks() {
-    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-    if (!isBetaUser) return;
+
 
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -4216,12 +4170,7 @@ function checkAndAlertPastDueUpcomingMocks() {
 }
 
 function renderUpcomingMocksInMocks() {
-    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
     const wrapper = document.getElementById('upcomingMocksBetaContainer');
-    if (!isBetaUser) {
-        if (wrapper) wrapper.style.display = 'none';
-        return;
-    }
     if (wrapper) wrapper.style.display = 'block';
 
     const container = document.getElementById('upcomingMocksListInMocks');
@@ -4803,9 +4752,7 @@ function renderSearchResults(query) {
         return;
     }
 
-    // Check for Day ID search (e.g. DAY-20260816 or ID: DAY-20260816) - BETA ONLY
-    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-    if (isBetaUser) {
+    // Check for Day ID search (e.g. DAY-20260816 or ID: DAY-20260816)
         const dayIdMatch = q.match(/(?:id:\s*)?day\s*-\s*(\d{4})(\d{2})(\d{2})/);
         if (dayIdMatch) {
         const y = dayIdMatch[1];
@@ -4873,7 +4820,6 @@ function renderSearchResults(query) {
         container.appendChild(sessionsGrid);
         return;
         }
-    }
 
     // Netflix-style normalization: convert & to and, remove special chars, tokenize
     const normalizeForSearch = (str) => {
@@ -5274,10 +5220,7 @@ function renderUpdateBadge() {
 }
 
 function processNewUpdate(updateInfo) {
-    // Channel guard: stable users never receive beta builds
-    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-    const isBetaBuild = (updateInfo.version || '').includes('beta');
-    if (isBetaBuild && !isBetaUser) return; // Don't show beta updates to stable users
+
 
     // Prevent downgrades by comparing semantic versions
     const compareVersions = (v1, v2) => {
@@ -6092,15 +6035,10 @@ function initSchedule() {
     document.getElementById('tabSchedulePast').addEventListener('click', () => setScheduleTab('past'));
     document.getElementById('tabScheduleRevision').addEventListener('click', () => setScheduleTab('revision'));
     
-    const isBetaUser = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
     const umTab = document.getElementById('tabScheduleUpcomingMocks');
     if (umTab) {
-        if (isBetaUser) {
-            umTab.style.display = 'inline-block';
-            umTab.addEventListener('click', () => setScheduleTab('upcomingmocks'));
-        } else {
-            umTab.style.display = 'none';
-        }
+        umTab.style.display = 'inline-block';
+        umTab.addEventListener('click', () => setScheduleTab('upcomingmocks'));
     }
     
     document.getElementById('addScheduleBtn').addEventListener('click', () => openScheduleModal());

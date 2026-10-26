@@ -1,12 +1,13 @@
 {
-  "version": "v1.0.87",
-  "build": "2026.07.22-stable",
-  "title": "v1.0.87 \u2014 The Pulse AI & Stability Update",
-  "description": "Welcome to AcademicPulse v1.0.87! We've made massive improvements under the hood to ensure your data stays intact and revamped the Pulse AI coach.",
+  "version": "v1.0.92",
+  "build": "2026.10.26-stable",
+  "title": "v1.0.92 \u2014 Enhanced PDF Reports, Attendance & Stability Update",
+  "description": "AcademicPulse v1.0.92 introduces beautifully enhanced Day, Weekly, and Monthly PDF reports with full session logs, improved Attendance calendar navigation, and performance fixes.",
   "features": [
-    "<div style='margin-bottom:8px'><b>\uD83E\uDD16 Pulse AI Overhaul</b></div>The Pulse AI coach has been completely redesigned with a cleaner UI and smarter insights to help you track your streaks, study focus, and mock test readiness.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDEE1\uFE0F Uncompromised Stability</b></div>We've rewritten our data syncing algorithms and squashed bugs that caused dashboard freezes, ensuring your data is always safe and correctly rendered.",
-    "<div style='margin-bottom:8px'><b>\u2601\uFE0F Bulletproof Cloud Sync</b></div>Cloud syncing now safely waits for completion before any app updates, guaranteeing that your latest changes are backed up.",
-    "<div style='margin-bottom:8px'><b>\uD83E\uDDD1\u200D\uD83D\uDCBB Beta Channel Access</b></div>Opt in from the Profile tab to test bleeding-edge features before they hit the main release!"
+    "<div style='margin-bottom:8px'><b>\uD83D\uDCC4 Enhanced PDF Reports</b></div>Weekly and Monthly PDFs now match the Day PDF with comprehensive study type & platform breakdowns (Revision, Class, YouTube, Instill) and detailed session logs.",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDDD3\uFE0F Attendance Calendar & Month Navigation</b></div>Smooth navigation across previous months with active day selection and monthly study hour summaries.",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDD0D Day ID Search</b></div>Every report includes a unique Day ID (e.g. DAY-20261026). Search any Day ID to instantly open that day's overview dashboard.",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDCC5 Upcoming Mock Exams Tracker</b></div>Easily schedule upcoming mock tests, track countdowns, and link them directly to your study plan.",
+    "<div style='margin-bottom:8px'><b>\u26A1 Bug Fixes & Stability</b></div>Resolved date-parsing edge cases for legacy sessions, eliminated stale beta caches, and optimized rendering responsiveness."
   ]
 }

@@ -1,11 +1,11 @@
-const CACHE_NAME = 'academicpulse-v1.0.91-beta';
+const CACHE_NAME = 'academicpulse-v1.0.92';
 
 const STATIC_ASSETS = [
     'index.html',
     'style.css?v=19',
-    'app.js?v=112',
+    'app.js?v=113',
     'auth.js?v=14',
-    'export.js?v=10',
+    'export.js?v=11',
     'manifest.json',
     'icon.svg'
 ];
@@ -86,8 +86,7 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'CHECK_FOR_UPDATES') {
-        const isBeta = event.data.isBeta === true;
-        const targetFile = isBeta ? './beta_version.json' : './version.json';
+        const targetFile = './version.json';
         fetch(targetFile + '?t=' + Date.now())
             .then(res => res.json())
             .then(updateInfo => {

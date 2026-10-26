@@ -226,9 +226,7 @@ function loadData() {
         sysState.currentVersion = AppState.currentVersion;
         Storage.set(STORAGE_KEYS.SYSTEM_STATE, sysState);
     }
-    if (AppState.currentVersion.includes('beta')) {
-        localStorage.setItem('academicpulse_beta_opt_in', 'true');
-    }
+    localStorage.removeItem('academicpulse_beta_opt_in');
     AppState.availableUpdate = sysState.availableUpdate;
     // Push version to UI immediately (before renderUpdateBadge fires)
     const _vEl = document.getElementById('appVersionTextProfile');
@@ -1300,6 +1298,8 @@ function renderAttendance() {
         if (isCurrentMonth && day === now.getDate()) {
             cell.style.border = '2px solid white';
             cell.classList.add('selected');
+        } else if (!isCurrentMonth && day === 1) {
+            cell.classList.add('selected');
         }
         
         cell.innerHTML = `<div class="day-num">${day}</div>`;
@@ -2347,7 +2347,10 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
             
             AppState.sessions.forEach(s => {
-                const d = new Date(s.startTime);
+                const rawDate = s.startTime || s.date;
+                if (!rawDate) return;
+                const d = new Date(rawDate);
+                if (isNaN(d.getTime())) return;
                 if (d >= sevenDaysAgo) {
                     if (!recentSubjTotals[s.subjectId]) recentSubjTotals[s.subjectId] = 0;
                     recentSubjTotals[s.subjectId] += (s.duration || (s.durationMinutes ? s.durationMinutes * 60 : 0));
@@ -4761,12 +4764,23 @@ function renderSearchResults(query) {
         const targetDateKey = `${y}-${m}-${d}`;
         
         const daySessions = AppState.sessions.filter(s => {
-            const dk = typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(new Date(s.startTime)) : new Date(s.startTime).toISOString().split('T')[0];
+            const raw = s.startTime || s.date;
+            if (!raw) return false;
+            const dObj = new Date(raw);
+            if (isNaN(dObj.getTime())) return false;
+            const dk = typeof TimeUtils !== 'undefined' && TimeUtils.getDateKey ? TimeUtils.getDateKey(dObj) : (dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0') + '-' + String(dObj.getDate()).padStart(2, '0'));
             return dk === targetDateKey;
         });
         
         let totalDur = 0;
-        daySessions.forEach(s => totalDur += (s.duration || (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 1000 : 0)));
+        daySessions.forEach(s => {
+            if (s.durationMinutes !== undefined && !isNaN(s.durationMinutes)) totalDur += s.durationMinutes * 60;
+            else if (s.duration && !isNaN(s.duration)) totalDur += parseFloat(s.duration);
+            else if (s.endTime && s.startTime) {
+                const diff = (new Date(s.endTime) - new Date(s.startTime)) / 1000;
+                if (isFinite(diff) && diff > 0) totalDur += diff;
+            }
+        });
         const durH = Math.floor(totalDur / 3600);
         const durM = Math.floor((totalDur % 3600) / 60);
 
@@ -4806,12 +4820,17 @@ function renderSearchResults(query) {
         const sessionsGrid = document.createElement('div');
         sessionsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;';
         
-        daySessions.sort((a,b) => new Date(a.startTime) - new Date(b.startTime)).forEach(s => {
+        daySessions.sort((a,b) => new Date(a.startTime || a.date) - new Date(b.startTime || b.date)).forEach(s => {
             const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
-            const durationHrs = s.duration ? (s.duration / 3600).toFixed(2) : ((new Date(s.endTime) - new Date(s.startTime)) / 3600000).toFixed(2);
-            const subtitle = `⏱️ ${durationHrs} Hours ${s.topic ? `• ${s.topic}` : ''}`;
+            let sDur = 0;
+            if (s.durationMinutes !== undefined && !isNaN(s.durationMinutes)) sDur = s.durationMinutes * 60;
+            else if (s.duration) sDur = parseFloat(s.duration);
+            else if (s.endTime && s.startTime) sDur = Math.max(0, (new Date(s.endTime) - new Date(s.startTime)) / 1000);
+            const durationHrs = (sDur / 3600).toFixed(2);
+            const subtitle = `\u23F1\uFE0F ${durationHrs} Hours ${s.topic ? `\u2022 ${s.topic}` : ""}`;
             const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
-            const dateStr = new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const sTimeObj = s.startTime ? new Date(s.startTime) : null;
+            const dateStr = sTimeObj && !isNaN(sTimeObj.getTime()) ? sTimeObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : (s.date || '-');
             
             const card = createResultCard('session', subj ? subj.name : 'Unknown Subject', subtitle, dateStr, cleanNotes, subj ? subj.color : '#0A84FF');
             sessionsGrid.appendChild(card);
@@ -4904,8 +4923,10 @@ function renderSearchResults(query) {
 
         // ── Render helper: one individual session card ──────────────
         const makeSessionCard = (s, subjColor) => {
-            const dateStr = new Date(s.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            const timeStr = new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const rawDate = s.startTime || s.date;
+            const dObj = rawDate ? new Date(rawDate) : null;
+            const dateStr = dObj && !isNaN(dObj.getTime()) ? dObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : (s.date || '-');
+            const timeStr = s.startTime && !isNaN(new Date(s.startTime).getTime()) ? new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
             const durStr = s.duration ? TimeUtils.formatHours(s.duration) : '-';
             const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
             const partLabel = getPartLabel(s.topic, s.notes);
@@ -5019,8 +5040,10 @@ function renderSearchResults(query) {
                 } else {
                     // Single part — show full detail inline
                     const s = parts[0];
-                    const dateStr = new Date(s.startTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                    const timeStr = new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const rawDate = s.startTime || s.date;
+                    const dObj = rawDate ? new Date(rawDate) : null;
+                    const dateStr = dObj && !isNaN(dObj.getTime()) ? dObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : (s.date || '-');
+                    const timeStr = s.startTime && !isNaN(new Date(s.startTime).getTime()) ? new Date(s.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
                     const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
 
                     const detailEl = document.createElement('div');
@@ -5129,11 +5152,16 @@ function renderSearchResults(query) {
             let card;
             if (res.type === 'session') {
                 const s = res.data;
-                const durationHrs = s.duration ? (s.duration / 3600).toFixed(2) : ((new Date(s.endTime) - new Date(s.startTime)) / 3600000).toFixed(2);
-                const liveTag = res.isLiveClass ? ' 🎥' : '';
-                const subtitle = `⏱️ ${durationHrs} Hours ${s.topic ? `• ${s.topic}` : ''}${liveTag}`;
+                let sDur = 0;
+                if (s.durationMinutes !== undefined && !isNaN(s.durationMinutes)) sDur = s.durationMinutes * 60;
+                else if (s.duration) sDur = parseFloat(s.duration);
+                else if (s.endTime && s.startTime) sDur = Math.max(0, (new Date(s.endTime) - new Date(s.startTime)) / 1000);
+                const durationHrs = (sDur / 3600).toFixed(2);
+                const liveTag = res.isLiveClass ? ' \uD83C\uDFA5' : '';
+                const subtitle = `\u23F1\uFE0F ${durationHrs} Hours ${s.topic ? `\u2022 ${s.topic}` : ""}${liveTag}`;
                 const cleanNotes = (s.notes || '').replace(/\(live class\)/gi, '').trim();
-                card = createResultCard('session', res.subj ? res.subj.name : 'Unknown Subject', subtitle, res.date.toLocaleDateString(), cleanNotes, res.subj ? res.subj.color : '#0A84FF');
+                const dDisplay = res.date && !isNaN(res.date.getTime()) ? res.date.toLocaleDateString() : '-';
+                card = createResultCard('session', res.subj ? res.subj.name : 'Unknown Subject', subtitle, dDisplay, cleanNotes, res.subj ? res.subj.color : '#0A84FF');
             } else if (res.type === 'mock') {
                 const m = res.data;
                 const subtitle = `Score: ${m.score} / ${m.maxScore} (${((m.score/m.maxScore)*100).toFixed(1)}%)`;
@@ -5299,8 +5327,7 @@ window.checkForUpdates = function(btnEl) {
         btnEl.style.borderColor = 'var(--neon-blue)';
     }
 
-    const isBeta = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-    const targetFile = isBeta ? './beta_version.json' : './version.json';
+    const targetFile = './version.json';
 
     fetch(targetFile + '?t=' + Date.now())
         .then(r => r.json())
@@ -5365,16 +5392,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initialize beta toggle
-    const betaToggle = document.getElementById('betaUpdatesToggle');
-    const isOptedIn = localStorage.getItem('academicpulse_beta_opt_in') === 'true';
-    if (betaToggle) {
-        betaToggle.checked = isOptedIn;
-    }
-    const betaBadge = document.getElementById('betaBadgeProfile');
-    if (betaBadge) {
-        betaBadge.style.display = isOptedIn ? 'inline-block' : 'none';
-    }
 
     const backupBtn = document.getElementById('btnBackupData');
     if (backupBtn) {

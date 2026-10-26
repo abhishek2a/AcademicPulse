@@ -197,8 +197,9 @@
 
         <!-- View: Attendance -->
         <section id="view-attendance" class="view-section">
-            <div class="header">
+            <div class="header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <h1>Attendance & Day Report</h1>
+                <button class="btn btn-outline" style="border-color: var(--neon-blue); color: var(--neon-blue); font-size: 0.85rem; padding: 6px 14px;" onclick="loadPdfLibraries().then(() => generateMonthlyReport())">📅 Export Month PDF</button>
             </div>
             <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); margin-bottom: 20px;">
                 <div class="stat-card" style="padding: 15px;">
@@ -618,7 +619,7 @@
             </div>
 
             <!-- Scheduled Upcoming Mocks -->
-            <div id="upcomingMocksBetaContainer" class="chart-card" style="margin-bottom: 30px; text-align: left; position: relative; display: none;">
+            <div id="upcomingMocksBetaContainer" class="chart-card" style="margin-bottom: 30px; text-align: left; position: relative; display: block;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="margin: 0;">Scheduled Upcoming Mocks</h3>
                     <button class="btn btn-outline" onclick="openAddUpcomingMockModal()" style="padding: 6px 12px; font-size: 0.85rem; display:flex; align-items:center; gap:6px;">
@@ -1756,7 +1757,7 @@
     </div>
     
     <script src="auth.js?v=14"></script>
-    <script src="app.js?v=112"></script>
-    <script src="export.js?v=10"></script>
+    <script src="app.js?v=113"></script>
+    <script src="export.js?v=11"></script>
 </body>
 </html>

@@ -1,13 +1,13 @@
 {
-  "version": "v1.0.92",
-  "build": "2026.10.26-stable",
-  "title": "v1.0.92 \u2014 Enhanced PDF Reports, Attendance & Stability Update",
-  "description": "AcademicPulse v1.0.92 introduces beautifully enhanced Day, Weekly, and Monthly PDF reports with full session logs, improved Attendance calendar navigation, and performance fixes.",
+  "version": "v1.0.93",
+  "build": "2026.11.05-stable",
+  "title": "v1.0.93 \u2014 Astra Malayalam Platform & Performance Optimization",
+  "description": "AcademicPulse v1.0.93 adds Astra Malayalam class platform support, optimizes subject lookup with O(1) caching, strengthens numerical/date safety, and boosts UI responsiveness.",
   "features": [
-    "<div style='margin-bottom:8px'><b>\uD83D\uDCC4 Enhanced PDF Reports</b></div>Weekly and Monthly PDFs now match the Day PDF with comprehensive study type & platform breakdowns (Revision, Class, YouTube, Instill) and detailed session logs.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDDD3\uFE0F Attendance Calendar & Month Navigation</b></div>Smooth navigation across previous months with active day selection and monthly study hour summaries.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDD0D Day ID Search</b></div>Every report includes a unique Day ID (e.g. DAY-20261026). Search any Day ID to instantly open that day's overview dashboard.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDCC5 Upcoming Mock Exams Tracker</b></div>Easily schedule upcoming mock tests, track countdowns, and link them directly to your study plan.",
-    "<div style='margin-bottom:8px'><b>\u26A1 Bug Fixes & Stability</b></div>Resolved date-parsing edge cases for legacy sessions, eliminated stale beta caches, and optimized rendering responsiveness."
+    "<div style='margin-bottom:8px'><b>\uD83C\uDF93 Astra Malayalam Platform</b></div>Updated class platform selection with Astra Malayalam across session logging, schedules, and attendance logs.",
+    "<div style='margin-bottom:8px'><b>\u26A1 O(1) Performance Caching</b></div>Replaced repetitive array scans with optimized map lookups for faster rendering across large study logs and searches.",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDCC4 Enhanced PDF Reports</b></div>Weekly, Monthly, and Day PDFs with comprehensive study type & platform breakdowns and full session logs.",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDDD3\uFE0F Calendar & Attendance Navigation</b></div>Smooth navigation across previous months with active day selection and monthly study hour summaries.",
+    "<div style='margin-bottom:8px'><b>\uD83D\uDEE1\uFE0F Bug Fixes & Stability</b></div>Guarded mock score calculations against division-by-zero, hardened date parsing, and optimized UI animation layers."
   ]
 }

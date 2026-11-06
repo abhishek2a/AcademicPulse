@@ -81,7 +81,7 @@ const AppState = {
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
     upcomingMocks: [],
-    currentVersion: 'v1.0.92',
+    currentVersion: 'v1.0.93',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -166,7 +166,23 @@ function updateSessionBadges(id) {
 // ==========================================
 // DATA MANAGEMENT
 // ==========================================
+let _subjectCacheMap = null;
+function getSubjectById(id) {
+    if (!id) return null;
+    if (!_subjectCacheMap) {
+        _subjectCacheMap = new Map();
+        (AppState.subjects || []).forEach(s => {
+            if (s && s.id) _subjectCacheMap.set(s.id, s);
+        });
+    }
+    return _subjectCacheMap.get(id) || null;
+}
+function invalidateSubjectCache() {
+    _subjectCacheMap = null;
+}
+
 function loadData() {
+    invalidateSubjectCache();
     AppState.subjects = Storage.get(STORAGE_KEYS.SUBJECTS, []);
     
     // Pre-populate with default courses if empty
@@ -550,7 +566,7 @@ window.showWhatsNewPopup = async function() {
 };
 
 function saveData(key) {
-    if (key === 'subjects' || key === 'all') Storage.set(STORAGE_KEYS.SUBJECTS, AppState.subjects);
+    if (key === 'subjects' || key === 'all') { Storage.set(STORAGE_KEYS.SUBJECTS, AppState.subjects); invalidateSubjectCache(); }
     if (key === 'attendance' || key === 'all') Storage.set(STORAGE_KEYS.ATTENDANCE, AppState.attendance);
     if (key === 'sessions' || key === 'all') {
         Storage.set(STORAGE_KEYS.SESSIONS, AppState.sessions);
@@ -621,7 +637,7 @@ function checkAchievements() {
         const mocks = mocksBySubj[subjId].sort((a,b) => new Date(a.date) - new Date(b.date));
         if (mocks.length >= 3) {
             const last3 = mocks.slice(-3);
-            const allAbove85 = last3.every(m => (m.score / m.maxScore) >= 0.85);
+            const allAbove85 = last3.every(m => m.maxScore > 0 && (m.score / m.maxScore) >= 0.85);
             if (allAbove85) {
                 const subj = AppState.subjects.find(s => s.id === subjId);
                 const subjName = subj ? subj.name : 'a subject';
@@ -1506,7 +1522,7 @@ function renderDayReport(dateKey) {
     pendingSchedule.forEach(item => {
 
         const isExamRegItem = item.type === 'exam_register';
-        const subj = isExamRegItem ? null : (AppState.subjects.find(sub => sub.id === item.subjectId) || null);
+        const subj = isExamRegItem ? null : (getSubjectById(item.subjectId) || null);
         const subjName = isExamRegItem ? escapeHtml(item.title || 'Exam Registration') : (subj ? escapeHtml(subj.name) : 'Unknown Subject');
         const typeLabel = isExamRegItem ? 'EXAM REG' : 'SCHEDULED';
         const typeLabelColor = isExamRegItem ? 'var(--neon-green)' : 'var(--neon-blue)';
@@ -1559,7 +1575,7 @@ function renderDayReport(dateKey) {
             if (isFinite(diff) && diff > 0) sessionMins = diff;
         }
         totalDuration += sessionMins;
-        const subj = AppState.subjects.find(sub => sub.id === s.subjectId) || { name: 'Unknown', color: 'var(--text-main)' };
+        const subj = getSubjectById(s.subjectId) || { name: 'Unknown', color: 'var(--text-main)' };
         
         let hrs = 0;
         if(s.durationMinutes !== undefined) {
@@ -1784,8 +1800,8 @@ function renderMockAnalyticsTable() {
         else if (pct < 75) color = 'var(--neon-gold)';
         
         const d = new Date(m.date);
-        const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-        const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        const dateStr = !isNaN(d.getTime()) ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : (m.date || '-');
+        const timeStr = !isNaN(d.getTime()) ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
         
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -1815,7 +1831,7 @@ function renderMockExamsChart() {
         const filteredMocks = (AppState.mockTests || []).filter(m => m.course === currentMockAnalyticsTab);
         const sortedMocks = [...filteredMocks].sort((a,b) => new Date(a.date) - new Date(b.date)).slice(-10);
         
-        const labels = sortedMocks.map(m => new Date(m.date).toLocaleDateString(undefined, {month:'short', day:'numeric'}));
+        const labels = sortedMocks.map(m => { const d = new Date(m.date); return !isNaN(d.getTime()) ? d.toLocaleDateString(undefined, {month:'short', day:'numeric'}) : '-'; });
         const data = sortedMocks.map(m => Math.max(0, Math.min(100, Math.round((m.score / (m.maxScore || 1)) * 100))));
         
         if (mockExamsLineChartInst) mockExamsLineChartInst.destroy();
@@ -1914,7 +1930,7 @@ function renderAnalytics() {
         if(dur < minDur) { minDur = dur; leastSubj = sid; }
     });
     
-    const getSubjName = (id) => { const s = AppState.subjects.find(x => x.id === id); return s ? s.name : '-'; };
+    const getSubjName = (id) => { const s = getSubjectById(id); return s ? s.name : '-'; };
     if(e('mostStudiedSubject')) {
         e('mostStudiedSubject').textContent = mostSubj ? `🏆 ${getSubjName(mostSubj)}` : '🏆 -';
         e('mostStudiedHours').textContent = mostSubj ? `${(maxDur/3600).toFixed(1)} Hours` : '0 Hours';
@@ -2405,9 +2421,9 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
         if (!appCache.analytics || !appCache.analytics.data) rebuildAnalyticsCache();
         const cache = appCache.analytics.data;
         
-        const labels = subjArr.map(s => { const b=AppState.subjects.find(x=>x.id===s.id); return b?b.name:'-'; });
+        const labels = subjArr.map(s => { const b=getSubjectById(s.id); return b?b.name:'-'; });
         const data = subjArr.map(s => s.dur/3600);
-        const colors = subjArr.map(s => { const b=AppState.subjects.find(x=>x.id===s.id); return b?b.color:'#555'; });
+        const colors = subjArr.map(s => { const b=getSubjectById(s.id); return b?b.color:'#555'; });
         
         if (subjectPieChartInst) subjectPieChartInst.destroy();
         subjectPieChartInst = new Chart(pieCtx, {
@@ -4121,7 +4137,7 @@ function renderMocksHistory() {
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--glass-border)';
         tr.innerHTML = `
-            <td style="padding:15px 10px;">${new Date(m.date).toLocaleDateString()}</td>
+            <td style="padding:15px 10px;">${(function(){var d=new Date(m.date);return !isNaN(d.getTime())?d.toLocaleDateString():(m.date||"-");})()}</td>
             <td style="padding:15px 10px;">
                 <div class="mock-name-title" style="font-weight: 600; color: var(--text-main); word-break: break-word; line-height: 1.3;"></div>
                 <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 4px;">
@@ -4510,7 +4526,7 @@ async function processPDF(file) {
     } catch (error) {
         console.error("PDF Parsing Error:", error);
         pdfDropZone.style.display = 'block';
-        analyzerLoading.style.display = 'none';
+        if (typeof analyzerLoading !== 'undefined' && analyzerLoading) analyzerLoading.style.display = 'none';
         alert("Could not read the PDF. Error: " + (error.message || error));
     }
 }
@@ -4528,8 +4544,8 @@ function analyzeReportText(text) {
     const attMatch = text.match(/Attendance\s*Percentage:?\s*(\d+)%/i);
     if(attMatch) attendance = parseInt(attMatch[1], 10);
     
-    document.getElementById('analyzerHours').textContent = totalHours > 0 ? `${totalHours}h` : 'N/A';
-    document.getElementById('analyzerAttendance').textContent = attendance > 0 ? `${attendance}%` : 'N/A';
+    const aHoursEl = document.getElementById('analyzerHours'); if(aHoursEl) aHoursEl.textContent = totalHours > 0 ? `${totalHours}h` : 'N/A';
+    const aAttEl = document.getElementById('analyzerAttendance'); if(aAttEl) aAttEl.textContent = attendance > 0 ? `${attendance}%` : 'N/A';
     
     const suggestions = [];
     
@@ -4557,10 +4573,10 @@ function analyzeReportText(text) {
         suggestions.push("<li><strong>Action Item:</strong> Review the subjects with the lowest progress in your Dashboard and dedicate your next study session entirely to them.</li>");
     }
     
-    document.getElementById('analyzerSuggestions').innerHTML = suggestions.join('');
+    const aSugEl = document.getElementById('analyzerSuggestions'); if(aSugEl) aSugEl.innerHTML = suggestions.join('');
     
-    analyzerLoading.style.display = 'none';
-    analyzerResults.style.display = 'block';
+    if (typeof analyzerLoading !== 'undefined' && analyzerLoading) analyzerLoading.style.display = 'none';
+    if (typeof analyzerResults !== 'undefined' && analyzerResults) analyzerResults.style.display = 'block';
     
     if(!document.getElementById('resetAnalyzerBtn')) {
         const resetBtn = document.createElement('button');
@@ -4570,10 +4586,10 @@ function analyzeReportText(text) {
         resetBtn.style.width = '100%';
         resetBtn.textContent = 'Analyze Another Report';
         resetBtn.onclick = () => {
-            analyzerResults.style.display = 'none';
-            pdfDropZone.style.display = 'block';
+            if (typeof analyzerResults !== 'undefined' && analyzerResults) analyzerResults.style.display = 'none';
+            if (typeof pdfDropZone !== 'undefined' && pdfDropZone) pdfDropZone.style.display = 'block';
         };
-        analyzerResults.appendChild(resetBtn);
+        if (typeof analyzerResults !== 'undefined' && analyzerResults) analyzerResults.appendChild(resetBtn);
     }
 }
 
@@ -4821,7 +4837,7 @@ function renderSearchResults(query) {
         sessionsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;';
         
         daySessions.sort((a,b) => new Date(a.startTime || a.date) - new Date(b.startTime || b.date)).forEach(s => {
-            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const subj = getSubjectById(s.subjectId);
             let sDur = 0;
             if (s.durationMinutes !== undefined && !isNaN(s.durationMinutes)) sDur = s.durationMinutes * 60;
             else if (s.duration) sDur = parseFloat(s.duration);
@@ -4874,7 +4890,7 @@ function renderSearchResults(query) {
 
         // Filter by search query too
         const filtered = liveSessions.filter(s => {
-            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const subj = getSubjectById(s.subjectId);
             return searchTerms.length === 0 || matchesSearch(subj ? subj.name : '', s.notes, s.topic);
         });
 
@@ -4913,7 +4929,7 @@ function renderSearchResults(query) {
         // Group: subject → chapter root → sessions[]
         const bySubject = {};
         filtered.forEach(s => {
-            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const subj = getSubjectById(s.subjectId);
             const subjKey = subj ? subj.id : '__unknown__';
             if (!bySubject[subjKey]) bySubject[subjKey] = { subj, chapters: {} };
             const root = getChapterRoot(s.topic, s.notes);
@@ -5078,7 +5094,7 @@ function renderSearchResults(query) {
         AppState.sessions.forEach(s => {
             // Skip live-class sessions in regular search (they have their own filter)
             if (isLiveClass(s.notes) && currentSearchFilter !== 'sessions') return;
-            const subj = AppState.subjects.find(sub => sub.id === s.subjectId);
+            const subj = getSubjectById(s.subjectId);
             const subjName = subj ? subj.name : '';
             const notes = s.notes || '';
             const topic = s.topic || '';
@@ -5164,13 +5180,13 @@ function renderSearchResults(query) {
                 card = createResultCard('session', res.subj ? res.subj.name : 'Unknown Subject', subtitle, dDisplay, cleanNotes, res.subj ? res.subj.color : '#0A84FF');
             } else if (res.type === 'mock') {
                 const m = res.data;
-                const subtitle = `Score: ${m.score} / ${m.maxScore} (${((m.score/m.maxScore)*100).toFixed(1)}%)`;
-                card = createResultCard('mock', m.name, subtitle, res.date.toLocaleDateString(), m.notes || `Mock Test Log`, '#FF453A');
+                const mScore = m.score || 0; const mMax = (m.maxScore && m.maxScore > 0) ? m.maxScore : 100; const subtitle = `Score: ${mScore} / ${mMax} (${((mScore/mMax)*100).toFixed(1)}%)`;
+                const mDate = res.date && !isNaN(res.date.getTime()) ? res.date.toLocaleDateString() : '-'; card = createResultCard('mock', m.name || 'Mock Exam', subtitle, mDate, m.notes || `Mock Test Log`, '#FF453A');
             } else if (res.type === 'practice') {
                 const p = res.data;
                 const pct = p.attempted > 0 ? Math.round((p.correct / p.attempted) * 100) : 0;
                 const subtitle = `Score: ${p.correct} / ${p.attempted} (${pct}%) • ${p.confidence} Conf`;
-                card = createResultCard('practice', p.topic || p.syllabusArea || 'Practice', subtitle, res.date.toLocaleDateString(), p.notes || `Course: ${p.course}`, '#FF9F0A');
+                const pDate = res.date && !isNaN(res.date.getTime()) ? res.date.toLocaleDateString() : '-'; card = createResultCard('practice', p.topic || p.syllabusArea || 'Practice', subtitle, pDate, p.notes || `Course: ${p.course || ''}`, '#FF9F0A');
             }
             if(card) cardsWrap.appendChild(card);
         });
@@ -5490,7 +5506,7 @@ function renderPracticeHistory() {
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--glass-border)';
         tr.innerHTML = `
-            <td style="padding:15px 10px;">${new Date(m.date).toLocaleDateString()}</td>
+            <td style="padding:15px 10px;">${(function(){var d=new Date(m.date);return !isNaN(d.getTime())?d.toLocaleDateString():(m.date||"-");})()}</td>
             <td class="mock-name" style="padding:15px 10px;">
                 <div style="font-weight:600">${m.syllabusArea || 'General'}</div>
                 <div style="font-size:0.8rem; color:var(--text-muted);">${m.course} ${m.topic ? '• '+m.topic : ''}</div>
@@ -6675,7 +6691,7 @@ function renderScheduleList() {
                 </div>
             `;
         } else {
-            const subj = AppState.subjects.find(s => s.id === item.subjectId);
+            const subj = getSubjectById(item.subjectId);
             const subjName = subj ? subj.name : 'Unknown Subject';
             // Support both new multi-topics array and legacy single topic
             const topicsArr = (item.topics && item.topics.length > 0) ? item.topics : (item.topic ? [item.topic] : []);
@@ -6776,7 +6792,7 @@ function renderOverviewScheduleWidget() {
                 </div>
             `;
         } else {
-            const subj = AppState.subjects.find(sub => sub.id === item.subjectId);
+            const subj = getSubjectById(item.subjectId);
             const subjName = subj ? subj.name : 'Unknown Subject';
             const courseStr = subj ? (subj.course || 'CSEB') : '';
             const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');

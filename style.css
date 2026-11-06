@@ -1003,3 +1003,30 @@ body.light-theme .ai-coach-btn.active-prompt {
     }
 }
 
+/* ── Performance & UI Render Optimizations ── */
+.chart-card, .subject-card, .stat-card {
+    contain: layout style;
+}
+
+.modal-content {
+    will-change: transform, opacity;
+}
+
+.platform-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+
+/* Smooth transitions for interactive controls */
+button, .btn, .nav-item, .toggle-slider, .day-cell {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+

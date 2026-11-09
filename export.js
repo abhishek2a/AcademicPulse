@@ -423,7 +423,7 @@ function generateStudyReport() {
 
     (AppState.subjects || []).forEach(s => {
         subjectStats[s.id] = {
-            name: s.name, course: s.course || 'CSEB', priority: s.priority,
+            name: s.name, course: s.course || 'ACCA', priority: s.priority,
             totalSeconds: 0, sessions: 0, lastStudied: null
         };
     });

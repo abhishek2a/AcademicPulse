@@ -390,14 +390,18 @@ body.light-theme .ambient-bg { opacity: 0.5; }
 
 .view-section {
     display: none;
-    animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
 }
 
-.view-section.active { display: block; }
+.view-section.active {
+    display: block;
+    opacity: 1;
+    animation: fadeInFast 0.15s ease-out forwards;
+}
 
-@keyframes fadeSlideUp { 
-    from { opacity: 0; transform: translateY(20px); } 
-    to { opacity: 1; transform: translateY(0); } 
+@keyframes fadeInFast { 
+    from { opacity: 0; } 
+    to { opacity: 1; } 
 }
 
 /* Shared Components */
@@ -1027,6 +1031,87 @@ body.light-theme .ai-coach-btn.active-prompt {
 button, .btn, .nav-item, .toggle-slider, .day-cell {
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
+}
+
+/* ── AI Topic & Standard-Wise Recommendation Card ── */
+.ai-standard-card {
+    background: linear-gradient(135deg, rgba(191, 90, 242, 0.08), rgba(10, 132, 255, 0.08));
+    border: 1px solid rgba(191, 90, 242, 0.28);
+    border-radius: 16px;
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ai-standard-card::before {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle, var(--neon-purple), transparent 70%);
+    opacity: 0.25;
+    pointer-events: none;
+    filter: blur(50px);
+}
+.ai-standard-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(191, 90, 242, 0.15);
+    color: var(--neon-purple);
+    border: 1px solid rgba(191, 90, 242, 0.3);
+}
+.ai-standard-title {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 10px 0 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.ai-standard-stat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+}
+.ai-standard-prescription {
+    font-size: 0.92rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 12px 0 18px 0;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 12px 14px;
+    border-radius: 10px;
+    border-left: 3px solid var(--neon-purple);
+}
+.ai-standard-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.ai-standard-actions .btn {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 

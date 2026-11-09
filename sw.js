@@ -1,11 +1,11 @@
-const CACHE_NAME = 'academicpulse-v1.0.93';
+const CACHE_NAME = 'academicpulse-v1.0.97';
 
 const STATIC_ASSETS = [
     'index.html',
-    'style.css?v=20',
-    'app.js?v=114',
+    'style.css?v=23',
+    'app.js?v=118',
     'auth.js?v=14',
-    'export.js?v=12',
+    'export.js?v=13',
     'manifest.json',
     'icon.svg'
 ];
@@ -49,57 +49,48 @@ self.addEventListener('fetch', (event) => {
                         cache.put(event.request, fetchRes.clone());
                         return fetchRes;
                     });
+                }).catch(() => {
+                    // Fallback to cache without query string if versioned fetch fails offline
+                    return caches.match(url.pathname);
                 });
             })
         );
         return;
     }
 
-    // Stale While Revalidate for fonts
-    if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com')) {
-        event.respondWith(
-            caches.match(event.request).then(cachedResponse => {
-                const fetchPromise = fetch(event.request).then(networkResponse => {
-                    const responseToCache = networkResponse.clone();
-                    caches.open(CACHE_NAME).then(cache => {
-                        cache.put(event.request, responseToCache);
-                    });
-                    return networkResponse;
-                });
-                return cachedResponse || fetchPromise;
-            })
-        );
-        return;
-    }
-
-    // Network First for HTML, JS, API endpoints (fallback to cache for offline)
+    // Network First for all other requests (APIs, dynamic data)
     event.respondWith(
-        fetch(event.request).then(response => {
-            const resClone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
-            return response;
-        }).catch(() => {
-            return caches.match(event.request);
-        })
+        fetch(event.request)
+            .then(response => {
+                // Clone and cache successful GET responses
+                if (response && response.status === 200 && response.type === 'basic') {
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseClone);
+                    });
+                }
+                return response;
+            })
+            .catch(() => {
+                // Offline fallback: try cache
+                return caches.match(event.request).then(cachedResponse => {
+                    if (cachedResponse) return cachedResponse;
+                    // If HTML request fails, return cached index.html
+                    if (event.request.headers.get('accept')?.includes('text/html')) {
+                        return caches.match('index.html');
+                    }
+                    return new Response('Network error occurred', {
+                        status: 408,
+                        headers: { 'Content-Type': 'text/plain' }
+                    });
+                });
+            })
     );
 });
 
+// Handle update check requests from the application
 self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'CHECK_FOR_UPDATES') {
-        const targetFile = './version.json';
-        fetch(targetFile + '?t=' + Date.now())
-            .then(res => res.json())
-            .then(updateInfo => {
-                updateInfo.date = new Date().toLocaleDateString();
-                event.source.postMessage({
-                    type: 'UPDATE_AVAILABLE',
-                    payload: updateInfo
-                });
-            })
-            .catch(err => console.error('Error checking updates:', err));
-    }
-
-    if (event.data && event.data.type === 'SKIP_WAITING') {
+    if (event.data && event.data.action === 'skipWaiting') {
         self.skipWaiting();
     }
 });

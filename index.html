@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -15,7 +15,7 @@
         }
     </script>
     <link rel="icon" href="icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css?v=20">
+    <link rel="stylesheet" href="style.css?v=23">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Firebase Scripts -->
@@ -92,6 +92,7 @@
                 <!-- Injected via JS -->
             </div>
 
+
             <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));">
                 <div class="stat-card" style="text-align: center;">
                     <div class="stat-label">Study Streak</div>
@@ -164,14 +165,15 @@
         <section id="view-subjects" class="view-section">
             <div class="header">
                 <h1>Course Management</h1>
-                <button class="btn" id="openSubjectModalBtn" style="display: none;">+ Add Subject</button>
+                <button class="btn" id="openSubjectModalBtn" style="display: inline-block;">+ Add Subject</button>
             </div>
             
             <!-- Level 1: Course Selection -->
-            <div id="courseSelectionView">
+            <div id="courseSelectionView" style="display: none;">
                 <h2 style="font-size: 1.2rem; margin-bottom: 20px; color: var(--text-muted);">Select a Course</h2>
                 <div class="stats-grid">
-                    <div class="stat-card" style="cursor: pointer; text-align: center;" onclick="window.selectCourseView('CSEB')">
+                    <!-- CSEB card hidden -->
+                    <div class="stat-card" style="cursor: pointer; text-align: center; display: none;" onclick="window.selectCourseView('CSEB')">
                         <div class="stat-value text-blue" style="font-size: 2rem; margin-bottom: 10px;">CSEB</div>
                         <div class="stat-sub">Co-operative Service Examination Board</div>
                     </div>
@@ -183,10 +185,10 @@
             </div>
 
             <!-- Level 2: Subject List -->
-            <div id="subjectsListView" style="display: none;">
+            <div id="subjectsListView" style="display: block;">
                 <div style="display: flex; align-items: center; margin-bottom: 20px; gap: 15px;">
-                    <button class="btn btn-outline" onclick="window.backToCourses()" style="padding: 6px 12px; font-size: 0.9rem;">← Back</button>
-                    <h2 id="currentCourseTitle" style="font-size: 1.4rem; margin: 0; color: var(--text-main);">Course Subjects</h2>
+                    <button class="btn btn-outline" onclick="window.backToCourses()" style="padding: 6px 12px; font-size: 0.9rem; display: none;">← Back</button>
+                    <h2 id="currentCourseTitle" style="font-size: 1.4rem; margin: 0; color: var(--text-main);">ACCA Subjects</h2>
                 </div>
                 
                 <div class="subjects-grid" id="courseSubjectsGrid" style="margin-bottom: 30px;">
@@ -283,12 +285,15 @@
                 </div>
                 <div class="chart-card" style="display: flex; flex-direction: column; position: relative; overflow: hidden;">
                     <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: var(--neon-purple); filter: blur(80px); opacity: 0.3; border-radius: 50%; pointer-events: none;"></div>
-                    <h3 style="display: flex; align-items: center; gap: 8px; margin-bottom: auto;"><span style="color: var(--neon-purple);">✨</span> AI Next Study Suggestion</h3>
-                    <div id="aiSuggestionContainer" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px;">
-                        <div style="font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 15px;" id="aiSuggestedSubject">-</div>
-                        <div style="font-size: 0.95rem; color: var(--text-muted); line-height: 1.6;" id="aiSuggestedInsight">Analyzing your study patterns...</div>
+                    <h3 style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;"><span style="color: var(--neon-purple);">✨</span> AI Next Study Suggestion</h3>
+                    <div id="aiSuggestionContainer" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: stretch; text-align: left; padding: 5px;">
+                        <div style="font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px;" id="aiSuggestedSubject">-</div>
+                        <div style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.6;" id="aiSuggestedInsight">Analyzing your study patterns...</div>
                     </div>
-                    <button class="btn" style="margin-top: auto; padding: 10px; background: rgba(191, 90, 242, 0.1); color: var(--neon-purple); border: 1px solid var(--neon-purple);" onclick="const subj = document.getElementById('aiSuggestedSubject').textContent; if(subj !== '-') { const target = AppState.subjects.find(s => s.name === subj); if(target) { document.querySelector('.nav-item[data-target=\'view-focus\']').click(); setTimeout(() => { document.getElementById('focusSubjectSelect').value = target.id; }, 100); } }">Study Now</button>
+                    <div id="aiSuggestionActions" style="margin-top: auto; padding-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn" id="aiStudyNowBtn" style="flex: 1; padding: 10px; background: rgba(191, 90, 242, 0.15); color: var(--neon-purple); border: 1px solid var(--neon-purple); font-weight: 600;">🎯 Focus Mode</button>
+                        <button class="btn btn-outline" id="aiPracticeQuestionsBtn" style="padding: 10px; font-weight: 600;">🗃️ Practice</button>
+                    </div>
                 </div>
             </div>
 
@@ -465,7 +470,8 @@
                 <h2 style="margin: 0;">Mock Exam Performance</h2>
                 <div style="display: flex; gap: 10px; background: var(--glass-bg); padding: 5px; border-radius: 8px; border: 1px solid var(--glass-border);">
                     <div class="tab active" onclick="setMockAnalyticsTab('ACCA', this)" style="padding: 6px 16px; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">ACCA</div>
-                    <div class="tab" onclick="setMockAnalyticsTab('CSEB', this)" style="padding: 6px 16px; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">CSEB</div>
+                    <!-- CSEB mock tab hidden -->
+                    <div class="tab" onclick="setMockAnalyticsTab('CSEB', this)" style="padding: 6px 16px; font-size: 0.85rem; border-radius: 6px; cursor: pointer; display: none;">CSEB</div>
                 </div>
             </div>
             
@@ -494,7 +500,8 @@
                             <div id="readinessAccaBar" style="height: 100%; background: var(--neon-blue); width: 0%;"></div>
                         </div>
                     </div>
-                    <div style="flex: 1; background: var(--glass-hover); padding: 20px; border-radius: 12px; text-align: center; min-width: 150px;">
+                    <!-- CSEB Readiness hidden -->
+                    <div style="flex: 1; background: var(--glass-hover); padding: 20px; border-radius: 12px; text-align: center; min-width: 150px; display: none;">
                         <div class="stat-label" style="margin-bottom: 10px;">CSEB Readiness</div>
                         <div style="font-size: 2.5rem; font-weight: bold; color: var(--neon-green);" id="readinessCseb">0%</div>
                         <div style="width: 100%; height: 8px; background: var(--glass-bg); margin-top: 10px; border-radius: 4px; overflow: hidden;">
@@ -577,7 +584,7 @@
                 <div style="background: var(--glass-border); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <select id="practiceCourseInput" style="flex:1; min-width: 100px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
-                            <option value="CSEB">CSEB</option>
+                            <!-- <option value="CSEB">CSEB</option> hidden -->
                             <option value="ACCA">ACCA</option>
                         </select>
                         <select id="practiceAreaInput" style="flex:1; min-width: 100px; background:var(--glass-hover); border:1px solid var(--glass-border); color:var(--text-main); padding:10px; border-radius:8px;">
@@ -639,7 +646,7 @@
                         <label>Course</label>
                         <select id="mockCourseInput" class="form-input">
                             <option value="ACCA">ACCA</option>
-                            <option value="CSEB">CSEB</option>
+                            <!-- <option value="CSEB">CSEB</option> hidden -->
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: span 1;">
@@ -725,7 +732,7 @@
                         <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Course</label>
                         <select id="wbCourseFilter" class="form-control" onchange="renderWorkoutBank()">
                             <option value="ALL">All Courses</option>
-                            <option value="CSEB">CSEB</option>
+                            <!-- <option value="CSEB">CSEB</option> hidden -->
                             <option value="ACCA">ACCA</option>
                         </select>
                     </div>
@@ -912,7 +919,8 @@
                 <!-- Subscriptions -->
                 <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 20px; border-radius: 16px; margin-bottom: 30px;">
                     <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Active Subscriptions</h3>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--glass-border);">
+                    <!-- CSEB subscription hidden -->
+                    <div style="display: none; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--glass-border);">
                         <span style="font-weight: 600; color: var(--text-main);">CSEB</span>
                         <span style="color: var(--neon-green); font-size: 0.9rem; font-weight: 500;">Valid till 25/05/2027</span>
                     </div>
@@ -1068,7 +1076,7 @@
             <div class="form-group">
                 <label>Course</label>
                 <select id="wqCourse" class="form-control" onchange="populateWqSubjects()">
-                    <option value="CSEB">CSEB</option>
+                    <!-- <option value="CSEB">CSEB</option> hidden -->
                     <option value="ACCA">ACCA</option>
                 </select>
             </div>
@@ -1207,7 +1215,7 @@
                     <div class="form-group" style="flex: 1;">
                         <label>Course</label>
                         <select id="scheduleCourseInput" required>
-                            <option value="CSEB">CSEB</option>
+                            <!-- <option value="CSEB">CSEB</option> hidden -->
                             <option value="ACCA">ACCA</option>
                         </select>
                         <div id="scheduleExamAlert" style="margin-top: 6px; font-size: 0.75rem; color: var(--neon-gold); display: none;"></div>
@@ -1264,7 +1272,7 @@
                 <div class="form-group">
                     <label>Course</label>
                     <select id="scheduleExamRegCourse">
-                        <option value="CSEB">CSEB</option>
+                        <!-- <option value="CSEB">CSEB</option> hidden -->
                         <option value="ACCA">ACCA</option>
                     </select>
                 </div>
@@ -1325,7 +1333,7 @@
             <div class="form-group">
                 <label>Course</label>
                 <select id="subjectCourseInput">
-                    <option value="CSEB">CSEB</option>
+                    <!-- <option value="CSEB">CSEB</option> hidden -->
                     <option value="ACCA">ACCA</option>
                 </select>
             </div>
@@ -1399,7 +1407,7 @@
                 <div class="form-group" style="flex: 1;">
                     <label>Course</label>
                     <select id="logCourseInput" required>
-                        <option value="CSEB">CSEB</option>
+                        <!-- <option value="CSEB">CSEB</option> hidden -->
                         <option value="ACCA">ACCA</option>
                     </select>
                 </div>
@@ -1731,7 +1739,7 @@
                     <label>Course *</label>
                     <select id="umCourseInput" class="form-input" onchange="_populateUMAreaDropdown(this.value)">
                         <option value="ACCA">ACCA</option>
-                        <option value="CSEB">CSEB</option>
+                        <!-- <option value="CSEB">CSEB</option> hidden -->
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
@@ -1757,7 +1765,7 @@
     </div>
     
     <script src="auth.js?v=14"></script>
-    <script src="app.js?v=114"></script>
-    <script src="export.js?v=12"></script>
+    <script src="app.js?v=118"></script>
+    <script src="export.js?v=13"></script>
 </body>
 </html>

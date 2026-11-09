@@ -1,13 +1,12 @@
 {
-  "version": "v1.0.93",
-  "build": "2026.11.05-stable",
-  "title": "v1.0.93 \u2014 Astra Malayalam Platform & Performance Optimization",
-  "description": "AcademicPulse v1.0.93 adds Astra Malayalam class platform support, optimizes subject lookup with O(1) caching, strengthens numerical/date safety, and boosts UI responsiveness.",
+  "version": "v1.0.97",
+  "build": "2026.11.09-stable",
+  "title": "v1.0.97 — Streamlined AI Recommendations Exclusive to Analytics",
+  "description": "AcademicPulse v1.0.97 streamlines the interface by keeping the AI Study Recommendation engine exclusively in the Analytics view, decluttering the main Dashboard overview while providing rich standard-wise diagnostic insights in Analytics.",
   "features": [
-    "<div style='margin-bottom:8px'><b>\uD83C\uDF93 Astra Malayalam Platform</b></div>Updated class platform selection with Astra Malayalam across session logging, schedules, and attendance logs.",
-    "<div style='margin-bottom:8px'><b>\u26A1 O(1) Performance Caching</b></div>Replaced repetitive array scans with optimized map lookups for faster rendering across large study logs and searches.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDCC4 Enhanced PDF Reports</b></div>Weekly, Monthly, and Day PDFs with comprehensive study type & platform breakdowns and full session logs.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDDD3\uFE0F Calendar & Attendance Navigation</b></div>Smooth navigation across previous months with active day selection and monthly study hour summaries.",
-    "<div style='margin-bottom:8px'><b>\uD83D\uDEE1\uFE0F Bug Fixes & Stability</b></div>Guarded mock score calculations against division-by-zero, hardened date parsing, and optimized UI animation layers."
+    "<div style='margin-bottom:8px'><b>🎯 Analytics-Exclusive AI Recommendation Engine</b></div>AI recommendations now live exclusively in the Analytics view, analyzing all 27 accounting standards and providing diagnostic prescriptions, accuracy pills, and instant action shortcuts.",
+    "<div style='margin-bottom:8px'><b>✨ Clean Dashboard Overview</b></div>Removed recommendation widget from the main Dashboard page to preserve focus on core streaks, study time, and today's schedule.",
+    "<div style='margin-bottom:8px'><b>🚀 Independent Analytics Execution</b></div>AI recommendation cards now render instantly within Analytics without waiting for Chart.js canvas elements to load.",
+    "<div style='margin-bottom:8px'><b>🔄 Cache & PWA Synchronization</b></div>Updated service worker cache and asset query strings (style.css?v=23, app.js?v=118) to ensure smooth update rollouts."
   ]
 }

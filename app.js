@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Activity Tracker & Study Manager v3.0
  */
 
@@ -49,15 +49,6 @@ const debouncedRenderAttendance= debounce(() => renderAttendance(),120);
 
 
 const DEFAULT_SUBJECTS = [
-    // CSEB Subjects
-    { id: generateId(), name: 'Banking (CSEB)', course: 'CSEB', color: '#2997FF', priority: 'High', targetHours: 5, totalHours: 0 },
-    { id: generateId(), name: 'Cooperation (CSEB)', course: 'CSEB', color: '#30D158', priority: 'High', targetHours: 5, totalHours: 0 },
-    { id: generateId(), name: 'Act & Rules (CSEB)', course: 'CSEB', color: '#BF5AF2', priority: 'High', targetHours: 5, totalHours: 0 },
-    { id: generateId(), name: 'General English (CSEB)', course: 'CSEB', color: '#FFD60A', priority: 'Medium', targetHours: 3, totalHours: 0 },
-    { id: generateId(), name: 'General Knowledge (CSEB)', course: 'CSEB', color: '#FF453A', priority: 'Low', targetHours: 2, totalHours: 0 },
-    { id: generateId(), name: 'Reasoning (CSEB)', course: 'CSEB', color: '#FF9F0A', priority: 'Medium', targetHours: 3, totalHours: 0 },
-    { id: generateId(), name: 'Accounting (CSEB)', course: 'CSEB', color: '#32ADE6', priority: 'High', targetHours: 5, totalHours: 0 },
-    
     // ACCA Subjects
     { id: generateId(), name: 'Financial Reporting (FR)', course: 'ACCA', color: '#0A84FF', priority: 'High', targetHours: 38, totalHours: 0 }
 ];
@@ -81,7 +72,7 @@ const AppState = {
     workoutQuestions: [],
     workoutStats: { totalDone: 0, totalCorrect: 0 },
     upcomingMocks: [],
-    currentVersion: 'v1.0.93',
+    currentVersion: 'v1.0.97',
     dataVersion: 2,
     availableUpdate: null,
     analyticsCache: null
@@ -181,26 +172,46 @@ function invalidateSubjectCache() {
     _subjectCacheMap = null;
 }
 
+function isCsebSubject(s) {
+    if (!s) return false;
+    if (s.course === 'CSEB') return true;
+    const name = (s.name || '').toLowerCase();
+    if (name.includes('cseb')) return true;
+    const csebKeywords = [
+        'banking', 'cooperation', 'co-operation', 'act & rules', 'act and rules',
+        'kcs act', 'general english', 'general knowledge', 'reasoning'
+    ];
+    return csebKeywords.some(k => name.includes(k));
+}
+
 function loadData() {
     invalidateSubjectCache();
     AppState.subjects = Storage.get(STORAGE_KEYS.SUBJECTS, []);
     
-    // Pre-populate with default courses if empty
-    if (AppState.subjects.length === 0) {
-        AppState.subjects = [...DEFAULT_SUBJECTS];
-        saveData('subjects');
-    } else {
-        // Migration: Fix old default names to match syllabus keys
-        let changed = false;
-        AppState.subjects.forEach(s => {
-            if (s.name === 'Co-operation (CSEB)') { s.name = 'Cooperation (CSEB)'; changed = true; }
-            if (s.name === 'KCS Act and Rules (CSEB)') { s.name = 'Act & Rules (CSEB)'; changed = true; }
-            if (s.name === 'English (CSEB)') { s.name = 'General English (CSEB)'; changed = true; }
-            if (s.name === 'GK (CSEB)') { s.name = 'General Knowledge (CSEB)'; changed = true; }
-            if (s.name === 'Accountancy (CSEB)') { s.name = 'Accounting (CSEB)'; changed = true; }
-        });
-        if (changed) saveData('subjects');
+    // Normalization & migration of subjects
+    let changed = false;
+    AppState.subjects.forEach(s => {
+        if (s.name === 'Co-operation (CSEB)') { s.name = 'Cooperation (CSEB)'; changed = true; }
+        if (s.name === 'KCS Act and Rules (CSEB)') { s.name = 'Act & Rules (CSEB)'; changed = true; }
+        if (s.name === 'English (CSEB)') { s.name = 'General English (CSEB)'; changed = true; }
+        if (s.name === 'GK (CSEB)') { s.name = 'General Knowledge (CSEB)'; changed = true; }
+        if (s.name === 'Accountancy (CSEB)') { s.name = 'Accounting (CSEB)'; changed = true; }
+
+        if (isCsebSubject(s)) {
+            if (s.course !== 'CSEB') { s.course = 'CSEB'; changed = true; }
+        } else if (!s.course) {
+            s.course = 'ACCA';
+            changed = true;
+        }
+    });
+
+    // Ensure at least default ACCA subject is present if no ACCA subjects exist
+    const hasAcca = AppState.subjects.some(s => !isCsebSubject(s));
+    if (!hasAcca) {
+        AppState.subjects.push(...DEFAULT_SUBJECTS);
+        changed = true;
     }
+    if (changed) saveData('subjects');
 
     AppState.attendance = Storage.get(STORAGE_KEYS.ATTENDANCE, {});
     AppState.sessions = Storage.get(STORAGE_KEYS.SESSIONS, []);
@@ -568,9 +579,10 @@ window.showWhatsNewPopup = async function() {
 function saveData(key) {
     if (key === 'subjects' || key === 'all') { Storage.set(STORAGE_KEYS.SUBJECTS, AppState.subjects); invalidateSubjectCache(); }
     if (key === 'attendance' || key === 'all') Storage.set(STORAGE_KEYS.ATTENDANCE, AppState.attendance);
-    if (key === 'sessions' || key === 'all') {
+        if (key === 'sessions' || key === 'all') {
         Storage.set(STORAGE_KEYS.SESSIONS, AppState.sessions);
-        rebuildAnalyticsCache();
+        markAnalyticsDirty();
+        rebuildAnalyticsCache(true);
     }
     if (key === 'goals' || key === 'all') Storage.set(STORAGE_KEYS.GOALS, AppState.goals);
     if (key === 'accaTopics' || key === 'all') Storage.set(STORAGE_KEYS.ACCA_TOPICS, AppState.accaTopics);
@@ -771,6 +783,9 @@ function initNavigation() {
             if (targetId === 'view-mocks') {
                 renderUpcomingMocksInMocks();
             }
+            if (targetId === 'view-subjects') {
+                window.selectCourseView('ACCA');
+            }
             if (targetId === 'view-focus') {
                 try {
                     const ctxStr = sessionStorage.getItem('navigationContext');
@@ -809,7 +824,7 @@ function initSubjects() {
         document.getElementById('subjectModalTitle').textContent = 'Add Subject';
         document.getElementById('subjectIdInput').value = '';
         document.getElementById('subjectNameInput').value = '';
-        document.getElementById('subjectCourseInput').value = 'CSEB';
+        document.getElementById('subjectCourseInput').value = currentViewCourse || 'ACCA';
         document.getElementById('subjectColorInput').value = '#2997FF';
         document.getElementById('subjectPriorityInput').value = 'Medium';
         document.getElementById('subjectTargetInput').value = '5';
@@ -851,14 +866,14 @@ function initSubjects() {
     });
 }
 
-let currentViewCourse = null;
+let currentViewCourse = 'ACCA';
 
 window.selectCourseView = function(course) {
-    currentViewCourse = course;
+    currentViewCourse = 'ACCA';
     document.getElementById('courseSelectionView').style.display = 'none';
     document.getElementById('subjectsListView').style.display = 'block';
     document.getElementById('openSubjectModalBtn').style.display = 'inline-block';
-    document.getElementById('currentCourseTitle').textContent = course + ' Subjects';
+    document.getElementById('currentCourseTitle').textContent = 'ACCA Subjects';
     
     // Topic Tracker Visibility
     const accaContainer = document.getElementById('accaTopicTrackerContainer');
@@ -866,10 +881,7 @@ window.selectCourseView = function(course) {
 };
 
 window.backToCourses = function() {
-    currentViewCourse = null;
-    document.getElementById('courseSelectionView').style.display = 'block';
-    document.getElementById('subjectsListView').style.display = 'none';
-    document.getElementById('openSubjectModalBtn').style.display = 'none';
+    window.selectCourseView('ACCA');
 };
 
 function renderSubjects() {
@@ -882,7 +894,7 @@ function renderSubjects() {
     if (!appCache.analytics) rebuildAnalyticsCache();
     const subjectTotals = appCache.analytics.data.subjTotals || {};
 
-    const filteredSubjects = AppState.subjects.filter(s => s.course === currentViewCourse || (!s.course && currentViewCourse === 'CSEB'));
+    currentViewCourse = 'ACCA'; const filteredSubjects = AppState.subjects.filter(s => s && !isCsebSubject(s));
 
     filteredSubjects.forEach(subj => {
         const totalHours = ((subjectTotals[subj.id] || 0) / 3600);
@@ -906,7 +918,7 @@ function renderSubjects() {
         
         let syllabusTopics = null;
         let syllabusType = null;
-        const currentViewCourse = subj.course || 'CSEB';
+        const currentViewCourse = subj.course || 'ACCA';
         const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
         
         if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
@@ -963,7 +975,7 @@ window.openSyllabusModal = (subjId) => {
     
     let syllabusTopics = null;
     let syllabusType = null;
-    const currentViewCourse = subj.course || 'CSEB';
+    const currentViewCourse = subj.course || 'ACCA';
     const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
     
     if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
@@ -1066,7 +1078,7 @@ window.editSubject = (id) => {
     document.getElementById('subjectModalTitle').textContent = 'Edit Subject';
     document.getElementById('subjectIdInput').value = subj.id;
     document.getElementById('subjectNameInput').value = subj.name;
-    document.getElementById('subjectCourseInput').value = subj.course || 'CSEB';
+    document.getElementById('subjectCourseInput').value = subj.course || 'ACCA';
     document.getElementById('subjectColorInput').value = subj.color;
     document.getElementById('subjectPriorityInput').value = subj.priority;
     document.getElementById('subjectTargetInput').value = subj.targetHours;
@@ -1085,6 +1097,9 @@ window.deleteSubject = (id) => {
 // OVERVIEW & STREAKS
 // ==========================================
 function calculateStreaks() {
+    if (!_analyticsDirty && _cachedStreaks) {
+        return _cachedStreaks;
+    }
     // Group sessions by day
     const activeDays = new Set();
     AppState.sessions.forEach(s => {
@@ -1136,7 +1151,8 @@ function calculateStreaks() {
         }
     }
 
-    return { current: currentStreak, best: bestStreak, totalActive: activeDays.size };
+        _cachedStreaks = { current: currentStreak, best: bestStreak, totalActive: activeDays.size };
+    return _cachedStreaks;
 }
 
 function renderOverview() {
@@ -2024,7 +2040,7 @@ function renderAnalytics() {
         });
 
         let csebTopicsCompleted = 0, totalCsebTopics = 0;
-        Object.entries(AppState.csebSyllabus || {}).forEach(([area, topics]) => {
+        Object.entries({} /* CSEB syllabus hidden */).forEach(([area, topics]) => {
             if (!Array.isArray(topics)) return;
             initAreaObj(area, 'CSEB');
             topics.forEach(t => {
@@ -2036,7 +2052,7 @@ function renderAnalytics() {
 
         if (Array.isArray(AppState.questionPractice)) {
             AppState.questionPractice.forEach(p => {
-                if(p.syllabusArea && p.syllabusArea !== 'General') {
+                if(p.syllabusArea && p.syllabusArea !== 'General' && p.course !== 'CSEB') {
                     initAreaObj(p.syllabusArea, p.course);
                     performanceData[p.syllabusArea].practiceAtt += p.attempted || 0;
                     performanceData[p.syllabusArea].practiceCor += p.correct || 0;
@@ -2045,7 +2061,7 @@ function renderAnalytics() {
         }
 
         (AppState.mockTests || []).forEach(m => {
-            if(m.syllabusArea && m.syllabusArea !== 'General') {
+            if(m.syllabusArea && m.syllabusArea !== 'General' && m.course !== 'CSEB') {
                 initAreaObj(m.syllabusArea, m.course);
                 performanceData[m.syllabusArea].mockScores.push(m.score);
                 performanceData[m.syllabusArea].mockMaxScores.push(m.maxScore);
@@ -2206,6 +2222,7 @@ function renderAnalytics() {
     }
 
     // Charts & heatmap — each isolated
+    try { renderAnalyticsAiRecommendation(); } catch(e) { console.warn('renderAnalyticsAiRecommendation error:', e); }
     try { renderLiveClassAnalytics(); } catch(e) { console.warn('renderLiveClassAnalytics error:', e); }
     try {
         if (window.Chart) {
@@ -2323,77 +2340,51 @@ function renderLiveClassAnalytics() {
 function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, subjArr) {
     const lineCtx = document.getElementById('dailyStudyLineChart');
     if (lineCtx) {
-        if (dailyStudyLineChartInst) dailyStudyLineChartInst.destroy();
-        Chart.defaults.color = 'rgba(255, 255, 255, 0.6)';
-        dailyStudyLineChartInst = new Chart(lineCtx, {
-            type: 'line',
-            data: {
-                labels: last14Days.map(d => d.substr(5).replace('-','/')),
-                datasets: [{ label: 'Hours', data: last14Days.map(d => (dailyData[d]/3600).toFixed(1)), borderColor: '#0A84FF', backgroundColor: 'rgba(10, 132, 255, 0.1)', borderWidth: 3, tension: 0.4, fill: true }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'var(--glass-border)' } }, x: { grid: { display: false } } } }
-        });
+        const lineLabels = last14Days.map(d => d.substr(5).replace('-','/'));
+        const lineData = last14Days.map(d => (dailyData[d]/3600).toFixed(1));
+        if (dailyStudyLineChartInst && dailyStudyLineChartInst.ctx) {
+            dailyStudyLineChartInst.data.labels = lineLabels;
+            dailyStudyLineChartInst.data.datasets[0].data = lineData;
+            dailyStudyLineChartInst.update('none');
+        } else {
+            if (dailyStudyLineChartInst) dailyStudyLineChartInst.destroy();
+            Chart.defaults.color = 'rgba(255, 255, 255, 0.6)';
+            dailyStudyLineChartInst = new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: lineLabels,
+                    datasets: [{ label: 'Hours', data: lineData, borderColor: '#0A84FF', backgroundColor: 'rgba(10, 132, 255, 0.1)', borderWidth: 3, tension: 0.4, fill: true }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'var(--glass-border)' } }, x: { grid: { display: false } } } }
+            });
+        }
     }
     
     const barCtx = document.getElementById('monthlyStudyBarChart');
     if (barCtx) {
-        if (monthlyStudyBarChartInst) monthlyStudyBarChartInst.destroy();
-        monthlyStudyBarChartInst = new Chart(barCtx, {
-            type: 'bar',
-            data: {
-                labels: last6Months,
-                datasets: [{ label: 'Hours', data: last6Months.map(m => (monthlyData[m]/3600).toFixed(1)), backgroundColor: '#BF5AF2', borderRadius: 6 }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'var(--glass-border)' } }, x: { grid: { display: false } } } }
-        });
-    }
-
-    // AI Suggestion Logic
-    const aiSubjectEl = document.getElementById('aiSuggestedSubject');
-    const aiInsightEl = document.getElementById('aiSuggestedInsight');
-    
-    if (aiSubjectEl && aiInsightEl) {
-        if (AppState.subjects.length === 0) {
-            aiSubjectEl.textContent = 'No Subjects';
-            aiInsightEl.textContent = 'Add subjects to get AI recommendations.';
+        const barData = last6Months.map(m => (monthlyData[m]/3600).toFixed(1));
+        if (monthlyStudyBarChartInst && monthlyStudyBarChartInst.ctx) {
+            monthlyStudyBarChartInst.data.labels = last6Months;
+            monthlyStudyBarChartInst.data.datasets[0].data = barData;
+            monthlyStudyBarChartInst.update('none');
         } else {
-            // Suggest the subject with the LEAST amount of study time today/week to keep them balanced
-            const recentSubjTotals = {};
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            
-            AppState.sessions.forEach(s => {
-                const rawDate = s.startTime || s.date;
-                if (!rawDate) return;
-                const d = new Date(rawDate);
-                if (isNaN(d.getTime())) return;
-                if (d >= sevenDaysAgo) {
-                    if (!recentSubjTotals[s.subjectId]) recentSubjTotals[s.subjectId] = 0;
-                    recentSubjTotals[s.subjectId] += (s.duration || (s.durationMinutes ? s.durationMinutes * 60 : 0));
-                }
+            if (monthlyStudyBarChartInst) monthlyStudyBarChartInst.destroy();
+            monthlyStudyBarChartInst = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: last6Months,
+                    datasets: [{ label: 'Hours', data: barData, backgroundColor: '#BF5AF2', borderRadius: 6 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'var(--glass-border)' } }, x: { grid: { display: false } } } }
             });
-
-            const subjectsScores = AppState.subjects.map(subj => {
-                return { subj, recentTime: recentSubjTotals[subj.id] || 0 };
-            });
-            
-            subjectsScores.sort((a, b) => a.recentTime - b.recentTime);
-            const recommended = subjectsScores[0].subj;
-            
-            aiSubjectEl.textContent = recommended.name;
-            
-            if (subjectsScores[0].recentTime === 0) {
-                aiInsightEl.innerHTML = `You haven't touched this subject in the last 7 days! <br/><b>Time for a quick revision session!</b>`;
-            } else {
-                aiInsightEl.innerHTML = `This is your least studied subject this week. <br/><b>Spend 30 mins to keep it fresh in your mind.</b>`;
-            }
         }
     }
 
+        // AI Standard & Topic Wise Recommendation (Analytics Exclusive)
+    renderAnalyticsAiRecommendation();
+
     const attBarCtx = document.getElementById('monthlyAttendanceBarChart');
     if (attBarCtx) {
-        if (monthlyAttendanceBarChartInst) monthlyAttendanceBarChartInst.destroy();
-        
         const monthlyAttData = {};
         last6Months.forEach(m => monthlyAttData[m] = 0);
         Object.keys(AppState.attendance).forEach(dateKey => {
@@ -2403,34 +2394,44 @@ function renderAnalyticsCharts(last14Days, dailyData, last6Months, monthlyData, 
             }
         });
 
-        if (monthlyAttendanceBarChartInst) monthlyAttendanceBarChartInst.destroy();
-        monthlyAttendanceBarChartInst = new Chart(attBarCtx, {
-            type: 'bar',
-            data: {
-                labels: last6Months,
-                datasets: [{ label: 'Days Present', data: last6Months.map(m => monthlyAttData[m]), backgroundColor: '#30D158', borderRadius: 6 }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 31, grid: { color: 'var(--glass-border)' } }, x: { grid: { display: false } } } }
-        });
+        const attData = last6Months.map(m => monthlyAttData[m]);
+        if (monthlyAttendanceBarChartInst && monthlyAttendanceBarChartInst.ctx) {
+            monthlyAttendanceBarChartInst.data.labels = last6Months;
+            monthlyAttendanceBarChartInst.data.datasets[0].data = attData;
+            monthlyAttendanceBarChartInst.update('none');
+        } else {
+            if (monthlyAttendanceBarChartInst) monthlyAttendanceBarChartInst.destroy();
+            monthlyAttendanceBarChartInst = new Chart(attBarCtx, {
+                type: 'bar',
+                data: {
+                    labels: last6Months,
+                    datasets: [{ label: 'Days Present', data: attData, backgroundColor: '#30D158', borderRadius: 6 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 31, grid: { color: 'var(--glass-border)' } }, x: { grid: { display: false } } } }
+            });
+        }
     }
 
     const pieCtx = document.getElementById('subjectPieChart');
     if (pieCtx) {
-        if (subjectPieChartInst) subjectPieChartInst.destroy();
-        
         if (!appCache.analytics || !appCache.analytics.data) rebuildAnalyticsCache();
-        const cache = appCache.analytics.data;
-        
         const labels = subjArr.map(s => { const b=getSubjectById(s.id); return b?b.name:'-'; });
         const data = subjArr.map(s => s.dur/3600);
         const colors = subjArr.map(s => { const b=getSubjectById(s.id); return b?b.color:'#555'; });
-        
-        if (subjectPieChartInst) subjectPieChartInst.destroy();
-        subjectPieChartInst = new Chart(pieCtx, {
-            type: 'doughnut',
-            data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
-            options: { responsive: true, cutout: '70%', plugins: { legend: { position: 'right', labels: { color: 'var(--text-main)' } } } }
-        });
+
+        if (subjectPieChartInst && subjectPieChartInst.ctx) {
+            subjectPieChartInst.data.labels = labels;
+            subjectPieChartInst.data.datasets[0].data = data;
+            subjectPieChartInst.data.datasets[0].backgroundColor = colors;
+            subjectPieChartInst.update('none');
+        } else {
+            if (subjectPieChartInst) subjectPieChartInst.destroy();
+            subjectPieChartInst = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+                options: { responsive: true, cutout: '70%', plugins: { legend: { position: 'right', labels: { color: 'var(--text-main)' } } } }
+            });
+        }
     }
 
     renderMockExamsChart();
@@ -2554,11 +2555,11 @@ function generateSmartInsights() {
     if (weekTotal > 0) {
         const csebPct = Math.round((courseTotals.CSEB / weekTotal) * 100);
         const accaPct = Math.round((courseTotals.ACCA / weekTotal) * 100);
-        if (csebPct > 70) {
+        if (false && csebPct > 70) {
             html += `<div class="insight-box" style="border-left-color: var(--neon-blue);"><strong>Course Focus:</strong> You've dedicated ${csebPct}% of your time to CSEB this week.</div>`;
         } else if (accaPct > 70) {
             html += `<div class="insight-box" style="border-left-color: var(--neon-blue);"><strong>Course Focus:</strong> You've dedicated ${accaPct}% of your time to ACCA this week.</div>`;
-        } else if (csebPct > 0 && accaPct > 0) {
+        } else if (false && csebPct > 0 && accaPct > 0) {
             html += `<div class="insight-box" style="border-left-color: var(--neon-blue);"><strong>Balanced Focus:</strong> You're splitting your time between CSEB (${csebPct}%) and ACCA (${accaPct}%).</div>`;
         }
     }
@@ -2749,7 +2750,7 @@ function initRetrospectiveLogging() {
 function populateLogSubjects(course) {
     const select = document.getElementById('logSubjectInput');
     select.innerHTML = '';
-    const filtered = AppState.subjects.filter(s => s.course === course || (!s.course && course === 'CSEB'));
+    const filtered = AppState.subjects.filter(s => s && !isCsebSubject(s));
     filtered.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.id;
@@ -2771,7 +2772,7 @@ function populateLogTopics(subjId) {
     if (!subj) return;
     
     let syllabusTopics = null;
-    const currentViewCourse = subj.course || 'CSEB';
+    const currentViewCourse = subj.course || 'ACCA';
     const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
     
     if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
@@ -2850,8 +2851,8 @@ function openLogSessionModal(dateKey) {
     if (typeof renderLogTopicChips === 'function') renderLogTopicChips();
     
     const courseInput = document.getElementById('logCourseInput');
-    courseInput.value = 'CSEB'; // Default
-    populateLogSubjects('CSEB');
+    courseInput.value = 'ACCA'; // Default
+    populateLogSubjects('ACCA');
     
     document.getElementById('logSessionModal').classList.add('active');
 }
@@ -2904,7 +2905,343 @@ function initTheme() {
 // ==========================================
 // INITIALIZATION
 // ==========================================
+// ==========================================
+// ACCA STANDARDS & TOPICS INTELLIGENCE ENGINE
+// ==========================================
+let _analyticsDirty = true;
+let _cachedStreaks = null;
+function markAnalyticsDirty() {
+    _analyticsDirty = true;
+    _cachedStreaks = null;
+}
+
+const ACCA_STANDARDS_METADATA = {
+    // High Weight (Core FR Exam Drivers: Section B & C)
+    "IFRS 16 (Leases)": { weight: "High", examFocus: "ROU asset initial recognition, lease liability discounting & amortization, low-value/short-term exemptions." },
+    "IFRS 15 (Revenue)": { weight: "High", examFocus: "5-step revenue model, variable consideration, contract assets/liabilities, warranties." },
+    "CONSOLIDATION": { weight: "High", examFocus: "Group accounts (Section C, 20 marks), goodwill, NCI at fair value vs proportionate, intra-group sales & PURP." },
+    "FS PREPARATION": { weight: "High", examFocus: "Full Statement of Profit or Loss, OCI, and Statement of Financial Position with year-end trial balance adjustments." },
+    "INTERPRETATION": { weight: "High", examFocus: "20-mark Section C ratio analysis (profitability, liquidity, gearing, working capital) with operational insights." },
+    "IAS 16 (PPE)": { weight: "High", examFocus: "Component depreciation, revaluation surplus & reserves, complex asset disposal, dismantling provisions." },
+    "IAS 36 (Impairment)": { weight: "High", examFocus: "Cash-generating units (CGU), allocation of impairment losses (Goodwill first), reversals." },
+    "IAS 37 (Provisions)": { weight: "High", examFocus: "Present obligation, probable outflow, reliable estimate, restructuring provisions, contingent liabilities." },
+    "IAS 12 (Deferred Tax)": { weight: "High", examFocus: "Tax base vs carrying amount, deductible vs taxable temporary differences, revaluations." },
+    "IFRS 9 (Financial Instruments)": { weight: "High", examFocus: "Amortised cost with effective interest, FVTPL, FVTOCI debt vs equity, transaction costs." },
+
+    // Medium Weight
+    "IAS 38 (Intangibles)": { weight: "Medium", examFocus: "Research vs Development criteria (PIRATE), amortization, indefinite life testing." },
+    "IAS 40 (Investment Property)": { weight: "Medium", examFocus: "Fair value model through P&L vs cost model, transfers to/from inventory or owner-occupied PPE." },
+    "IAS 2 (Inventories)": { weight: "Medium", examFocus: "Lower of cost and net realizable value (NRV), FIFO and weighted average formulas." },
+    "IAS 33 (EPS)": { weight: "Medium", examFocus: "Basic EPS (bonus & rights issues), Diluted EPS with convertible bonds & share options." },
+    "IAS 20 (Gov Grants)": { weight: "Medium", examFocus: "Revenue grants vs capital grants, netting-off method vs deferred income." },
+    "IAS 23 (Borrowing Costs)": { weight: "Medium", examFocus: "Mandatory capitalisation for qualifying assets, suspension, investment income deduction." },
+    "IFRS 5 (Non-current Assets)": { weight: "Medium", examFocus: "Held for sale criteria, lower of carrying value and fair value less costs to sell, discontinued operations." },
+    "CASHFLOW STATEMENT": { weight: "Medium", examFocus: "Indirect method operating cashflows, cash payments for PPE acquisitions, tax & dividend flows." },
+
+    // Foundation & Standard Areas
+    "CONCEPTUAL FRAMEWORK": { weight: "Standard", examFocus: "Fundamental & enhancing qualitative characteristics, asset/liability definitions, measurement bases." },
+    "IAS 10 (Events After Reporting)": { weight: "Standard", examFocus: "Adjusting vs non-adjusting events, going concern impacts, disclosure." },
+    "IAS 8 (Accounting Policies)": { weight: "Standard", examFocus: "Changes in accounting policies (retrospective) vs accounting estimates (prospective), error corrections." },
+    "IAS 21 (Foreign Exchange)": { weight: "Standard", examFocus: "Individual foreign currency transactions, closing rate translation for monetary items." },
+    "IFRS 13 (Fair Value)": { weight: "Standard", examFocus: "3-level fair value hierarchy (quoted prices, observable inputs, unobservable inputs)." },
+    "IFRS 18 (Presentation)": { weight: "Standard", examFocus: "Operating, investing, and financing categories in the Statement of Profit or Loss." },
+    "IAS 41 (Agriculture)": { weight: "Standard", examFocus: "Biological assets at fair value less costs to sell, agricultural produce at harvest." },
+    "IAS 27 (Separate FS)": { weight: "Standard", examFocus: "Accounting for investments in subsidiaries, associates, and joint ventures in separate FS." },
+    "IFRS 9 (Hedging)": { weight: "Standard", examFocus: "Cash flow hedges vs fair value hedges, qualifying criteria, ineffective portion in P&L." }
+};
+
+function getStandardWiseAnalytics() {
+    const accaTopics = (AppState.accaTopics && Object.keys(AppState.accaTopics).length > 0)
+        ? AppState.accaTopics 
+        : buildDefaultAccaTopics();
+
+    const now = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const standardList = [];
+    const topicLookup = {};
+    const norm = (str) => (str || '').trim().toLowerCase();
+
+    Object.entries(accaTopics).forEach(([cat, topics]) => {
+        if (!Array.isArray(topics)) return;
+        topics.forEach(t => {
+            const meta = ACCA_STANDARDS_METADATA[t.name] || { weight: 'Standard', examFocus: 'Review core standard principles, recognition criteria, and exam questions.' };
+            const item = {
+                name: t.name,
+                category: cat,
+                difficulty: t.difficulty || 'Medium',
+                completed: !!t.completed,
+                weight: meta.weight,
+                examFocus: meta.examFocus,
+                totalSecs: 0,
+                recentWeekSecs: 0,
+                lastStudied: null,
+                daysSinceLastStudied: null,
+                practiceAtt: 0,
+                practiceCor: 0,
+                accuracy: null,
+                mockScores: [],
+                mockAvg: null,
+                priorityScore: 0
+            };
+            topicLookup[norm(t.name)] = item;
+            standardList.push(item);
+        });
+    });
+
+    // Scan sessions
+    if (Array.isArray(AppState.sessions)) {
+        AppState.sessions.forEach(s => {
+            const rawDate = s.startTime || s.date;
+            if (!rawDate) return;
+            const d = new Date(rawDate);
+            if (isNaN(d.getTime())) return;
+            const dur = parseFloat(s.duration) || (s.durationMinutes ? s.durationMinutes * 60 : 0);
+            if (dur <= 0) return;
+
+            const matchedItems = new Set();
+            const candTopics = [s.topic, ...(s.topics || [])].filter(Boolean);
+            candTopics.forEach(ct => {
+                const n = norm(ct);
+                if (topicLookup[n]) matchedItems.add(topicLookup[n]);
+                else {
+                    standardList.forEach(item => {
+                        const inorm = norm(item.name);
+                        if (n && (inorm.includes(n) || n.includes(inorm.split(' ')[0]))) matchedItems.add(item);
+                    });
+                }
+            });
+
+            if (matchedItems.size === 0 && s.notes) {
+                const notesLower = s.notes.toLowerCase();
+                standardList.forEach(item => {
+                    const codeNum = item.name.split('(')[0].trim().toLowerCase();
+                    if (codeNum && notesLower.includes(codeNum)) matchedItems.add(item);
+                    else if (item.name.toLowerCase().includes('consolidation') && notesLower.includes('consolidation')) matchedItems.add(item);
+                });
+            }
+
+            matchedItems.forEach(item => {
+                item.totalSecs += dur;
+                if (d >= sevenDaysAgo) item.recentWeekSecs += dur;
+                if (!item.lastStudied || d > item.lastStudied) item.lastStudied = d;
+            });
+        });
+    }
+
+    // Scan question practice
+    if (Array.isArray(AppState.questionPractice)) {
+        AppState.questionPractice.forEach(p => {
+            const key = p.topic || p.syllabusArea;
+            if (!key) return;
+            const n = norm(key);
+            const item = topicLookup[n] || standardList.find(s => norm(s.name).includes(n) || n.includes(norm(s.name)));
+            if (item) {
+                item.practiceAtt += (p.attempted || 0);
+                item.practiceCor += (p.correct || 0);
+            }
+        });
+    }
+
+    // Scan workout bank
+    if (Array.isArray(AppState.workoutQuestions)) {
+        AppState.workoutQuestions.forEach(q => {
+            const key = q.subtopic || q.subject;
+            if (!key) return;
+            const n = norm(key);
+            const item = topicLookup[n] || standardList.find(s => norm(s.name).includes(n) || n.includes(norm(s.name)));
+            if (item && q.practiceStats) {
+                item.practiceAtt += (q.practiceStats.attempted || 0);
+                item.practiceCor += (q.practiceStats.correct || 0);
+            }
+        });
+    }
+
+    // Scan mocks
+    if (Array.isArray(AppState.mockTests)) {
+        AppState.mockTests.forEach(m => {
+            const key = m.topic || m.syllabusArea;
+            if (!key) return;
+            const n = norm(key);
+            const item = topicLookup[n] || standardList.find(s => norm(s.name).includes(n) || n.includes(norm(s.name)));
+            if (item && m.score !== undefined && m.maxScore) {
+                item.mockScores.push(Math.round((m.score / m.maxScore) * 100));
+            }
+        });
+    }
+
+    // Calculate urgency score
+    standardList.forEach(item => {
+        let score = 50;
+        if (item.weight === 'High') score += 30;
+        else if (item.weight === 'Medium') score += 15;
+        else score += 5;
+
+        if (item.difficulty === 'Hard') score += 15;
+        else if (item.difficulty === 'Medium') score += 10;
+        else score += 5;
+
+        if (!item.completed) score += 20;
+
+        if (item.practiceAtt > 0) {
+            item.accuracy = Math.round((item.practiceCor / item.practiceAtt) * 100);
+            if (item.accuracy < 50) score += 35;
+            else if (item.accuracy < 70) score += 20;
+            else if (item.accuracy >= 85) score -= 25;
+        } else {
+            item.accuracy = null;
+            score += 15; // needs diagnostic practice
+        }
+
+        if (item.mockScores.length > 0) {
+            const avgMock = Math.round(item.mockScores.reduce((a, b) => a + b, 0) / item.mockScores.length);
+            item.mockAvg = avgMock;
+            if (avgMock < 50) score += 25;
+            else if (avgMock >= 75) score -= 15;
+        }
+
+        if (!item.lastStudied) {
+            score += 25;
+            item.daysSinceLastStudied = null;
+        } else {
+            const diffDays = Math.floor((now - item.lastStudied) / (1000 * 3600 * 24));
+            item.daysSinceLastStudied = diffDays;
+            if (diffDays <= 3) score -= 15;
+            else if (diffDays <= 7) score += 5;
+            else if (diffDays <= 14) score += 15;
+            else score += 25;
+        }
+
+        item.priorityScore = Math.max(0, Math.min(100, Math.round(score)));
+    });
+
+    standardList.sort((a, b) => b.priorityScore - a.priorityScore);
+    return standardList;
+}
+
+window.startFocusOnStandard = function(standardName) {
+    if (!standardName) return;
+    const frSubject = (AppState.subjects || []).find(s => !isCsebSubject(s));
+    
+    sessionStorage.setItem('navigationContext', JSON.stringify({
+        subjectId: frSubject ? frSubject.id : '',
+        topicName: standardName
+    }));
+    
+    const navItem = document.querySelector('.nav-item[data-target="view-focus"]');
+    if (navItem) navItem.click();
+    
+    setTimeout(() => {
+        let display = document.getElementById('focusContextDisplay');
+        if (!display) {
+            display = document.createElement('div');
+            display.id = 'focusContextDisplay';
+            display.style.cssText = 'color: var(--neon-purple); font-weight: bold; margin-bottom: 15px; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 1px; background: rgba(191,90,242,0.1); padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(191,90,242,0.3); display: inline-block;';
+            const container = document.querySelector('.session-setup');
+            if (container) container.insertBefore(display, container.firstChild);
+        }
+        display.innerHTML = `🎯 Target Standard: <b>${escapeHtml(standardName)}</b>`;
+        window._pendingFocusStandard = standardName;
+    }, 50);
+};
+
+window.practiceStandardInWorkout = function(standardName) {
+    if (!standardName) return;
+    const navItem = document.querySelector('.nav-item[data-target="view-workout"]');
+    if (navItem) navItem.click();
+    setTimeout(() => {
+        const courseFilter = document.getElementById('wbCourseFilter');
+        if (courseFilter) {
+            courseFilter.value = 'ACCA';
+            populateWbSubjectFilter();
+        }
+        const subjFilter = document.getElementById('wbSubjectFilter');
+        if (subjFilter) {
+            const opt = Array.from(subjFilter.options).find(o => o.value.toLowerCase().includes(standardName.toLowerCase()) || standardName.toLowerCase().includes(o.value.toLowerCase()));
+            if (opt) subjFilter.value = opt.value;
+            renderWorkoutBank();
+        }
+    }, 50);
+};
+
+function renderOverviewAiRecommendation() {
+    // Disabled: AI recommendation is now exclusively displayed in Analytics
+    const container = document.getElementById('overviewAiRecommendationContainer');
+    if (container) container.style.display = 'none';
+}
+
+function renderAnalyticsAiRecommendation() {
+    const aiSubjectEl = document.getElementById('aiSuggestedSubject');
+    const aiInsightEl = document.getElementById('aiSuggestedInsight');
+    if (!aiSubjectEl || !aiInsightEl) return;
+
+    const ranked = getStandardWiseAnalytics();
+    if (!ranked || ranked.length === 0) {
+        aiSubjectEl.textContent = 'No Standards Data';
+        aiInsightEl.textContent = 'Add study sessions or practice questions to generate standard-level recommendations.';
+        return;
+    }
+
+    const top = ranked[0];
+    const weightColor = top.weight === 'High' ? 'var(--neon-purple)' : (top.weight === 'Medium' ? 'var(--neon-gold)' : 'var(--neon-blue)');
+
+    aiSubjectEl.innerHTML = `
+        <div style="font-size: 0.8rem; color: ${weightColor}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 700;">
+            🎯 Recommended Standard • ${top.weight} Exam Weight
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+            <span>${escapeHtml(top.name)}</span>
+            <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">
+                ${top.difficulty} Difficulty
+            </span>
+        </div>
+    `;
+
+    let reasonText = '';
+    if (top.accuracy !== null && top.accuracy < 60) {
+        reasonText = `Practice accuracy is currently <b>${top.accuracy}%</b> (${top.practiceCor}/${top.practiceAtt} correct). Core standard needing immediate reinforcement.`;
+    } else if (!top.lastStudied) {
+        reasonText = `Untested and unstudied in your logs. High frequency ACCA Financial Reporting standard with heavy mark allocation.`;
+    } else if (top.daysSinceLastStudied > 7) {
+        reasonText = `Last studied <b>${top.daysSinceLastStudied} days ago</b> (${(top.totalSecs/3600).toFixed(1)}h total). Retention decay risk is elevated.`;
+    } else {
+        reasonText = `Key syllabus area with high Section B & C exam allocation. Keep your momentum going.`;
+    }
+
+    const statusPill = top.accuracy !== null 
+        ? `<span style="display:inline-block; font-size: 0.75rem; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 4px; margin-right: 6px; margin-top: 4px;">🎯 Accuracy: <b>${top.accuracy}%</b> (${top.practiceCor}/${top.practiceAtt})</span>`
+        : `<span style="display:inline-block; font-size: 0.75rem; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 4px; margin-right: 6px; margin-top: 4px;">🔍 Practice: <b>Untested</b></span>`;
+
+    const recencyPill = top.lastStudied 
+        ? `<span style="display:inline-block; font-size: 0.75rem; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 4px; margin-right: 6px; margin-top: 4px;">🕒 Last Studied: <b>${top.daysSinceLastStudied === 0 ? 'Today' : top.daysSinceLastStudied + 'd ago'}</b></span>`
+        : `<span style="display:inline-block; font-size: 0.75rem; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 4px; margin-right: 6px; margin-top: 4px;">🕒 Status: <b>Not Started</b></span>`;
+
+    const areaPill = `<span style="display:inline-block; font-size: 0.75rem; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 4px; margin-top: 4px;">📚 Area: <b>${escapeHtml(top.category)}</b></span>`;
+
+    aiInsightEl.innerHTML = `
+        <div style="margin-bottom: 6px; line-height: 1.5;">${reasonText}</div>
+        <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px;">${statusPill}${recencyPill}${areaPill}</div>
+        <div style="color: #e0e0e0; font-size: 0.88rem; background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${weightColor};">
+            <b>Exam Tip:</b> ${escapeHtml(top.examFocus)}
+        </div>
+    `;
+
+    const btnStudy = document.getElementById('aiStudyNowBtn');
+    if (btnStudy) {
+        btnStudy.onclick = () => window.startFocusOnStandard(top.name);
+    }
+    const btnPractice = document.getElementById('aiPracticeQuestionsBtn');
+    if (btnPractice) {
+        btnPractice.onclick = () => window.practiceStandardInWorkout(top.name);
+    }
+}
+
 function rebuildAnalyticsCache(force = false) {
+    if (!force && !_analyticsDirty && appCache.analytics && appCache.analytics.data) {
+        return; // Instant O(1) cache hit!
+    }
+    _analyticsDirty = false;
     // Robust hash: includes length, last ID, and a checksum of durations/timestamps
     let hashSum = 0;
     for (let i = 0; i < AppState.sessions.length; i++) {
@@ -3146,16 +3483,16 @@ let _drillAnswerShown = false; // whether card is flipped
 
 // ── Helpers ────────────────────────────────
 function getWorkoutSubjectsForCourse(course) {
-    if (course === 'ACCA') {
+    if (course === 'ACCA' || course === 'ALL') {
         return Object.values(AppState.accaTopics).flat().map(t => t.name);
     }
     // CSEB — combine subject names + syllabus area names
-    const fromSubjects = AppState.subjects.filter(s => s.course === 'CSEB').map(s => s.name);
-    return [...new Set([...fromSubjects, ...Object.keys(AppState.csebSyllabus)])];
+    return [];
+    // cseb subjects hidden
 }
 
 function populateWqSubjects() {
-    const course = document.getElementById('wqCourse')?.value || 'CSEB';
+    const course = document.getElementById('wqCourse')?.value || 'ACCA';
     const sel = document.getElementById('wqSubject');
     if (!sel) return;
     const items = getWorkoutSubjectsForCourse(course);
@@ -3250,7 +3587,7 @@ function populateWbSubtopicFilter() {
 }
 
 function populateWqSubtopicList() {
-    const course = document.getElementById('wqCourse')?.value || 'CSEB';
+    const course = document.getElementById('wqCourse')?.value || 'ACCA';
     const subject = document.getElementById('wqSubject')?.value || '';
     const subtopicSelect = document.getElementById('wqSubtopic');
     if (!subtopicSelect) return;
@@ -3327,7 +3664,7 @@ window.renderWorkoutBank = function() {
 
 
 
-    let filtered = [...qs];
+    let filtered = qs.filter(q => q.course !== 'CSEB');
     if (courseFilter !== 'ALL') filtered = filtered.filter(q => q.course === courseFilter);
     if (subjFilter !== 'ALL') filtered = filtered.filter(q => q.subject === subjFilter);
     if (subtopicFilter !== 'ALL') filtered = filtered.filter(q => q.subtopic === subtopicFilter);
@@ -3450,7 +3787,7 @@ window.openWorkoutQuestionModal = function(id) {
         document.getElementById('wqDate').value = q.createdAt ? q.createdAt.split('T')[0] : TimeUtils.getDateKey();
         document.getElementById('wqSection').value = q.section || '';
     } else {
-        document.getElementById('wqCourse').value = 'CSEB';
+        document.getElementById('wqCourse').value = 'ACCA';
         populateWqSubjects();
         document.getElementById('wqSubtopic').value = '';
         document.getElementById('wqSourceBank').value = 'Custom';
@@ -4198,7 +4535,7 @@ function renderUpcomingMocksInMocks() {
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    const upcoming = [...(AppState.upcomingMocks || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const upcoming = (AppState.upcomingMocks || []).filter(m => m.course !== 'CSEB').sort((a, b) => new Date(a.date) - new Date(b.date));
 
     if (upcoming.length === 0) {
         container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px 0; font-style:italic;">No upcoming mock exams scheduled.<br><button onclick="openAddUpcomingMockModal()" style="margin-top:12px; background:var(--neon-blue); color:#fff; border:none; border-radius:10px; padding:10px 22px; cursor:pointer; font-weight:700; touch-action:manipulation;">+ Schedule First Mock</button></div>`;
@@ -4253,7 +4590,7 @@ function renderUpcomingMocksInPlanner() {
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    const upcoming = [...(AppState.upcomingMocks || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const upcoming = (AppState.upcomingMocks || []).filter(m => m.course !== 'CSEB').sort((a, b) => new Date(a.date) - new Date(b.date));
 
     if (upcoming.length === 0) {
         container.innerHTML = `
@@ -5598,7 +5935,8 @@ window.editAttendance = function(id) {
     
     const subjectSelect = document.getElementById('editAttendanceSubject');
     subjectSelect.innerHTML = '';
-    AppState.subjects.forEach(subj => {
+    const allowedSubjects = AppState.subjects.filter(s => s && !isCsebSubject(s));
+    allowedSubjects.forEach(subj => {
         const opt = document.createElement('option');
         opt.value = subj.id;
         opt.textContent = subj.name;
@@ -6167,7 +6505,7 @@ function addCustomTopicToSyllabus(subjId, topicName) {
     const subj = AppState.subjects.find(s => s.id === subjId);
     if (!subj) return;
     
-    const currentViewCourse = subj.course || 'CSEB';
+    const currentViewCourse = subj.course || 'ACCA';
     const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
     
     if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
@@ -6198,7 +6536,7 @@ function addCustomTopicToSyllabus(subjId, topicName) {
 function populateScheduleSubjects(course) {
     const select = document.getElementById('scheduleSubjectInput');
     select.innerHTML = '';
-    const filtered = AppState.subjects.filter(s => s.course === course || (!s.course && course === 'CSEB'));
+    const filtered = AppState.subjects.filter(s => s && !isCsebSubject(s));
     filtered.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.id;
@@ -6261,7 +6599,7 @@ function populateScheduleTopics(subjId) {
     if (!subj) return;
 
     let syllabusTopics = null;
-    const currentViewCourse = subj.course || 'CSEB';
+    const currentViewCourse = subj.course || 'ACCA';
     const cleanName = subj.name.replace(/\(cseb\)|\(acca\)/gi, '').trim().toLowerCase();
 
     if (currentViewCourse === 'CSEB' && AppState.csebSyllabus) {
@@ -6320,8 +6658,8 @@ window.openScheduleModal = function(id = null) {
         document.getElementById('scheduleModalTitle').textContent = 'Edit Schedule Plan';
         document.getElementById('scheduleIdInput').value = item.id;
         document.getElementById('scheduleTypeInput').value = item.type;
-        document.getElementById('scheduleCourseInput').value = item.course || 'CSEB';
-        populateScheduleSubjects(item.course || 'CSEB');
+        document.getElementById('scheduleCourseInput').value = item.course || 'ACCA';
+        populateScheduleSubjects(item.course || 'ACCA');
         if (item.subjectId) {
             document.getElementById('scheduleSubjectInput').value = item.subjectId;
             populateScheduleTopics(item.subjectId);
@@ -6359,7 +6697,7 @@ window.openScheduleModal = function(id = null) {
         const erReg = document.getElementById('scheduleExamRegNo');
         const erDate = document.getElementById('scheduleExamDate');
         const erNotes = document.getElementById('scheduleExamNotes');
-        if (erCourse) erCourse.value = item.course || 'CSEB';
+        if (erCourse) erCourse.value = item.course || 'ACCA';
         if (erTitle) erTitle.value = item.title || '';
         if (erNotif) erNotif.value = item.notifNo || '';
         if (erReg) erReg.value = item.regNo || '';
@@ -6369,8 +6707,8 @@ window.openScheduleModal = function(id = null) {
         document.getElementById('scheduleModalTitle').textContent = 'Add Schedule Plan';
         document.getElementById('scheduleIdInput').value = '';
         document.getElementById('scheduleTypeInput').value = 'study';
-        document.getElementById('scheduleCourseInput').value = 'CSEB';
-        populateScheduleSubjects('CSEB');
+        document.getElementById('scheduleCourseInput').value = 'ACCA';
+        populateScheduleSubjects('ACCA');
         document.getElementById('scheduleTitleInput').value = '';
         const today = TimeUtils.getDateKey(new Date());
         document.getElementById('scheduleDateInput').value = today;
@@ -6577,8 +6915,8 @@ window.completeScheduleItem = function(id) {
     document.getElementById('logEndTimeInput').value = item.endTime || '01:00';
     
     const courseInput = document.getElementById('logCourseInput');
-    courseInput.value = item.course || 'CSEB';
-    populateLogSubjects(item.course || 'CSEB');
+    courseInput.value = item.course || 'ACCA';
+    populateLogSubjects(item.course || 'ACCA');
     document.getElementById('logSubjectInput').value = item.subjectId;
     populateLogTopics(item.subjectId);
     
@@ -6608,7 +6946,7 @@ function renderScheduleList() {
     
     const todayStr = TimeUtils.getDateKey(new Date());
     
-    let filtered = AppState.schedule.filter(s => {
+    let filtered = AppState.schedule.filter(s => { if (s.course === 'CSEB') return false;
         if (currentScheduleTab === 'today') return s.date === todayStr;
         if (currentScheduleTab === 'upcoming') return s.date > todayStr;
         if (currentScheduleTab === 'past') return s.date < todayStr;
@@ -6745,7 +7083,7 @@ function renderOverviewScheduleWidget() {
     if (!container) return;
     
     const todayStr = TimeUtils.getDateKey(new Date());
-    let todayItems = AppState.schedule.filter(s => s.date === todayStr && s.status !== 'missed');
+    let todayItems = AppState.schedule.filter(s => s.date === todayStr && s.status !== 'missed' && s.course !== 'CSEB');
     
     if (todayItems.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding:15px; color:var(--text-muted); font-size:0.9rem;">No plans scheduled for today.</div>`;
@@ -6794,7 +7132,7 @@ function renderOverviewScheduleWidget() {
         } else {
             const subj = getSubjectById(item.subjectId);
             const subjName = subj ? subj.name : 'Unknown Subject';
-            const courseStr = subj ? (subj.course || 'CSEB') : '';
+            const courseStr = subj ? (subj.course || 'ACCA') : '';
             const displayTitle = [subjName, item.topic, item.title].filter(Boolean).join(' - ');
             
             html += `

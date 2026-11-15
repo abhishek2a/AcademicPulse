@@ -13,13 +13,15 @@ const app = firebase.initializeApp(firebaseConfig);
 
 // Initialize Firebase App Check with reCAPTCHA Enterprise
 try {
-    const appCheck = firebase.appCheck();
-    appCheck.activate(
-        new firebase.appCheck.ReCaptchaEnterpriseProvider('6LdSBBMtAAAAAAyOgUbNa37n9vUyU7WX6fMKYHC7'),
-        true // isTokenAutoRefreshEnabled
-    );
+    if (typeof firebase !== 'undefined' && typeof firebase.appCheck === 'function') {
+        const appCheck = firebase.appCheck();
+        appCheck.activate(
+            new firebase.appCheck.ReCaptchaEnterpriseProvider('6LdSBBMtAAAAAAyOgUbNa37n9vUyU7WX6fMKYHC7'),
+            true // isTokenAutoRefreshEnabled
+        );
+    }
 } catch (e) {
-    console.warn("App Check failed to initialize (expected if running locally):", e);
+    // Silent fallback when running locally or if App Check is unavailable
 }
 
 const auth = firebase.auth();

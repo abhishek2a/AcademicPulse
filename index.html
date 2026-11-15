@@ -15,7 +15,7 @@
         }
     </script>
     <link rel="icon" href="icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css?v=23">
+    <link rel="stylesheet" href="style.css?v=25">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Firebase Scripts -->
@@ -544,8 +544,6 @@
                     </tbody>
                 </table>
             </div>
-                </div>
-            </div>
 
             <!-- Export Section -->
             <div class="export-section" style="margin-bottom: 25px; margin-top: 40px;">
@@ -728,7 +726,7 @@
             <div id="workoutBankTab">
                 <!-- Filters + Add -->
                 <div style="background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:16px; padding:15px; margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-                    <div style="flex:1; min-width:120px;" class="form-group" style="margin-bottom:0;">
+                    <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
                         <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Course</label>
                         <select id="wbCourseFilter" class="form-control" onchange="renderWorkoutBank()">
                             <option value="ALL">All Courses</option>
@@ -736,19 +734,19 @@
                             <option value="ACCA">ACCA</option>
                         </select>
                     </div>
-                    <div style="flex:1; min-width:140px;" class="form-group" style="margin-bottom:0;">
+                    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
                         <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Subject</label>
                         <select id="wbSubjectFilter" class="form-control" onchange="renderWorkoutBank()">
                             <option value="ALL">All Subjects</option>
                         </select>
                     </div>
-                    <div style="flex:1; min-width:140px;" class="form-group" style="margin-bottom:0;">
+                    <div class="form-group" style="flex:1; min-width:140px; margin-bottom:0;">
                         <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Subtopic</label>
                         <select id="wbSubtopicFilter" class="form-control" onchange="renderWorkoutBank()">
                             <option value="ALL">All Subtopics</option>
                         </select>
                     </div>
-                    <div style="flex:1; min-width:120px;" class="form-group" style="margin-bottom:0;">
+                    <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
                         <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Source</label>
                         <select id="wbSourceFilter" class="form-control" onchange="renderWorkoutBank()">
                             <option value="ALL">All Sources</option>
@@ -759,7 +757,7 @@
                             <option value="Mixed">Mixed Sources</option>
                         </select>
                     </div>
-                    <div style="flex:1; min-width:120px;" class="form-group" style="margin-bottom:0;">
+                    <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
                         <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Sort By</label>
                         <select id="wbSortFilter" class="form-control" onchange="renderWorkoutBank()">
                             <option value="TOPIC" selected>By Topic</option>
@@ -767,7 +765,7 @@
                             <option value="DATE_ASC">Oldest First</option>
                         </select>
                     </div>
-                    <div style="flex:1; min-width:120px;" class="form-group" style="margin-bottom:0;">
+                    <div class="form-group" style="flex:1; min-width:120px; margin-bottom:0;">
                         <label style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; display:block;">Section</label>
                         <select id="wbSectionFilter" class="form-control" onchange="renderWorkoutBank()">
                             <option value="ALL">All Sections</option>
@@ -797,31 +795,40 @@
             </div>
             
 
-            <div class="session-setup" style="margin: 0 auto; margin-bottom: 20px; max-width: 500px; text-align: center;">
-                <div class="timer-modes" style="justify-content: center; margin-bottom: 25px; flex-wrap: wrap;">
+            <div class="session-setup" style="margin: 0 auto; margin-bottom: 20px; max-width: 520px; text-align: center;">
+                <div class="timer-modes" style="justify-content: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px;">
                     <button class="mode-btn active" id="modePomodoroBtn">Pomodoro</button>
+                    <button class="mode-btn" id="modeStopwatchBtn">♾️ No Limit Timer</button>
                     <button class="mode-btn" id="modeShortBreakBtn">Short Break</button>
                     <button class="mode-btn" id="modeLongBreakBtn">Long Break</button>
-                    <button class="mode-btn" id="modeStopwatchBtn">Stopwatch</button>
+                </div>
+
+                <div id="noLimitInfoBanner" style="display: none; margin-bottom: 20px; padding: 12px 16px; background: rgba(10, 132, 255, 0.1); border: 1px solid rgba(10, 132, 255, 0.3); border-radius: 12px; font-size: 0.88rem; color: #a5d8ff; line-height: 1.5;">
+                    <span style="font-weight: 700; color: #fff;">♾️ Timer Without Limit:</span> Counts up continuously with no upper cap. Study for as many hours as you need, then click <b>Finish & Record</b> anytime to record your exact hours.
                 </div>
                 
                 <div id="pomodoroConfigContainer" style="margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.1); border-radius: 12px; border: 1px solid var(--glass-border); display: inline-block;">
                     <label style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; display: block;">Study Duration (Minutes)</label>
-                    <input type="number" id="focusDurationInput" value="25" min="1" max="120" style="width: 80px; text-align: center; font-size: 1.2rem; padding: 8px; border-radius: 8px; background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-main);">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                        <input type="number" id="focusDurationInput" value="25" min="1" max="720" style="width: 80px; text-align: center; font-size: 1.2rem; padding: 8px; border-radius: 8px; background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-main);">
+                        <button type="button" class="btn btn-outline" id="switchToNoLimitBtn" style="font-size: 0.8rem; padding: 8px 12px; border-color: rgba(255,255,255,0.2);">♾️ Switch to No Limit</button>
+                    </div>
                 </div>
 
                 <div class="timer-container" style="min-height: auto;">
-                    <div class="timer-display" id="focusTimerDisplay" style="margin: 10px 0 30px 0;">25:00</div>
-                    <div class="timer-controls" style="justify-content: center; margin-bottom: 20px;">
-                        <button class="timer-btn btn-start" id="focusStartBtn">▶</button>
-                        <button class="timer-btn btn-pause" id="focusPauseBtn" style="display: none;">⏸</button>
-                        <button class="timer-btn btn-stop" id="focusResetBtn">⏹</button>
+                    <div class="timer-display" id="focusTimerDisplay" style="margin: 10px 0 8px 0;">25:00</div>
+                    <div id="focusTimerSubtext" style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 25px;">Pomodoro Focus Session</div>
+                    <div class="timer-controls" style="justify-content: center; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <button class="timer-btn btn-start" id="focusStartBtn" title="Start Timer">▶</button>
+                        <button class="timer-btn btn-pause" id="focusPauseBtn" style="display: none;" title="Pause Timer">⏸</button>
+                        <button class="timer-btn btn-stop" id="focusResetBtn" title="Reset Timer">⏹</button>
+                        <button class="btn hover-lift" id="focusFinishLogBtn" style="display: none; background: var(--neon-green); color: #000; font-weight: 700; padding: 12px 24px; border-radius: 14px; font-size: 0.95rem; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(48,209,88,0.3);">🏁 Finish & Record</button>
                     </div>
                 </div>
 
                 <div id="focusLogContainer" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
-                    <div style="margin-bottom: 15px; font-weight: 600; color: var(--neon-gold);" id="focusLogMsg">Session Complete!</div>
-                    <button class="btn hover-lift" id="focusLogSessionBtn" style="background: var(--neon-blue); color: #000; width: 100%;">Log this Session</button>
+                    <div style="margin-bottom: 15px; font-weight: 700; color: var(--neon-gold); font-size: 1.05rem;" id="focusLogMsg">Session Complete!</div>
+                    <button class="btn hover-lift" id="focusLogSessionBtn" style="background: var(--neon-blue); color: #000; width: 100%; font-weight: 700; padding: 14px; font-size: 1rem; border-radius: 12px;">Log this Session to Records</button>
                 </div>
             </div>
         </section>
@@ -972,7 +979,10 @@
                 <div style="font-size:3rem; margin-bottom:16px;">✅</div>
                 <h2 style="margin:0 0 8px; font-size:1.4rem;">You're up to date</h2>
                 <p style="color:var(--text-muted); margin-bottom:28px; font-size:0.95rem;">Running <strong id="currentVersionLabel" style="color:var(--neon-blue);">...</strong></p>
-                <button id="checkForUpdatesBtn" onclick="checkForUpdates(this)" style="background:var(--neon-blue); color:#000; font-weight:700; border:none; border-radius:30px; padding:14px 36px; font-size:1rem; cursor:pointer; box-shadow:0 8px 20px rgba(10,132,255,0.3);">🔍 Check for Updates</button>
+                <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+                    <button id="checkForUpdatesBtn" onclick="checkForUpdates(this)" style="background:var(--neon-blue); color:#000; font-weight:700; border:none; border-radius:30px; padding:14px 30px; font-size:0.95rem; cursor:pointer; box-shadow:0 8px 20px rgba(10,132,255,0.3);">&#128269; Check for Updates</button>
+                    <button type="button" onclick="showWhatsNewPopup()" class="btn btn-outline" style="border-radius:30px; padding:14px 26px; font-size:0.95rem; border-color:rgba(255,255,255,0.2); color:var(--text-main);">&#128214; View Release Notes</button>
+                </div>
             </div>
 
             <!-- Update available state: shown when an update is found -->
@@ -1764,8 +1774,8 @@
         </div>
     </div>
     
-    <script src="auth.js?v=14"></script>
-    <script src="app.js?v=118"></script>
+    <script src="auth.js?v=15"></script>
+    <script src="app.js?v=122"></script>
     <script src="export.js?v=13"></script>
 </body>
 </html>

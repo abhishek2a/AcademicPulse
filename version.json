@@ -1,12 +1,14 @@
 {
-  "version": "v1.0.97",
-  "build": "2026.11.09-stable",
-  "title": "v1.0.97 — Streamlined AI Recommendations Exclusive to Analytics",
-  "description": "AcademicPulse v1.0.97 streamlines the interface by keeping the AI Study Recommendation engine exclusively in the Analytics view, decluttering the main Dashboard overview while providing rich standard-wise diagnostic insights in Analytics.",
+  "version": "v1.1.00",
+  "build": "2026.11.15-stable",
+  "title": "v1.1.00 — Focus Timer Without Limit, Timezone-Safe Streaks & UI Polish",
+  "description": "AcademicPulse v1.1.00 introduces open-ended study in Focus Mode with live hour tracking and 1-click recording, timezone-safe streak calculations for IST, mobile touch optimizations, and analytics-exclusive AI guidance.",
   "features": [
-    "<div style='margin-bottom:8px'><b>🎯 Analytics-Exclusive AI Recommendation Engine</b></div>AI recommendations now live exclusively in the Analytics view, analyzing all 27 accounting standards and providing diagnostic prescriptions, accuracy pills, and instant action shortcuts.",
-    "<div style='margin-bottom:8px'><b>✨ Clean Dashboard Overview</b></div>Removed recommendation widget from the main Dashboard page to preserve focus on core streaks, study time, and today's schedule.",
-    "<div style='margin-bottom:8px'><b>🚀 Independent Analytics Execution</b></div>AI recommendation cards now render instantly within Analytics without waiting for Chart.js canvas elements to load.",
-    "<div style='margin-bottom:8px'><b>🔄 Cache & PWA Synchronization</b></div>Updated service worker cache and asset query strings (style.css?v=23, app.js?v=118) to ensure smooth update rollouts."
+    "<div style='margin-bottom:8px'><b>♾️ Focus Timer Without Limit (Open Study Mode)</b></div>Study without duration ceilings! The new open-ended count-up timer in Focus Mode lets you study for any number of hours, formatted dynamically in HH:MM:SS with real-time accumulated hours tracking.",
+    "<div style='margin-bottom:8px'><b>🏁 1-Click Finish & Record Action</b></div>Added a prominent 'Finish & Record' button that immediately pauses your open timer session and pre-fills your exact hours and minutes into your permanent study logs.",
+    "<div style='margin-bottom:8px'><b>🛡️ Anti-Loss Timer Protection</b></div>Stopping or resetting an open study session now preserves your accumulated study time and automatically prompts you to log it, preventing any accidental loss of study hours.",
+    "<div style='margin-bottom:8px'><b>🔥 Timezone-Safe Streak Tracking (IST / UTC+)</b></div>Study streaks and attendance streaks now calculate using local calendar dates rather than UTC midnight, completely eliminating off-by-one streak breaks for users in UTC+ time zones.",
+    "<div style='margin-bottom:8px'><b>⚡ Mobile & UI Optimization</b></div>Enhanced touch manipulation across mobile screens, restored smooth scrolling on heatmaps and tables, integrated safe-area insets for notched phones, and improved light theme text contrast.",
+    "<div style='margin-bottom:8px'><b>🤖 Standard & Topic AI Guidance in Analytics</b></div>Integrated syllabus-standard and topic-wise AI study guidance exclusively in the Analytics view, accompanied by course hub isolation and clean chart destruction lifecycles."
   ]
 }
